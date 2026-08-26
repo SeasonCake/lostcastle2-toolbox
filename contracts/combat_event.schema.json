@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/SeasonCake/lostcastle2-toolbox/main/contracts/combat_event.schema.json",
+  "title": "Lost Castle 2 Combat Bridge Event v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "session_id",
+    "sequence",
+    "monotonic_ms",
+    "room_id",
+    "aggregate",
+    "hook_path"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "event_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "event_type": {
+      "enum": [
+        "damage_resolution",
+        "resource_change",
+        "effect_stack",
+        "trigger",
+        "room_checkpoint",
+        "status"
+      ]
+    },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "monotonic_ms": { "type": "integer", "minimum": 0 },
+    "room_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+    "aggregate": {
+      "type": "boolean",
+      "description": "Bridge 已裁决该事件是否进入总量；UI/聚合器不得从 depth 自行猜测。"
+    },
+    "hook_path": { "type": "string", "minLength": 1, "maxLength": 256 },
+
+    "player_id": { "type": ["string", "null"], "maxLength": 128 },
+    "actor_entity_id": { "type": ["string", "null"], "maxLength": 128 },
+    "owner_player_id": { "type": ["string", "null"], "maxLength": 128 },
+    "source_entity_id": { "type": ["string", "null"], "maxLength": 128 },
+    "source_token": { "type": ["string", "null"], "maxLength": 256 },
+    "parent_operation_id": { "type": ["integer", "null"], "minimum": 0 },
+    "nesting_depth": { "type": ["integer", "null"], "minimum": 0 },
+    "trigger_event_id": { "type": ["string", "null"], "maxLength": 160 },
+    "trigger_kind": {
+      "enum": [
+        "hit_dealt",
+        "hit_received",
+        "kill",
+        "summon_kill",
+        "skill_use",
+        "region_enter",
+        "periodic",
+        "manual_use",
+        "unknown",
+        null
+      ]
+    },
+
+    "damage_direction": { "enum": ["dealt", "taken", "environment", null] },
+    "hit_id": { "type": ["integer", "null"], "minimum": 0 },
+    "target_id": { "type": ["string", "null"], "maxLength": 128 },
+    "target_kind": { "enum": ["normal", "elite", "boss", "player", "unknown", null] },
+    "pre_mitigation_damage": { "type": ["number", "null"], "minimum": 0 },
+    "post_mitigation_damage": { "type": ["number", "null"], "minimum": 0 },
+    "applied_hp_damage": { "type": ["number", "null"], "minimum": 0 },
+    "settlement_damage": { "type": ["integer", "null"], "minimum": 0 },
+    "mitigated_damage": { "type": ["number", "null"], "minimum": 0 },
+    "overkill_damage": { "type": ["number", "null"], "minimum": 0 },
+    "damage_outcome": {
+      "enum": ["applied", "absorbed", "blocked", "dodged", "immune", "missed", "unknown", null]
+    },
+    "critical": { "type": ["boolean", "null"] },
+    "lethal": { "type": ["boolean", "null"] },
+    "is_boss": { "type": ["boolean", "null"] },
+    "damage_attributes": {
+      "type": ["array", "null"],
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "maxItems": 8,
+      "uniqueItems": true
+    },
+    "attack_tags": {
+      "type": ["array", "null"],
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+
+    "resource": { "enum": ["hp", "mp", "temporary_hp", "unknown", null] },
+    "resource_operation": { "enum": ["gain", "spend", "set", "attempt", "unknown", null] },
+    "requested_delta": { "type": ["number", "null"] },
+    "effective_delta": { "type": ["number", "null"] },
+    "value_before": { "type": ["number", "null"], "minimum": 0 },
+    "value_after": { "type": ["number", "null"], "minimum": 0 },
+    "max_before": { "type": ["number", "null"], "minimum": 0 },
+    "max_after": { "type": ["number", "null"], "minimum": 0 },
+    "blocked": { "type": ["boolean", "null"] },
+    "overflow": { "type": ["number", "null"], "minimum": 0 },
+
+    "effect_token": { "type": ["string", "null"], "maxLength": 256 },
+    "effect_kind": {
+      "enum": ["shield_charge", "barrier", "curse", "buff", "debuff", "temporary_hp", "unknown", null]
+    },
+    "stacks_before": { "type": ["number", "null"], "minimum": 0 },
+    "stacks_after": { "type": ["number", "null"], "minimum": 0 },
+    "stack_delta": { "type": ["number", "null"] },
+
+    "status": {
+      "enum": [
+        "connecting",
+        "live",
+        "disconnected",
+        "stale",
+        "session_started",
+        "session_ended",
+        "room_started",
+        "room_ended",
+        "error",
+        null
+      ]
+    },
+    "detail": { "type": ["string", "null"], "maxLength": 512 },
+    "checkpoint_totals": {
+      "type": ["object", "null"],
+      "additionalProperties": { "type": "number", "minimum": 0 }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event_type": { "const": "damage_resolution" } } },
+      "then": {
+        "required": [
+          "damage_direction",
+          "hit_id",
+          "target_id",
+          "pre_mitigation_damage",
+          "post_mitigation_damage",
+          "applied_hp_damage",
+          "settlement_damage",
+          "mitigated_damage",
+          "overkill_damage",
+          "damage_outcome",
+          "is_boss"
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "resource_change" } } },
+      "then": {
+        "required": [
+          "resource",
+          "resource_operation",
+          "requested_delta",
+          "effective_delta",
+          "value_before",
+          "value_after",
+          "max_before",
+          "max_after",
+          "blocked",
+          "overflow"
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "effect_stack" } } },
+      "then": {
+        "required": ["effect_token", "effect_kind", "stacks_before", "stacks_after", "stack_delta"]
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "trigger" } } },
+      "then": { "required": ["trigger_kind"] }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "room_checkpoint" } } },
+      "then": { "required": ["checkpoint_totals"] }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "status" } } },
+      "then": { "required": ["status"] }
+    }
+  ]
+}

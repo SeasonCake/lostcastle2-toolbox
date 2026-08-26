@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/SeasonCake/lostcastle2-toolbox/main/contracts/damage_event.schema.json",
+  "title": "Lost Castle 2 Damage Bridge Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_type",
+    "session_id",
+    "sequence",
+    "monotonic_ms",
+    "room_id",
+    "hook_path"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "event_type": {
+      "enum": ["damage", "room_checkpoint", "room_started", "session_ended"]
+    },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "monotonic_ms": { "type": "integer", "minimum": 0 },
+    "room_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "attacker_network_id": { "type": ["string", "null"], "maxLength": 128 },
+    "owner_player_id": { "type": ["string", "null"], "maxLength": 128 },
+    "source_entity_id": { "type": ["string", "null"], "maxLength": 128 },
+    "parent_hit_id": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "DamageProcess 嵌套调用的父 hit ID；顶层命中为空。"
+    },
+    "nesting_depth": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "DamageProcess 调用深度；0 为可直接累计的顶层区间。"
+    },
+    "source_id": { "type": ["string", "null"], "maxLength": 256 },
+    "target_id": { "type": ["string", "null"], "maxLength": 128 },
+    "target_kind": { "enum": ["normal", "elite", "boss", "player", "unknown", null] },
+    "damage_kind": {
+      "enum": ["direct", "critical", "dot", "summon", "environment", "unknown", null]
+    },
+    "raw_damage": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "游戏伤害结构报告的命中值；可能包含过量部分。"
+    },
+    "applied_damage": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "同一 hit 的 max(0, target_hp_before - target_hp_after)。"
+    },
+    "settlement_damage": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "与结算造成伤害口径一致的逐 hit ceil(applied_damage)。"
+    },
+    "overkill_damage": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "max(0, raw_damage - applied_damage)。"
+    },
+    "target_hp_before": { "type": ["number", "null"], "minimum": 0 },
+    "target_hp_after": { "type": ["number", "null"], "minimum": 0 },
+    "target_hp_max": { "type": ["number", "null"], "minimum": 0 },
+    "is_boss": { "type": ["boolean", "null"] },
+    "checkpoint_totals": {
+      "type": ["object", "null"],
+      "additionalProperties": { "type": "number", "minimum": 0 }
+    },
+    "hook_path": { "type": "string", "minLength": 1, "maxLength": 256 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event_type": { "const": "damage" } } },
+      "then": {
+        "required": ["target_id", "applied_damage", "is_boss"]
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "room_checkpoint" } } },
+      "then": { "required": ["checkpoint_totals"] }
+    }
+  ]
+}

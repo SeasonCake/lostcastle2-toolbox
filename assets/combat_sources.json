@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "entries": {
+    "ExhaustProps#Banana_0": {
+      "label": "香蕉",
+      "category": "consumable.heal",
+      "resource": "hp",
+      "effect_kind": "none"
+    },
+    "EatFood": {
+      "label": "进食恢复",
+      "category": "consumable.food",
+      "resource": "hp",
+      "effect_kind": "none",
+      "notes": "炼金灵药样本中的逐 tick 恢复也走此来源；不将名称硬编码为单一道具。"
+    },
+    "full_food_energy_or_recover_hp": {
+      "label": "饱食或进食恢复入口",
+      "category": "system.food",
+      "resource": "hp",
+      "effect_kind": "none"
+    },
+    "Gem#A_015_2": {
+      "label": "自愈",
+      "category": "passive.periodic_threshold",
+      "resource": "hp",
+      "effect_kind": "buff"
+    },
+    "Battle#Battle_ClearStageStatus_1": {
+      "label": "清场恢复",
+      "category": "system.stage",
+      "resource": "hp",
+      "effect_kind": "none"
+    },
+    "P4-019": {
+      "label": "护盾充能器",
+      "category": "defensive.shield_charge",
+      "resource": "none",
+      "effect_kind": "shield_charge"
+    }
+  }
+}

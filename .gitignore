@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local configuration and secrets
+config/
+.env
+.env.*
+!.env.example
+
+# Build and release output
+build/
+dist/
+package/
+release_history/
+*.zip
+*.log
+
+# .NET / IDE output
+.vs/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.pdb
+*.dll
+
+# Local QA captures. Keep only the small written evidence summaries.
+artifacts/**
+!artifacts/**/
+!artifacts/**/README.zh-CN.md
+
+# Editor / operating system
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

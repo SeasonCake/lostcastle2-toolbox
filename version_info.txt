@@ -1,0 +1,26 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 4, 1, 0),
+    prodvers=(1, 4, 1, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        '080404B0',
+        [StringStruct('CompanyName', 'Personal Tool'),
+         StringStruct('FileDescription', '失落城堡2按键显示器'),
+         StringStruct('FileVersion', '1.4.1'),
+         StringStruct('InternalName', 'LostCastle2KeyView'),
+         StringStruct('OriginalFilename', '失落城堡2按键显示器.exe'),
+         StringStruct('ProductName', '失落城堡2按键显示器'),
+         StringStruct('ProductVersion', '1.4.1')])
+    ]),
+    VarFileInfo([VarStruct('Translation', [2052, 1200])])
+  ]
+)

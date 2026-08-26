@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/SeasonCake/lostcastle2-toolbox/main/contracts/combat_source_registry.schema.json",
+  "title": "Lost Castle 2 Combat Source Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entries"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "entries": {
+      "type": "object",
+      "propertyNames": { "minLength": 1, "maxLength": 256 },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "category"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 96 },
+          "category": { "type": "string", "pattern": "^[a-z0-9_.-]+$", "maxLength": 96 },
+          "resource": { "enum": ["hp", "mp", "temporary_hp", "none", "unknown"] },
+          "effect_kind": {
+            "enum": ["shield_charge", "barrier", "curse", "buff", "debuff", "temporary_hp", "none", "unknown"]
+          },
+          "notes": { "type": "string", "maxLength": 512 }
+        }
+      }
+    }
+  }
+}
