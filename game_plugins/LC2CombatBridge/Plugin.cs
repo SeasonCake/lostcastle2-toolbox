@@ -17,7 +17,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.2.0";
+    public const string PluginVersion = "0.3.0";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
@@ -83,6 +83,7 @@ public sealed class Plugin : BasePlugin
     internal static void BeginRound()
     {
         Bridge?.BeginGameSession();
+        PublishCurrentRoom();
     }
 
     internal static void EndRound()
@@ -92,13 +93,16 @@ public sealed class Plugin : BasePlugin
 
     internal static void BeginRoom()
     {
+        PublishCurrentRoom();
+    }
+
+    private static void PublishCurrentRoom()
+    {
         var room = CaptureRoomLocation();
-        if (room is null)
+        if (room is not null)
         {
-            Bridge?.FailSession("location_unavailable");
-            return;
+            Bridge?.PublishRoomStarted(room);
         }
-        Bridge?.PublishRoomStarted(room);
     }
 
     internal static void EndRoom(SettlementDataMgr settlement)
@@ -419,7 +423,7 @@ public sealed class Plugin : BasePlugin
                 : 0.0;
             Bridge?.Emit(
                 "resource_change",
-                aggregate: state.Depth == 0,
+                aggregate: state.Depth == 0 && effective > 0.0001,
                 "runtime.creature_mp_change",
                 new Dictionary<string, object>
                 {
@@ -454,6 +458,50 @@ public sealed class Plugin : BasePlugin
             {
                 stack.Pop();
             }
+        }
+    }
+
+    internal static void EmitOfficialManaSpend(CreatureEvent.OnUseMana arg)
+    {
+        try
+        {
+            var entity = EntityMgr.Instance?.GetEntity(arg.creatureID);
+            var creature = TryCreature(entity);
+            if (!IsPlayerRootCreature(creature))
+            {
+                return;
+            }
+            var spent = Positive(arg.useMana);
+            if (spent <= 0.0001)
+            {
+                return;
+            }
+            Bridge?.Emit(
+                "resource_change",
+                aggregate: true,
+                "settlement.official_mana_spend",
+                new Dictionary<string, object>
+                {
+                    ["resource"] = "mp",
+                    ["resource_operation"] = "spend",
+                    ["requested_delta"] = -spent,
+                    ["effective_delta"] = -spent,
+                    ["value_before"] = null,
+                    ["value_after"] = null,
+                    ["max_before"] = null,
+                    ["max_after"] = null,
+                    ["blocked"] = false,
+                    ["overflow"] = 0.0,
+                    ["source_token"] = "resource.skill_cost",
+                    ["actor_entity_id"] = EntityToken(creature),
+                    ["trigger_kind"] = "skill_use",
+                    ["parent_operation_id"] = null,
+                    ["nesting_depth"] = 0,
+                });
+        }
+        catch
+        {
+            Bridge?.FailSession("mp_spend_conversion_failed");
         }
     }
 
@@ -710,6 +758,20 @@ internal static class PlayerMpChangePatch
         Plugin.EndPlayerMpObservation(deltaValue, __state);
 }
 
+[HarmonyPatch(typeof(CreatureRuntimeData), nameof(CreatureRuntimeData.UpdateMp))]
+internal static class PlayerMpRecoveryPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(
+        CreatureRuntimeData __instance,
+        out Plugin.PlayerMpChangeState __state) =>
+        __state = Plugin.BeginPlayerMpObservation(__instance);
+
+    [HarmonyPostfix]
+    private static void Postfix(Plugin.PlayerMpChangeState __state) =>
+        Plugin.EndPlayerMpObservation(0f, __state);
+}
+
 [HarmonyPatch(typeof(HeroRuntimeData), nameof(HeroRuntimeData.ChangeCurrentHp))]
 internal static class PlayerHeroHpChangePatch
 {
@@ -777,7 +839,7 @@ internal static class OfficialDefenderDamagePatch
         Plugin.EmitDamage("taken", arg.GetDisposeHitInfo(), "settlement.official_defender");
 }
 
-[HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.OnGameRoundStart))]
+[HarmonyPatch(typeof(StageMgr), nameof(StageMgr.OnGameRoundStart))]
 internal static class RoundStartPatch
 {
     [HarmonyPostfix]
@@ -791,11 +853,19 @@ internal static class RoundEndPatch
     private static void Postfix() => Plugin.EndRound();
 }
 
-[HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.RoomBattleData_RoomStart))]
+[HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.OnChangeRoomStart))]
 internal static class RoomStartPatch
 {
     [HarmonyPostfix]
     private static void Postfix() => Plugin.BeginRoom();
+}
+
+[HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.OnUseMana))]
+internal static class OfficialManaSpendPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(CreatureEvent.OnUseMana arg) =>
+        Plugin.EmitOfficialManaSpend(arg);
 }
 
 [HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.RoomBattleData_RoomEnd))]

@@ -180,6 +180,60 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.source_breakdown["P4-019"]["label"], "护盾充能器")
         self.assertEqual(snapshot.source_breakdown["P4-019"]["effect_event_count"], 1)
 
+    def test_official_mana_spend_wins_over_low_level_net_delta_and_new_round_resets(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "resource_change",
+                1,
+                aggregate=False,
+                resource="mp",
+                effective_delta=-12,
+                blocked=False,
+                overflow=0,
+                source_token="resource.skill_cost",
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "resource_change",
+                2,
+                resource="mp",
+                effective_delta=-24,
+                blocked=False,
+                overflow=0,
+                source_token="resource.skill_cost",
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "resource_change",
+                3,
+                resource="mp",
+                effective_delta=24,
+                blocked=False,
+                overflow=0,
+                source_token="resource.mana_recovery",
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.mp_spent, 24)
+        self.assertEqual(snapshot.mp_gained, 24)
+
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                0,
+                event_id="session-b:0",
+                session_id="session-b",
+                monotonic_ms=0,
+                status="session_started",
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.mp_spent, 0)
+        self.assertEqual(snapshot.mp_gained, 0)
+
     def test_trigger_sources_do_not_need_aggregator_code_changes(self) -> None:
         self.aggregator.ingest(
             common_event(

@@ -107,6 +107,30 @@ class CombatTransportContractTests(unittest.TestCase):
     def test_schema_validator_accepts_minimal_status_event(self) -> None:
         self.validator.validate(status_event())
 
+    def test_schema_accepts_official_mana_spend_without_snapshot_values(self) -> None:
+        event = status_event(
+            1,
+            event_type="resource_change",
+            aggregate=True,
+            hook_path="settlement.official_mana_spend",
+            resource="mp",
+            resource_operation="spend",
+            requested_delta=-24,
+            effective_delta=-24,
+            value_before=None,
+            value_after=None,
+            max_before=None,
+            max_after=None,
+            blocked=False,
+            overflow=0,
+            source_token="resource.skill_cost",
+            trigger_kind="skill_use",
+            parent_operation_id=None,
+            nesting_depth=0,
+        )
+        event.pop("status")
+        self.validator.validate(event)
+
     def test_schema_error_reports_only_path_and_keyword(self) -> None:
         event = status_event(session_id="private-account-token" * 20)
         with self.assertRaises(CombatSchemaError) as caught:
