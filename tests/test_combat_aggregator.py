@@ -234,6 +234,35 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.mp_spent, 0)
         self.assertEqual(snapshot.mp_gained, 0)
 
+    def test_ended_round_keeps_totals_for_thirty_seconds_then_clears(self) -> None:
+        now = [1_000]
+        self.aggregator.clock_ms = lambda: now[0]
+        self.aggregator.ingest(
+            common_event(
+                "resource_change",
+                1,
+                resource="mp",
+                effective_delta=-24,
+                blocked=False,
+                overflow=0,
+                source_token="resource.skill_cost",
+            )
+        )
+        self.aggregator.ingest(
+            common_event("status", 2, status="session_ended")
+        )
+
+        now[0] += 29_999
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.connection_state, "ended")
+        self.assertEqual(snapshot.mp_spent, 24)
+
+        now[0] += 1
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.connection_state, "ended")
+        self.assertEqual(snapshot.mp_spent, 0)
+        self.assertIsNone(snapshot.current_room_id)
+
     def test_trigger_sources_do_not_need_aggregator_code_changes(self) -> None:
         self.aggregator.ingest(
             common_event(

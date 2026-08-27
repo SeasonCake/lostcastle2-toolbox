@@ -29,7 +29,7 @@ from toolbox.mod_manager import ModCatalog, ModManager
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.2"
+APP_VERSION = "1.5.3"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
     os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
@@ -2578,6 +2578,7 @@ def main(argv: list[str] | None = None) -> int:
         launch_game=keyboard_app.launch_game,
         choose_game_path=keyboard_app.choose_game_path,
         close_command=close_all,
+        app_version=APP_VERSION,
         persist_window_geometry=args.window_size is None,
     )
     if combat_client is not None:

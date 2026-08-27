@@ -1034,6 +1034,7 @@ class ToolboxShell:
         launch_game: Callable[[], None],
         choose_game_path: Callable[[], None],
         close_command: Callable[[], None],
+        app_version: str,
         persist_window_geometry: bool = True,
     ) -> None:
         self.root = root
@@ -1046,6 +1047,7 @@ class ToolboxShell:
         self.launch_game = launch_game
         self.choose_game_path = choose_game_path
         self.close_command = close_command
+        self.app_version = app_version
         self.persist_window_geometry = persist_window_geometry
         self.main_ui_scale = min(1.15, max(0.9, float(keyboard.toolbox_ui_scale)))
         self.hud = CombatHudWindow(
@@ -1182,9 +1184,23 @@ class ToolboxShell:
             fg=TEXT,
             font=("Microsoft YaHei UI", 17, "bold"),
         ).pack(anchor="w")
-        self._button(header, "启动游戏", self.launch_game, accent=True, width=10).pack(
-            side="right"
+        header_actions = tk.Frame(header, bg="#F8F4EB")
+        header_actions.pack(side="right")
+        self._button(
+            header_actions,
+            "启动游戏",
+            self.launch_game,
+            accent=True,
+            width=10,
+        ).pack(side="right")
+        self.labels["app_version"] = tk.Label(
+            header_actions,
+            text=f"v{self.app_version}",
+            bg="#F8F4EB",
+            fg=MUTED,
+            font=("Segoe UI", 8, "bold"),
         )
+        self.labels["app_version"].pack(side="right", padx=(0, 12))
 
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True)
@@ -1357,7 +1373,7 @@ class ToolboxShell:
     ) -> None:
         panel = RoundedPanel(
             parent,
-            height=76,
+            height=None,
             content_padx=12,
             content_pady=10,
         )

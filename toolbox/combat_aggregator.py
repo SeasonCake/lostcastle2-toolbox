@@ -4,13 +4,19 @@ from collections import Counter, defaultdict, deque
 from dataclasses import asdict, dataclass, field
 import json
 from pathlib import Path
-from typing import Any, Mapping
+import time
+from typing import Any, Callable, Mapping
 
 
 SCHEMA_VERSION = 2
 DEFAULT_DPS_WINDOW_MS = 10_000
+DEFAULT_ENDED_RETENTION_MS = 30_000
 VALID_ROOM_INDICES = frozenset((*range(0, 11), 99, 100, 101))
 VALID_TRANSPORT_STATES = frozenset({"connecting", "disconnected", "stale", "error"})
+
+
+def monotonic_milliseconds() -> int:
+    return max(0, round(time.monotonic() * 1_000))
 
 
 class CombatEventError(ValueError):
@@ -232,25 +238,38 @@ class CombatAggregator:
     registry: SourceRegistry = field(default_factory=SourceRegistry)
     scenario_registry: ScenarioRegistry = field(default_factory=ScenarioRegistry)
     dps_window_ms: int = DEFAULT_DPS_WINDOW_MS
+    ended_retention_ms: int = DEFAULT_ENDED_RETENTION_MS
+    clock_ms: Callable[[], int] = field(
+        default=monotonic_milliseconds,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         if self.dps_window_ms <= 0:
             raise ValueError("dps_window_ms must be positive")
+        if self.ended_retention_ms < 0:
+            raise ValueError("ended_retention_ms must not be negative")
         self.reset()
 
     def reset(self, session_id: str | None = None) -> None:
         self.session_id = session_id
         self.connection_state = "disconnected"
+        self.last_sequence: int | None = None
+        self.last_monotonic_ms: int | None = None
+        self._seen_event_ids: set[str] = set()
+        self._seen_sequences: dict[int, str] = {}
+        self._ended_at_clock_ms: int | None = None
+        self._ended_metrics_cleared = False
+        self._clear_session_metrics()
+
+    def _clear_session_metrics(self) -> None:
         self.current_room_id: str | None = None
         self.current_stage_level: int | None = None
         self.current_scenario_id: str | None = None
         self.current_scenario_label: str | None = None
         self.current_room_index: int | None = None
         self.current_map_file_name: str | None = None
-        self.last_sequence: int | None = None
-        self.last_monotonic_ms: int | None = None
-        self._seen_event_ids: set[str] = set()
-        self._seen_sequences: dict[int, str] = {}
         self._recent_damage: deque[tuple[int, int]] = deque()
         self._source_totals: defaultdict[str, SourceTotals] = defaultdict(SourceTotals)
         self._unknown_sources: Counter[str] = Counter()
@@ -337,6 +356,7 @@ class CombatAggregator:
         self.connection_state = state
 
     def snapshot(self, monotonic_ms: int | None = None) -> CombatSnapshot:
+        self._expire_ended_metrics()
         now = self.last_monotonic_ms if monotonic_ms is None else monotonic_ms
         if now is None:
             now = 0
@@ -518,8 +538,12 @@ class CombatAggregator:
         status = str(event.get("status"))
         if status in {"session_started", "live", "room_started", "room_ended"}:
             self.connection_state = "live"
+            self._ended_at_clock_ms = None
+            self._ended_metrics_cleared = False
         elif status == "session_ended":
             self.connection_state = "ended"
+            if self._ended_at_clock_ms is None:
+                self._ended_at_clock_ms = self.clock_ms()
         elif status in {"connecting", "disconnected", "stale", "error"}:
             self.connection_state = status
         if status == "room_started":
@@ -530,6 +554,18 @@ class CombatAggregator:
             scenario = self.scenario_registry.resolve(self.current_scenario_id)
             self.current_scenario_label = scenario.label_zh_cn
             self.current_map_file_name = str(event["map_file_name"])
+
+    def _expire_ended_metrics(self) -> None:
+        if (
+            self.connection_state != "ended"
+            or self._ended_at_clock_ms is None
+            or self._ended_metrics_cleared
+        ):
+            return
+        if self.clock_ms() - self._ended_at_clock_ms < self.ended_retention_ms:
+            return
+        self._clear_session_metrics()
+        self._ended_metrics_cleared = True
 
     def _prune_recent_damage(self, now_ms: int) -> None:
         cutoff = now_ms - self.dps_window_ms
