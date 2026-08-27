@@ -30,6 +30,12 @@ release_history/
 *.pdb
 *.dll
 
+# Third-party binaries require explicit redistribution permission and are not source.
+third_party/**/*.exe
+third_party/**/*.zip
+third_party/**/*.7z
+third_party/**/*.rar
+
 # Local QA captures. Keep only the small written evidence summaries.
 artifacts/**
 !artifacts/**/

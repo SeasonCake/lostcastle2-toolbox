@@ -1,0 +1,253 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import threading
+import time
+import unittest
+import uuid
+
+from toolbox.combat_aggregator import CombatAggregator
+from toolbox.combat_transport import (
+    CombatBridgeClient,
+    CombatEventPump,
+    CombatEventValidator,
+    CombatInbox,
+    CombatLineDecoder,
+    NamedPipeConnector,
+    CombatProtocolError,
+    CombatSchemaError,
+    TransportNotice,
+)
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def status_event(sequence: int = 0, **fields: object) -> dict[str, object]:
+    event: dict[str, object] = {
+        "schema_version": 2,
+        "event_id": f"session-a:{sequence}",
+        "event_type": "status",
+        "session_id": "session-a",
+        "sequence": sequence,
+        "monotonic_ms": sequence * 100,
+        "room_id": None,
+        "aggregate": False,
+        "hook_path": "bridge.lifecycle",
+        "status": "session_started" if sequence == 0 else "live",
+    }
+    event.update(fields)
+    return event
+
+
+class FakeStream:
+    def __init__(self, chunks: list[bytes], read_event: threading.Event | None = None) -> None:
+        self.chunks = list(chunks)
+        self.read_event = read_event
+        self.closed = False
+
+    def read(self, _size: int) -> bytes:
+        if self.chunks:
+            chunk = self.chunks.pop(0)
+            if self.read_event is not None:
+                self.read_event.set()
+            return chunk
+        return b""
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class IdleStream(FakeStream):
+    def read(self, _size: int) -> bytes | None:
+        if self.closed:
+            return b""
+        time.sleep(0.005)
+        return None
+
+
+class CombatLineDecoderTests(unittest.TestCase):
+    def test_partial_and_multiple_lines_are_preserved_in_order(self) -> None:
+        decoder = CombatLineDecoder()
+        self.assertEqual(decoder.feed(b'{"first":'), [])
+        self.assertEqual(
+            decoder.feed(b'1}\n{"second":2}\r\n'),
+            [{"first": 1}, {"second": 2}],
+        )
+        decoder.finish()
+
+    def test_invalid_utf8_json_and_non_object_are_rejected(self) -> None:
+        cases = (
+            (b'\xff\n', "invalid_utf8"),
+            (b'{broken}\n', "invalid_json"),
+            (b'[1,2]\n', "event_not_object"),
+        )
+        for payload, code in cases:
+            with self.subTest(code=code):
+                with self.assertRaisesRegex(CombatProtocolError, code):
+                    CombatLineDecoder().feed(payload)
+
+    def test_overlong_and_unterminated_lines_fail_closed(self) -> None:
+        with self.assertRaisesRegex(CombatProtocolError, "line_too_long"):
+            CombatLineDecoder(max_line_bytes=8).feed(b"123456789")
+        decoder = CombatLineDecoder()
+        decoder.feed(b'{"partial":true}')
+        with self.assertRaisesRegex(CombatProtocolError, "unterminated_line"):
+            decoder.finish()
+
+
+class CombatTransportContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.validator = CombatEventValidator.from_file(
+            PROJECT_ROOT / "contracts" / "combat_event.schema.json"
+        )
+
+    def test_schema_validator_accepts_minimal_status_event(self) -> None:
+        self.validator.validate(status_event())
+
+    def test_schema_error_reports_only_path_and_keyword(self) -> None:
+        event = status_event(session_id="private-account-token" * 20)
+        with self.assertRaises(CombatSchemaError) as caught:
+            self.validator.validate(event)
+        message = str(caught.exception)
+        self.assertIn("/session_id:maxLength", message)
+        self.assertNotIn("private-account-token", message)
+
+    def test_bounded_inbox_surfaces_overflow_instead_of_dropping_silently(self) -> None:
+        inbox = CombatInbox(max_items=2)
+        self.assertTrue(inbox.publish_event(status_event()))
+        self.assertTrue(inbox.publish_event(status_event(1)))
+        self.assertFalse(inbox.publish_event(status_event(2)))
+        self.assertFalse(inbox.accepting)
+        self.assertEqual(
+            inbox.drain(),
+            [TransportNotice("error", "queue_overflow")],
+        )
+
+    def test_pump_applies_notices_and_events_only_when_drained(self) -> None:
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        pump = CombatEventPump(inbox, self.validator, aggregator)
+        inbox.publish_notice("connecting", "pipe_connecting")
+        inbox.publish_event(status_event())
+        self.assertEqual(aggregator.snapshot().connection_state, "disconnected")
+        report = pump.drain()
+        self.assertEqual(report.processed_events, 1)
+        self.assertEqual(report.notices, 1)
+        self.assertIsNone(report.fault_code)
+        self.assertEqual(aggregator.snapshot().connection_state, "live")
+
+    def test_schema_failure_stops_further_aggregation(self) -> None:
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        pump = CombatEventPump(inbox, self.validator, aggregator)
+        inbox.publish_event({"schema_version": 2})
+        inbox.publish_event(status_event())
+        report = pump.drain()
+        self.assertEqual(report.processed_events, 0)
+        self.assertIsNotNone(report.fault_code)
+        self.assertEqual(aggregator.snapshot().connection_state, "error")
+        self.assertIsNone(aggregator.snapshot().session_id)
+
+    def test_client_thread_never_mutates_aggregator(self) -> None:
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        pump = CombatEventPump(inbox, self.validator, aggregator)
+        delivered = threading.Event()
+        line = json.dumps(status_event()).encode("utf-8") + b"\n"
+        stream = FakeStream([line], delivered)
+        client = CombatBridgeClient(
+            inbox,
+            connector=lambda: stream,
+            reconnect_delay=10,
+        )
+        client.start()
+        self.assertTrue(delivered.wait(1.0))
+        client.stop()
+        self.assertIsNone(aggregator.snapshot().session_id)
+        report = pump.drain()
+        self.assertEqual(report.processed_events, 1)
+        self.assertEqual(aggregator.snapshot().session_id, "session-a")
+
+    def test_client_surfaces_a_missing_heartbeat_as_stale(self) -> None:
+        inbox = CombatInbox()
+        stream = IdleStream([])
+        client = CombatBridgeClient(
+            inbox,
+            connector=lambda: stream,
+            reconnect_delay=10,
+            stale_after=0.02,
+        )
+        client.start()
+        deadline = time.monotonic() + 1.0
+        notices: list[object] = []
+        while time.monotonic() < deadline:
+            notices.extend(inbox.drain())
+            if TransportNotice("stale", "heartbeat_timeout") in notices:
+                break
+            time.sleep(0.01)
+        client.stop()
+        self.assertIn(TransportNotice("stale", "heartbeat_timeout"), notices)
+
+    @unittest.skipUnless(os.name == "nt", "Windows named pipes are required")
+    def test_real_named_pipe_roundtrip_reaches_the_main_thread_pump(self) -> None:
+        try:
+            import win32file
+            import win32pipe
+        except ImportError:
+            self.skipTest("pywin32 is not installed")
+
+        pipe_name = rf"\\.\pipe\LC2CombatBridge.Test.{uuid.uuid4().hex}"
+        ready = threading.Event()
+        line = json.dumps(status_event()).encode("utf-8") + b"\n"
+
+        def serve() -> None:
+            handle = win32pipe.CreateNamedPipe(
+                pipe_name,
+                win32pipe.PIPE_ACCESS_OUTBOUND,
+                win32pipe.PIPE_TYPE_BYTE
+                | win32pipe.PIPE_READMODE_BYTE
+                | win32pipe.PIPE_WAIT,
+                1,
+                8192,
+                8192,
+                0,
+                None,
+            )
+            ready.set()
+            try:
+                win32pipe.ConnectNamedPipe(handle, None)
+                win32file.WriteFile(handle, line)
+                time.sleep(0.1)
+            finally:
+                try:
+                    win32pipe.DisconnectNamedPipe(handle)
+                except Exception:
+                    pass
+                win32file.CloseHandle(handle)
+
+        server = threading.Thread(target=serve, daemon=True)
+        server.start()
+        self.assertTrue(ready.wait(1.0))
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        pump = CombatEventPump(inbox, self.validator, aggregator)
+        client = CombatBridgeClient(
+            inbox,
+            connector=NamedPipeConnector(pipe_name),
+            reconnect_delay=10,
+        )
+        client.start()
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline and aggregator.snapshot().session_id is None:
+            pump.drain()
+            time.sleep(0.01)
+        client.stop()
+        server.join(1.0)
+        self.assertEqual(aggregator.snapshot().session_id, "session-a")
+
+
+if __name__ == "__main__":
+    unittest.main()

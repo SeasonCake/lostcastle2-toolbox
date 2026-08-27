@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "soul-stone-trainer",
+      "display_name": "灵魂石修改器",
+      "version": "1.2",
+      "author": "恨你不见",
+      "author_source": "程序内标题与用户提供信息",
+      "author_channel": "bilibili / QQ 昵称",
+      "kind": "external_trainer",
+      "expected_filename": "LostCastle2SoulStoneTrainer v1.2.exe",
+      "sha256": "025FB6CD01E79F9F2D8018BA9BF4FF592DE43EF2A7EDFD2E7A22F3C1842DF645",
+      "size_bytes": 72428059,
+      "signature_status": "unsigned",
+      "risk_level": "high",
+      "capabilities": [
+        "Frida IL2CPP 注入",
+        "灵魂石与成就写入",
+        "游戏资源替换"
+      ],
+      "redistribution_status": "permission_not_documented",
+      "bundled": false,
+      "description": "第三方独立修改器；由用户选择原文件，盒子校验后保存受管副本。"
+    }
+  ]
+}

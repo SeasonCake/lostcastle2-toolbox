@@ -18,11 +18,18 @@ import winreg
 
 from toolbox.app_shell import ToolboxShell, seed_demo_combat
 from toolbox.combat_aggregator import CombatAggregator, ScenarioRegistry, SourceRegistry
+from toolbox.combat_transport import (
+    CombatBridgeClient,
+    CombatEventPump,
+    CombatEventValidator,
+    CombatInbox,
+)
 from toolbox.macro_ui import MacroFeature
+from toolbox.mod_manager import ModCatalog, ModManager
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.4.1"
+APP_VERSION = "1.5.0"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
     os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
@@ -2146,7 +2153,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--show-keyboard", action="store_true", help="启动后同时显示按键悬浮窗")
     parser.add_argument(
         "--show-page",
-        choices=("home", "combat", "keyboard", "macro", "settings"),
+        choices=("home", "combat", "keyboard", "macro", "mods", "settings"),
         default="home",
         help="开发验证：主窗口直接打开指定页面",
     )
@@ -2230,6 +2237,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.tk_scaling is not None:
         root.tk.call("tk", "scaling", max(0.75, min(2.5, args.tk_scaling)))
     macro_feature = MacroFeature(root, CONFIG_DIR)
+    mod_manager = ModManager(
+        ModCatalog.from_file(RESOURCE_DIR / "assets" / "mod_catalog.json"),
+        CONFIG_DIR / "managed_mods",
+        RESOURCE_DIR / "third_party",
+    )
     keyboard_root = tk.Toplevel(root)
     keyboard_app: KeyViewApp
     keyboard_app = KeyViewApp(
@@ -2251,6 +2263,8 @@ def main(argv: list[str] | None = None) -> int:
         registry=registry,
         scenario_registry=scenario_registry,
     )
+    combat_client: CombatBridgeClient | None = None
+    combat_pump: CombatEventPump | None = None
     if args.demo or args.demo_large_values:
         seed_demo_combat(
             combat_aggregator,
@@ -2258,6 +2272,16 @@ def main(argv: list[str] | None = None) -> int:
             scenario_id=args.demo_scenario,
             room_index=args.demo_room_index,
         )
+    else:
+        combat_inbox = CombatInbox()
+        combat_pump = CombatEventPump(
+            combat_inbox,
+            CombatEventValidator.from_file(
+                RESOURCE_DIR / "contracts" / "combat_event.schema.json"
+            ),
+            combat_aggregator,
+        )
+        combat_client = CombatBridgeClient(combat_inbox)
     shell: ToolboxShell | None = None
     closing = False
 
@@ -2266,6 +2290,8 @@ def main(argv: list[str] | None = None) -> int:
         if closing:
             return
         closing = True
+        if combat_client is not None:
+            combat_client.stop()
         if shell is not None:
             shell.close()
         keyboard_app.shutdown()
@@ -2285,12 +2311,16 @@ def main(argv: list[str] | None = None) -> int:
         root,
         keyboard=keyboard_app,
         macro_feature=macro_feature,
+        mod_manager=mod_manager,
         combat_aggregator=combat_aggregator,
+        combat_event_pump=combat_pump,
         keyboard_preview_provider=keyboard_preview,
         launch_game=keyboard_app.launch_game,
         choose_game_path=keyboard_app.choose_game_path,
         close_command=close_all,
     )
+    if combat_client is not None:
+        combat_client.start()
     if args.window_size is not None:
         root.geometry(f"{args.window_size[0]}x{args.window_size[1]}")
     root.deiconify()

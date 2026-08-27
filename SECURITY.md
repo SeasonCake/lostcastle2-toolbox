@@ -11,3 +11,5 @@ Security fixes target the latest `main` branch. Research probes are version-scop
 ## Data handling
 
 The project should not collect account identifiers, nicknames, platform IDs, credentials, or network payloads. Diagnostic submissions must be minimized and redacted. Local JSON-line transport is treated as untrusted input and must be bounded, validated, and session-scoped before it reaches the UI.
+
+Cataloged third-party tools are also untrusted. They must never auto-run or inherit the combat bridge's read-only claim. A managed copy requires an exact catalog size and SHA-256, and removal is limited to the exact toolbox-owned leaf. Do not submit or commit third-party executables unless their redistribution permission is documented.

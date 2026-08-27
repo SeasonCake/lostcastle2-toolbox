@@ -7,7 +7,8 @@ Thank you for helping improve Lost Castle 2 Toolbox.
 - Keep the overlay, macro engine, game bridge, aggregator, and UI as separate modules.
 - Prefer one generic behavior over item-specific branches. New item names belong in `assets/combat_sources.json` unless they introduce genuinely new semantics.
 - Do not commit game binaries, generated interop assemblies, logs, screenshots containing personal data, local configuration, or packaged builds.
-- Do not add behavior that modifies combat values, saves, drops, network state, or bypasses game restrictions.
+- Do not add first-party behavior that modifies combat values, saves, drops, network state, or bypasses game restrictions. A third-party catalog entry must remain isolated, opt-in, hash-pinned, attributed, risk-labeled, and separately licensed.
+- Do not commit or package a third-party binary without documented redistribution permission.
 
 ## Tests
 

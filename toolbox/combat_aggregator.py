@@ -10,6 +10,7 @@ from typing import Any, Mapping
 SCHEMA_VERSION = 2
 DEFAULT_DPS_WINDOW_MS = 10_000
 VALID_ROOM_INDICES = frozenset((*range(0, 11), 99, 100, 101))
+VALID_TRANSPORT_STATES = frozenset({"connecting", "disconnected", "stale", "error"})
 
 
 class CombatEventError(ValueError):
@@ -328,6 +329,12 @@ class CombatAggregator:
             elif event_type == "room_checkpoint":
                 self._ingest_checkpoint(event)
         return True
+
+    def apply_transport_state(self, state: str) -> None:
+        """Apply a local transport observation without forging a game event."""
+        if state not in VALID_TRANSPORT_STATES:
+            raise CombatEventError(f"Unsupported transport state: {state!r}")
+        self.connection_state = state
 
     def snapshot(self, monotonic_ms: int | None = None) -> CombatSnapshot:
         now = self.last_monotonic_ms if monotonic_ms is None else monotonic_ms

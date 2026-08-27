@@ -16,6 +16,12 @@ Lost Castle 2
 
 The key overlay and macro modules stay usable when the bridge is absent.
 
+The Python client reads the local named pipe on a background thread, but it can
+only decode bounded JSON lines and publish them to a 512-item inbox. JSON Schema
+validation, session ordering and all `CombatAggregator` mutations run on the Tk
+thread. A malformed line, invalid event, missing heartbeat or queue overflow is
+shown as a distinct connection failure instead of silently dropping totals.
+
 ## Product shell and window responsibilities
 
 The application starts in one calculator-style toolbox window instead of starting in the keyboard overlay. That window is the only full application shell and opens or manages independent modules:
@@ -39,6 +45,22 @@ This is a small free/open-source desktop tool, not a hosted commercial platform.
 - Keep one snapshot/view-model for every presentation of the same combat session.
 - Add dependencies only when they remove more maintenance than they introduce.
 - Sponsorship or video links, if added later, remain static project links and do not create account or entitlement infrastructure.
+
+## Third-party tool management
+
+Third-party trainers are catalog data, not trusted extensions of the toolbox.
+Every entry records author attribution, version, exact filename, byte size,
+SHA-256, signature state, capabilities and redistribution status.
+
+- A non-bundled entry requires the user to select a local source file. Only an
+  exact size and SHA-256 match can become a managed copy.
+- Managed files live under ignored local `config/managed_mods/<id>/` directories.
+  Removal unlinks only the exact catalog-owned leaf; it never traverses a download
+  directory or the game installation.
+- External tools never auto-run. A high-risk launch requires a second explicit
+  confirmation and does not inherit the read-only guarantees of the combat bridge.
+- A third-party binary cannot enter Git or a public package without documented
+  redistribution permission. Its notice is separate from the repository MIT license.
 
 ## Event model
 
@@ -134,7 +156,7 @@ change.
 
 1. **Foundation (complete):** v2 schema, source registry, replay aggregator, tests and public repository hygiene.
 2. **Toolbox shell and replay HUD (current):** calculator-style main navigation, compact combat HUD, full combat details and deterministic demo/replay states.
-3. **Bridge v2:** convert the proven damage/HP observer into the event envelope and local transport, then expose live/stale/error connection states.
+3. **Bridge v2 (static candidate complete):** the proven damage/HP observer now emits the v2 envelope over a bounded local named pipe; live/stale/error states are wired. Game runtime compatibility remains a separate manual gate.
 4. **Mana and defenses:** verify MP cost/recovery/blocked paths and shield/effect stacks, then add registry entries.
 5. **Calibration:** host/client, game-update compatibility, checkpoint differences and packaging.
 

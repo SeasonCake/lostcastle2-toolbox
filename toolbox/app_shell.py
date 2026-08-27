@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+import queue
+import threading
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 from typing import Any, Callable, Iterable, Mapping, Protocol
 
 from .combat_aggregator import CombatAggregator, CombatSnapshot
+from .combat_transport import CombatEventPump
 from .macro_model import MacroProfile
+from .mod_manager import ModIntegrityError, ModManager, ModManagerError
 
 
 BG = "#F3EEE3"
@@ -30,6 +35,33 @@ MODE_SHORT_LABELS = {
     "hold_repeat": "按住循环",
     "toggle_repeat": "开关循环",
 }
+
+
+def combat_state_label(state: str, *, compact: bool = False) -> str:
+    labels = {
+        "live": ("● 实时", "● 实时记录中"),
+        "connecting": ("● 连接中", "● 正在连接战斗桥接"),
+        "stale": ("● 延迟", "● 战斗桥接响应延迟"),
+        "error": ("● 异常", "● 战斗数据异常，本轮统计已停止"),
+        "ended": ("● 已结束", "● 本轮战斗已结束"),
+        "disconnected": ("● 等待数据", "● 等待战斗桥接数据"),
+    }
+    short, full = labels.get(state, labels["disconnected"])
+    return short if compact else full
+
+
+def combat_state_color(state: str) -> str:
+    if state == "live":
+        return GREEN
+    if state == "error":
+        return RED
+    if state == "stale":
+        return GOLD
+    return MUTED
+
+
+def format_file_size(size_bytes: int) -> str:
+    return f"{size_bytes / (1024 * 1024):.1f} MiB"
 
 
 class KeyboardModule(Protocol):
@@ -728,10 +760,9 @@ class CombatHudWindow:
             return
         try:
             snapshot = self.aggregator.snapshot()
-            live = snapshot.connection_state == "live"
             self.labels["hud_status"].configure(
-                text="● 实时" if live else "● 等待数据",
-                fg=GREEN if live else MUTED,
+                text=combat_state_label(snapshot.connection_state, compact=True),
+                fg=combat_state_color(snapshot.connection_state),
             )
             _set_metric_label(
                 self.labels["damage"],
@@ -806,7 +837,9 @@ class ToolboxShell:
         *,
         keyboard: KeyboardModule,
         macro_feature: MacroModule,
+        mod_manager: ModManager,
         combat_aggregator: CombatAggregator,
+        combat_event_pump: CombatEventPump | None,
         keyboard_preview_provider: Callable[
             [], Iterable[tuple[str, str, tuple[int, int, int, int]]]
         ],
@@ -817,7 +850,9 @@ class ToolboxShell:
         self.root = root
         self.keyboard = keyboard
         self.macro_feature = macro_feature
+        self.mod_manager = mod_manager
         self.combat_aggregator = combat_aggregator
+        self.combat_event_pump = combat_event_pump
         self.keyboard_preview_provider = keyboard_preview_provider
         self.launch_game = launch_game
         self.choose_game_path = choose_game_path
@@ -827,6 +862,9 @@ class ToolboxShell:
         self.nav_buttons: dict[str, tk.Button] = {}
         self.labels: dict[str, tk.Label] = {}
         self._macro_row_descriptions: list[str] = []
+        self.mod_buttons: dict[str, tk.Button] = {}
+        self._mod_busy = False
+        self._mod_results: queue.Queue[tuple[bool, Exception | None]] = queue.Queue()
         self._after_id: str | None = None
         self._closed = False
 
@@ -883,7 +921,7 @@ class ToolboxShell:
         ).pack(anchor="w")
         tk.Label(
             title,
-            text="按键显示 · 前台宏 · 战斗统计",
+            text="按键显示 · 前台宏 · 战斗统计 · MOD 管理",
             bg="#F8F4EB",
             fg=MUTED,
             font=("Microsoft YaHei UI", 8),
@@ -902,6 +940,7 @@ class ToolboxShell:
             ("combat", "战斗统计"),
             ("keyboard", "按键显示"),
             ("macro", "按键宏"),
+            ("mods", "MOD 管理"),
             ("settings", "设置"),
         ):
             button = tk.Button(
@@ -941,13 +980,14 @@ class ToolboxShell:
         self._build_combat_page()
         self._build_keyboard_page()
         self._build_macro_page()
+        self._build_mod_page()
         self._build_settings_page()
 
         footer = tk.Frame(self.root, bg="#F8F4EB", padx=18, pady=7)
         footer.pack(fill="x")
         self.labels["footer"] = tk.Label(
             footer,
-            text="本地运行 · 无账号 · 无遥测",
+            text="工具箱本体：本地运行 · 无账号 · 无遥测",
             bg="#F8F4EB",
             fg=MUTED,
             font=("Microsoft YaHei UI", 8),
@@ -1395,6 +1435,242 @@ class ToolboxShell:
             width=10,
         ).pack(side="right")
 
+    def _build_mod_page(self) -> None:
+        page = self._new_page("mods")
+        self._page_heading(
+            page,
+            "MOD 管理",
+            "只管理盒子创建的受管副本；不会扫描或删除下载目录中的原文件。",
+        )
+        warning = tk.Frame(page, bg="#F4E4D8", padx=11, pady=8)
+        warning.pack(fill="x", pady=(0, 10))
+        tk.Label(
+            warning,
+            text="第三方高风险工具",
+            bg="#F4E4D8",
+            fg=RED,
+            font=("Microsoft YaHei UI", 8, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            warning,
+            text="独立修改器可能注入游戏、改写资源或写入不可逆成就；盒子只校验、保存副本并按你的点击启动。",
+            bg="#F4E4D8",
+            fg="#7A573F",
+            anchor="w",
+            justify="left",
+            wraplength=650,
+            font=("Microsoft YaHei UI", 8),
+        ).pack(fill="x", pady=(3, 0))
+
+        descriptor = self.mod_manager.catalog.entries[0]
+        panel = RoundedPanel(
+            page,
+            height=258,
+            content_padx=14,
+            content_pady=12,
+        )
+        panel.pack(fill="x")
+        card = panel.content
+        top = tk.Frame(card, bg=SURFACE)
+        top.pack(fill="x")
+        title = tk.Frame(top, bg=SURFACE)
+        title.pack(side="left", fill="x", expand=True)
+        tk.Label(
+            title,
+            text=f"{descriptor.display_name}  v{descriptor.version}",
+            bg=SURFACE,
+            fg=TEXT,
+            anchor="w",
+            font=("Microsoft YaHei UI", 12, "bold"),
+        ).pack(fill="x")
+        tk.Label(
+            title,
+            text=f"作者：{descriptor.author}  ·  {descriptor.author_channel}",
+            bg=SURFACE,
+            fg=MUTED,
+            anchor="w",
+            font=("Microsoft YaHei UI", 8),
+        ).pack(fill="x", pady=(3, 0))
+        self.labels["mod_status"] = tk.Label(
+            top,
+            text="● 正在检查",
+            bg=SURFACE,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 8, "bold"),
+        )
+        self.labels["mod_status"].pack(side="right", padx=(12, 0))
+
+        tk.Label(
+            card,
+            text=descriptor.description,
+            bg=SURFACE,
+            fg=TEXT,
+            anchor="w",
+            justify="left",
+            wraplength=640,
+            font=("Microsoft YaHei UI", 8),
+        ).pack(fill="x", pady=(11, 6))
+        metadata = (
+            f"类型：独立修改器（{descriptor.capabilities[0]}）\n"
+            f"文件：未签名 · {format_file_size(descriptor.size_bytes)} · "
+            f"SHA-256 {descriptor.sha256[:12]}…{descriptor.sha256[-8:]}\n"
+            "收录方式：本版不捆绑二进制；选择作者原文件并通过完整哈希后配置"
+        )
+        tk.Label(
+            card,
+            text=metadata,
+            bg=SURFACE,
+            fg=MUTED,
+            anchor="w",
+            justify="left",
+            font=("Microsoft YaHei UI", 8),
+        ).pack(fill="x")
+
+        actions = tk.Frame(card, bg=SURFACE)
+        actions.pack(side="bottom", fill="x", pady=(10, 0))
+        self.labels["mod_action_hint"] = tk.Label(
+            actions,
+            text="删除只移除盒子受管副本。",
+            bg=SURFACE,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 8),
+        )
+        self.labels["mod_action_hint"].pack(side="left", fill="x", expand=True)
+        self.mod_buttons["remove"] = self._button(
+            actions,
+            "删除副本",
+            lambda: self._remove_mod(descriptor.mod_id),
+            width=10,
+        )
+        self.mod_buttons["remove"].pack(side="right")
+        self.mod_buttons["launch"] = self._button(
+            actions,
+            "启动",
+            lambda: self._launch_mod(descriptor.mod_id),
+            width=8,
+        )
+        self.mod_buttons["launch"].pack(side="right", padx=(0, 6))
+        self.mod_buttons["configure"] = self._button(
+            actions,
+            "一键配置",
+            lambda: self._configure_mod(descriptor.mod_id),
+            accent=True,
+            width=10,
+        )
+        self.mod_buttons["configure"].pack(side="right", padx=(0, 6))
+
+    def _configure_mod(self, mod_id: str) -> None:
+        if self._mod_busy:
+            return
+        descriptor = self.mod_manager.descriptor(mod_id)
+        source = self.mod_manager.bundled_source(mod_id)
+        if source is None:
+            selected = filedialog.askopenfilename(
+                parent=self.root,
+                title=f"选择 {descriptor.expected_filename}",
+                filetypes=(("Windows 应用程序", "*.exe"), ("所有文件", "*.*")),
+            )
+            if not selected:
+                return
+            source = Path(selected)
+        self._mod_busy = True
+        self.labels["mod_action_hint"].configure(text="正在复制并校验完整 SHA-256…")
+        self._refresh_mod_page()
+
+        def install() -> None:
+            try:
+                self.mod_manager.install(mod_id, source)
+            except Exception as exception:
+                self._finish_mod_action(False, exception)
+            else:
+                self._finish_mod_action(True, None)
+
+        threading.Thread(target=install, name="LC2ModInstall", daemon=True).start()
+
+    def _finish_mod_action(self, success: bool, error: Exception | None) -> None:
+        self._mod_results.put((success, error))
+
+    def _drain_mod_results(self) -> None:
+        try:
+            success, error = self._mod_results.get_nowait()
+        except queue.Empty:
+            return
+        self._mod_busy = False
+        self.labels["mod_action_hint"].configure(text="删除只移除盒子受管副本。")
+        self._refresh_mod_page()
+        if success:
+            messagebox.showinfo("配置完成", "第三方工具已复制到盒子的受管目录并通过哈希校验。", parent=self.root)
+        else:
+            messagebox.showerror("配置失败", self._mod_error_text(error), parent=self.root)
+
+    @staticmethod
+    def _mod_error_text(error: Exception | None) -> str:
+        if isinstance(error, ModIntegrityError):
+            return "所选文件与登记版本不一致；大小或 SHA-256 校验失败。"
+        if isinstance(error, (ModManagerError, OSError)):
+            return "无法完成受管副本操作；请确认文件仍存在且目录可写。"
+        return "MOD 管理发生未预期错误，未启动第三方程序。"
+
+    def _launch_mod(self, mod_id: str) -> None:
+        descriptor = self.mod_manager.descriptor(mod_id)
+        confirmed = messagebox.askyesno(
+            "启动第三方修改器",
+            (
+                f"即将启动“{descriptor.display_name}”。\n\n"
+                "该未签名程序会使用 Frida 注入，并可能修改游戏资源或不可逆成就。"
+                "它不是本项目源码的一部分。是否继续？"
+            ),
+            parent=self.root,
+        )
+        if not confirmed:
+            return
+        try:
+            self.mod_manager.launch(mod_id)
+        except Exception as exception:
+            messagebox.showerror("启动失败", self._mod_error_text(exception), parent=self.root)
+
+    def _remove_mod(self, mod_id: str) -> None:
+        if self._mod_busy:
+            return
+        if not messagebox.askyesno(
+            "删除盒子副本",
+            "只删除盒子受管目录中的这一份文件；下载目录原件和游戏目录均保持不变。是否继续？",
+            parent=self.root,
+        ):
+            return
+        try:
+            removed = self.mod_manager.uninstall(mod_id)
+        except Exception as exception:
+            messagebox.showerror("删除失败", self._mod_error_text(exception), parent=self.root)
+            return
+        self._refresh_mod_page()
+        if removed:
+            messagebox.showinfo("已删除", "盒子受管副本已删除，原始下载文件未改动。", parent=self.root)
+
+    def _refresh_mod_page(self) -> None:
+        descriptor = self.mod_manager.catalog.entries[0]
+        status = self.mod_manager.status(descriptor.mod_id)
+        if self._mod_busy:
+            label, color = "● 配置中", GOLD
+        elif status.state == "installed":
+            label, color = "● 已配置 · 校验通过", GREEN
+        elif status.state == "integrity_error":
+            label, color = "● 副本校验失败", RED
+        else:
+            label, color = "● 未配置", MUTED
+        self.labels["mod_status"].configure(text=label, fg=color)
+        any_copy = status.state != "not_installed"
+        self.mod_buttons["configure"].configure(
+            text="重新配置" if any_copy else "一键配置",
+            state="disabled" if self._mod_busy else "normal",
+        )
+        self.mod_buttons["launch"].configure(
+            state="normal" if status.installed and not self._mod_busy else "disabled"
+        )
+        self.mod_buttons["remove"].configure(
+            state="normal" if any_copy and not self._mod_busy else "disabled"
+        )
+
     def _build_settings_page(self) -> None:
         page = self._new_page("settings")
         self._page_heading(page, "工具箱设置", "只放跨模块入口，具体选项回到对应模块。")
@@ -1481,11 +1757,14 @@ class ToolboxShell:
             self._refresh_macro_rows()
         elif page_id == "combat":
             self._refresh_combat()
+        elif page_id == "mods":
+            self._refresh_mod_page()
 
     def refresh(self) -> None:
         self._refresh_module_statuses()
         self._refresh_combat()
         self._refresh_macro_rows()
+        self._refresh_mod_page()
         self._draw_keyboard_preview()
         self.hud.refresh()
 
@@ -1496,10 +1775,9 @@ class ToolboxShell:
             fg=GREEN if game_running else MUTED,
         )
         snapshot = self.combat_aggregator.snapshot()
-        live = snapshot.connection_state == "live"
         self.labels["combat_status"].configure(
-            text="● 实时记录中" if live else "● 等待战斗数据",
-            fg=GREEN if live else MUTED,
+            text=combat_state_label(snapshot.connection_state),
+            fg=combat_state_color(snapshot.connection_state),
         )
         self.labels["combat_summary"].configure(
             text=(
@@ -1556,9 +1834,9 @@ class ToolboxShell:
             text=(
                 f"● 实时 · {format_stage_location(snapshot)}"
                 if live
-                else "● 等待战斗桥接数据；键盘和宏不受影响"
+                else f"{combat_state_label(snapshot.connection_state)}；键盘和宏不受影响"
             ),
-            fg=GREEN if live else MUTED,
+            fg=combat_state_color(snapshot.connection_state),
         )
         hp_loss = snapshot.hp_damage_taken + snapshot.hp_loss_other
         _set_metric_label(
@@ -1722,6 +2000,9 @@ class ToolboxShell:
     def _tick(self) -> None:
         if self._closed:
             return
+        if self.combat_event_pump is not None:
+            self.combat_event_pump.drain()
+        self._drain_mod_results()
         self.refresh()
         self._after_id = self.root.after(500, self._tick)
 

@@ -15,6 +15,8 @@ py -3 -m PyInstaller `
     --version-file '.\version_info.txt' `
     --add-data '.\assets\combat_sources.json;assets' `
     --add-data '.\assets\game_locations.json;assets' `
+    --add-data '.\assets\mod_catalog.json;assets' `
+    --add-data '.\contracts\combat_event.schema.json;contracts' `
     '.\keyview.py'
 
 $packageRoot = Join-Path $projectRoot 'package\失落城堡2工具箱'

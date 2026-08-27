@@ -6,9 +6,11 @@ from pathlib import Path
 
 from toolbox.app_shell import (
     boss_damage_share,
+    combat_state_label,
     combat_hud_size,
     combat_table_numeric_width,
     format_location_label,
+    format_file_size,
     format_metric,
     format_room_area,
     format_stage_location,
@@ -85,6 +87,7 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(format_metric(0), "0")
         self.assertEqual(format_metric(34_328), "34,328")
         self.assertEqual(format_metric(1.25), "1.2")
+        self.assertEqual(format_file_size(72_428_059), "69.1 MiB")
 
     def test_room_area_uses_game_special_indices(self) -> None:
         self.assertEqual(format_room_area(0), "入口")
@@ -111,6 +114,12 @@ class AppShellModelTests(unittest.TestCase):
         self.assertAlmostEqual(boss_damage_share(34_328, 8_940), 8_940 / 34_328)
         self.assertEqual(boss_damage_share(100, 140), 1.0)
         self.assertEqual(boss_damage_share(100, -5), 0.0)
+
+    def test_combat_connection_states_remain_distinct(self) -> None:
+        self.assertEqual(combat_state_label("live", compact=True), "● 实时")
+        self.assertEqual(combat_state_label("connecting"), "● 正在连接战斗桥接")
+        self.assertIn("异常", combat_state_label("error"))
+        self.assertNotEqual(combat_state_label("stale"), combat_state_label("disconnected"))
 
     def test_combat_hud_size_adds_only_needed_high_dpi_room(self) -> None:
         self.assertEqual(combat_hud_size(1.5), (350, 426))
