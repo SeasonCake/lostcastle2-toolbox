@@ -29,7 +29,7 @@ from toolbox.mod_manager import ModCatalog, ModManager
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.5.2"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
     os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
@@ -173,6 +173,58 @@ KEY_DEFINITIONS: dict[str, tuple[str, int]] = {
         for number in (*range(1, 8), 12)
     },
 }
+
+GAMEPAD_LABELS: dict[str, str] = {
+    "PAD_LT": "LT",
+    "PAD_LB": "LB",
+    "PAD_RB": "RB",
+    "PAD_RT": "RT",
+    "PAD_UP": "↑",
+    "PAD_LEFT": "←",
+    "PAD_RIGHT": "→",
+    "PAD_DOWN": "↓",
+    "PAD_LS": "L摇杆",
+    "PAD_VIEW": "视图",
+    "PAD_MENU": "菜单",
+    "PAD_RS": "R摇杆",
+    "PAD_X": "X",
+    "PAD_Y": "Y",
+    "PAD_A": "A",
+    "PAD_B": "B",
+}
+
+GAMEPAD_LAYOUT = {
+    "PAD_LT": (38, 84, 88, 54),
+    "PAD_LB": (136, 84, 88, 54),
+    "PAD_RB": (376, 84, 88, 54),
+    "PAD_RT": (474, 84, 88, 54),
+    "PAD_UP": (86, 160, 54, 54),
+    "PAD_LEFT": (28, 218, 54, 54),
+    "PAD_RIGHT": (144, 218, 54, 54),
+    "PAD_DOWN": (86, 276, 54, 54),
+    "PAD_LS": (218, 174, 78, 78),
+    "PAD_VIEW": (248, 278, 66, 46),
+    "PAD_MENU": (326, 278, 66, 46),
+    "PAD_RS": (334, 174, 78, 78),
+    "PAD_Y": (470, 160, 54, 54),
+    "PAD_X": (412, 218, 54, 54),
+    "PAD_B": (528, 218, 54, 54),
+    "PAD_A": (470, 276, 54, 54),
+}
+
+
+def gamepad_layout(*, key_only: bool = False) -> dict[str, tuple[int, int, int, int]]:
+    y_offset = -70 if key_only else 0
+    return {
+        key: (x, y + y_offset, width, height)
+        for key, (x, y, width, height) in GAMEPAD_LAYOUT.items()
+    }
+
+
+def display_label(input_id: str) -> str:
+    if input_id in GAMEPAD_LABELS:
+        return GAMEPAD_LABELS[input_id]
+    return KEY_DEFINITIONS[input_id][0]
 
 KEY_GROUPS = (
     ("字母", tuple("QWERTYUIOP") + tuple("ASDFGHJKL") + tuple("ZXCVBNM")),
@@ -460,6 +512,75 @@ def overlay_height(layout: dict[str, tuple[int, int, int, int]], *, key_only: bo
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
 
+
+class XInputGamepad(ctypes.Structure):
+    _fields_ = (
+        ("buttons", wintypes.WORD),
+        ("left_trigger", wintypes.BYTE),
+        ("right_trigger", wintypes.BYTE),
+        ("left_thumb_x", ctypes.c_short),
+        ("left_thumb_y", ctypes.c_short),
+        ("right_thumb_x", ctypes.c_short),
+        ("right_thumb_y", ctypes.c_short),
+    )
+
+
+class XInputState(ctypes.Structure):
+    _fields_ = (("packet_number", wintypes.DWORD), ("gamepad", XInputGamepad))
+
+
+XINPUT_BUTTONS = {
+    "PAD_UP": 0x0001,
+    "PAD_DOWN": 0x0002,
+    "PAD_LEFT": 0x0004,
+    "PAD_RIGHT": 0x0008,
+    "PAD_MENU": 0x0010,
+    "PAD_VIEW": 0x0020,
+    "PAD_LS": 0x0040,
+    "PAD_RS": 0x0080,
+    "PAD_LB": 0x0100,
+    "PAD_RB": 0x0200,
+    "PAD_A": 0x1000,
+    "PAD_B": 0x2000,
+    "PAD_X": 0x4000,
+    "PAD_Y": 0x8000,
+}
+
+
+def _load_xinput() -> Any | None:
+    for library_name in ("xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll"):
+        try:
+            library = ctypes.WinDLL(library_name)
+            library.XInputGetState.argtypes = (wintypes.DWORD, ctypes.POINTER(XInputState))
+            library.XInputGetState.restype = wintypes.DWORD
+            return library
+        except (OSError, AttributeError):
+            continue
+    return None
+
+
+XINPUT = _load_xinput()
+
+
+def read_gamepad_state(index: int = 0) -> tuple[bool, dict[str, bool]]:
+    state = XInputState()
+    if XINPUT is None or XINPUT.XInputGetState(index, ctypes.byref(state)) != 0:
+        return False, {key: False for key in GAMEPAD_LABELS}
+    gamepad = state.gamepad
+    active = {
+        key: bool(gamepad.buttons & mask)
+        for key, mask in XINPUT_BUTTONS.items()
+    }
+    active["PAD_LT"] = gamepad.left_trigger > 30
+    active["PAD_RT"] = gamepad.right_trigger > 30
+    active["PAD_LS"] = active["PAD_LS"] or (
+        abs(gamepad.left_thumb_x) > 7849 or abs(gamepad.left_thumb_y) > 7849
+    )
+    active["PAD_RS"] = active["PAD_RS"] or (
+        abs(gamepad.right_thumb_x) > 8689 or abs(gamepad.right_thumb_y) > 8689
+    )
+    return True, active
+
 kernel32.CreateToolhelp32Snapshot.argtypes = (wintypes.DWORD, wintypes.DWORD)
 kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
 kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
@@ -538,10 +659,13 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
         "show_background": True,
         "key_only": False,
         "selected_keys": list(LOST_CASTLE_KEYS),
+        "input_display_mode": "keyboard",
         "color_preset": DEFAULT_COLOR_PRESET,
         "ui_scale": 1.0,
         "toolbox_width": 900,
         "toolbox_height": 650,
+        "toolbox_ui_scale": 1.0,
+        "hud_ui_scale": 1.0,
         "always_on_top": True,
         "game_path": str(DEFAULT_GAME_EXE),
     }
@@ -557,8 +681,16 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
     except (OSError, ValueError, TypeError):
         pass
     defaults.pop("opacity", None)
-    defaults["background_opacity"] = min(
-        1.0, max(0.0, float(defaults.get("background_opacity", 0.88)))
+
+    def bounded_float(key: str, default: float, minimum: float, maximum: float) -> float:
+        try:
+            value = float(defaults.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return min(maximum, max(minimum, value))
+
+    defaults["background_opacity"] = bounded_float(
+        "background_opacity", 0.88, 0.0, 1.0
     )
     selected: list[str] = []
     for key in defaults.get("selected_keys", LOST_CASTLE_KEYS):
@@ -566,11 +698,15 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
         if key_id in KEY_DEFINITIONS and key_id not in selected:
             selected.append(key_id)
     defaults["selected_keys"] = (selected or list(LOST_CASTLE_KEYS))[:MAX_DISPLAY_KEYS]
+    input_display_mode = str(defaults.get("input_display_mode", "keyboard"))
+    defaults["input_display_mode"] = (
+        input_display_mode if input_display_mode in {"keyboard", "gamepad"} else "keyboard"
+    )
     color_preset = str(defaults.get("color_preset", DEFAULT_COLOR_PRESET))
     defaults["color_preset"] = (
         color_preset if color_preset in COLOR_PRESETS else DEFAULT_COLOR_PRESET
     )
-    defaults["ui_scale"] = min(1.8, max(0.6, float(defaults.get("ui_scale", 1.0))))
+    defaults["ui_scale"] = bounded_float("ui_scale", 1.0, 0.6, 1.8)
     try:
         toolbox_width = int(defaults.get("toolbox_width", 900))
         toolbox_height = int(defaults.get("toolbox_height", 650))
@@ -578,6 +714,10 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
         toolbox_width, toolbox_height = 900, 650
     defaults["toolbox_width"] = min(1400, max(780, toolbox_width))
     defaults["toolbox_height"] = min(1000, max(560, toolbox_height))
+    defaults["toolbox_ui_scale"] = bounded_float(
+        "toolbox_ui_scale", 1.0, 0.9, 1.15
+    )
+    defaults["hud_ui_scale"] = bounded_float("hud_ui_scale", 1.0, 0.85, 1.25)
     defaults["show_background"] = bool(defaults.get("show_background", True))
     defaults["key_only"] = bool(defaults.get("key_only", False))
     return defaults
@@ -759,10 +899,13 @@ class KeyViewApp:
         self.show_background = bool(self.settings["show_background"])
         self.key_only = bool(self.settings["key_only"])
         self.selected_keys = list(self.settings["selected_keys"])
+        self.display_mode = str(self.settings["input_display_mode"])
         self.color_preset = str(self.settings["color_preset"])
         self.ui_scale = float(self.settings["ui_scale"])
         self.toolbox_width = int(self.settings["toolbox_width"])
         self.toolbox_height = int(self.settings["toolbox_height"])
+        self.toolbox_ui_scale = float(self.settings["toolbox_ui_scale"])
+        self.hud_ui_scale = float(self.settings["hud_ui_scale"])
         self.applied_scale = 1.0
         self.canvas_font_bases: dict[int, tuple[str, int, str, str]] = {}
         self.resize_origin: tuple[int, int, float] | None = None
@@ -770,11 +913,13 @@ class KeyViewApp:
         self.always_on_top = bool(self.settings.get("always_on_top", True))
         self.click_through = False
         self.visible = True
-        self.current_layout = layout_for_keys(self.selected_keys, key_only=self.key_only)
+        self.current_layout = self._layout_for_display()
         self.current_height = overlay_height(self.current_layout, key_only=self.key_only)
         self.drag_origin: tuple[int, int, int, int] | None = None
         self.key_items: dict[str, tuple[int, int, int, int]] = {}
-        self.key_state: dict[str, bool] = {key: False for key in KEY_DEFINITIONS}
+        self.key_state: dict[str, bool] = {
+            key: False for key in (*KEY_DEFINITIONS, *GAMEPAD_LABELS)
+        }
         self.hotkey_state = {"F8": False, "F9": False, "F10": False, "F11": False}
         self.last_process_check = 0.0
         self.last_layer_order_check = 0.0
@@ -840,6 +985,16 @@ class KeyViewApp:
             round(WINDOW_WIDTH * self.ui_scale),
             round(self.current_height * self.ui_scale),
         )
+
+    def _layout_for_display(self) -> dict[str, tuple[int, int, int, int]]:
+        if self.display_mode == "gamepad":
+            return gamepad_layout(key_only=self.key_only)
+        return layout_for_keys(self.selected_keys, key_only=self.key_only)
+
+    def _visible_input_ids(self) -> tuple[str, ...]:
+        if self.display_mode == "gamepad":
+            return tuple(GAMEPAD_LABELS)
+        return tuple(self.selected_keys)
 
     def _position_window(self) -> None:
         self.root.update_idletasks()
@@ -961,6 +1116,24 @@ class KeyViewApp:
     def set_ui_scale(self, value: float) -> None:
         self._set_ui_scale(value)
 
+    def set_display_mode(self, mode: str) -> None:
+        if mode not in {"keyboard", "gamepad"}:
+            raise ValueError(f"Unsupported display mode: {mode}")
+        if mode == self.display_mode:
+            if not self.visible:
+                self.toggle_visible()
+            self.root.lift()
+            return
+        for input_id in self._visible_input_ids():
+            self.key_state[input_id] = False
+        self.display_mode = mode
+        self._apply_display_mode(save=False)
+        if not self.visible:
+            self.toggle_visible()
+        self.root.lift()
+        self._sync_background_layer()
+        self._save_current_settings()
+
     @property
     def toolbox_window_size(self) -> tuple[int, int]:
         return self.toolbox_width, self.toolbox_height
@@ -970,6 +1143,16 @@ class KeyViewApp:
         self.toolbox_height = min(1000, max(560, int(height)))
         self.settings["toolbox_width"] = self.toolbox_width
         self.settings["toolbox_height"] = self.toolbox_height
+        self._save_current_settings()
+
+    def set_toolbox_ui_scale(self, value: float) -> None:
+        self.toolbox_ui_scale = min(1.15, max(0.9, float(value)))
+        self.settings["toolbox_ui_scale"] = self.toolbox_ui_scale
+        self._save_current_settings()
+
+    def set_hud_ui_scale(self, value: float) -> None:
+        self.hud_ui_scale = min(1.25, max(0.85, float(value)))
+        self.settings["hud_ui_scale"] = self.hud_ui_scale
         self._save_current_settings()
 
     def _shell_hwnd(self, widget: tk.Misc) -> int:
@@ -1173,7 +1356,7 @@ class KeyViewApp:
     def _draw_key(
         self, key_id: str, x: int, y: int, width: int, height: int
     ) -> None:
-        label = KEY_DEFINITIONS[key_id][0]
+        label = display_label(key_id)
         label_size = 18 if len(label) == 1 else 14 if len(label) <= 4 else 11
         shadow = rounded_rectangle(
             self.canvas,
@@ -1223,14 +1406,14 @@ class KeyViewApp:
     def _rebuild_keys(self) -> None:
         self.canvas.delete("key-item")
         self.key_items.clear()
-        self.current_layout = layout_for_keys(self.selected_keys, key_only=self.key_only)
+        self.current_layout = self._layout_for_display()
         for key_id, (x, y, width, height) in self.current_layout.items():
             self._draw_key(key_id, x, y, width, height)
 
     def _apply_display_mode(self, *, save: bool = True) -> None:
         target_scale = self.ui_scale
         self._scale_canvas_contents(1.0)
-        self.current_layout = layout_for_keys(self.selected_keys, key_only=self.key_only)
+        self.current_layout = self._layout_for_display()
         self.current_height = overlay_height(self.current_layout, key_only=self.key_only)
         x, y = self.root.winfo_x(), self.root.winfo_y()
         self.root.geometry(f"{WINDOW_WIDTH}x{self.current_height}+{x}+{y}")
@@ -1354,6 +1537,15 @@ class KeyViewApp:
             )
 
     def _demo_key_state(self, key_id: str, now: float) -> bool:
+        if self.display_mode == "gamepad":
+            sequence = (
+                ("PAD_LS", "PAD_X"),
+                ("PAD_LS", "PAD_A"),
+                ("PAD_LB", "PAD_Y"),
+                ("PAD_RT", "PAD_B"),
+                ("PAD_UP", "PAD_MENU"),
+            )
+            return key_id in sequence[int((now - self.started_at) / 0.65) % len(sequence)]
         sequence = (
             ("W", "J"),
             ("W", "L"),
@@ -1370,12 +1562,30 @@ class KeyViewApp:
 
     def _tick(self) -> None:
         now = time.monotonic()
-        for key_id in self.selected_keys:
-            vk_code = KEY_DEFINITIONS[key_id][1]
-            active = self._demo_key_state(key_id, now) if self.demo else is_key_down(vk_code)
+        gamepad_connected, gamepad_state = (
+            read_gamepad_state() if self.display_mode == "gamepad" and not self.demo else (False, {})
+        )
+        for key_id in self._visible_input_ids():
+            if self.demo:
+                active = self._demo_key_state(key_id, now)
+            elif self.display_mode == "gamepad":
+                active = gamepad_state.get(key_id, False)
+            else:
+                active = is_key_down(KEY_DEFINITIONS[key_id][1])
             if active != self.key_state[key_id]:
                 self.key_state[key_id] = active
                 self._set_key_visual(key_id, active)
+
+        if self.display_mode == "gamepad" and hasattr(self, "status_text"):
+            if self.click_through:
+                self._update_status_text()
+            else:
+                status = "手柄已连接" if (gamepad_connected or self.demo) else "等待手柄"
+                self.canvas.itemconfigure(
+                    self.status_text,
+                    text=f"{status}  ·  拖动  ·  F8 隐藏  ·  F9 穿透  ·  F10 设置",
+                    fill="#7DDC9B" if (gamepad_connected or self.demo) else self.MUTED,
+                )
 
         self._poll_hotkey("F8", 0x77, self.toggle_visible)
         self._poll_hotkey("F9", 0x78, self.toggle_click_through)
@@ -1987,6 +2197,7 @@ class KeyViewApp:
         self.show_background = True
         self.background_opacity = 0.88
         self.key_only = False
+        self.display_mode = "keyboard"
         self._set_click_through(False)
         self._set_color_preset(DEFAULT_COLOR_PRESET, save=False)
         self._set_ui_scale(1.0, save=False)
@@ -2131,10 +2342,13 @@ class KeyViewApp:
                 "show_background": self.show_background,
                 "key_only": self.key_only,
                 "selected_keys": self.selected_keys,
+                "input_display_mode": self.display_mode,
                 "color_preset": self.color_preset,
                 "ui_scale": self.ui_scale,
                 "toolbox_width": self.toolbox_width,
                 "toolbox_height": self.toolbox_height,
+                "toolbox_ui_scale": self.toolbox_ui_scale,
+                "hud_ui_scale": self.hud_ui_scale,
                 "always_on_top": self.always_on_top,
             }
         )
@@ -2247,6 +2461,13 @@ def self_test() -> int:
             assert x >= 0 and y >= 0
             assert x + width <= WINDOW_WIDTH
             assert y + key_height <= height
+        pad_layout = gamepad_layout(key_only=key_only)
+        pad_height = overlay_height(pad_layout, key_only=key_only)
+        assert set(pad_layout) == set(GAMEPAD_LABELS)
+        for x, y, width, key_height in pad_layout.values():
+            assert x >= 0 and y >= 0
+            assert x + width <= WINDOW_WIDTH
+            assert y + key_height <= pad_height
     game_exe = resolve_game_exe(DEFAULT_GAME_EXE)
     print(
         json.dumps(
@@ -2342,7 +2563,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def keyboard_preview() -> list[tuple[str, str, tuple[int, int, int, int]]]:
         return [
-            (key_id, KEY_DEFINITIONS[key_id][0], geometry)
+            (key_id, display_label(key_id), geometry)
             for key_id, geometry in keyboard_app.current_layout.items()
         ]
 

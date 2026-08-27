@@ -7,6 +7,7 @@ from pathlib import Path
 
 from toolbox.app_shell import (
     TOOLBOX_WINDOW_PRESETS,
+    TOOLBOX_UI_SCALES,
     ToolboxShell,
     boss_damage_share,
     clamp_main_window_size,
@@ -127,16 +128,18 @@ class AppShellModelTests(unittest.TestCase):
         self.assertNotEqual(combat_state_label("stale"), combat_state_label("disconnected"))
 
     def test_combat_hud_size_adds_only_needed_high_dpi_room(self) -> None:
-        self.assertEqual(combat_hud_size(1.5), (350, 426))
-        self.assertEqual(combat_hud_size(2.0), (370, 462))
-        self.assertEqual(combat_hud_size(2.5), (390, 498))
+        self.assertEqual(combat_hud_size(1.5), (350, 456))
+        self.assertEqual(combat_hud_size(2.0), (370, 492))
+        self.assertEqual(combat_hud_size(2.5), (390, 528))
+        self.assertEqual(combat_hud_size(1.5, 0.85), (298, 388))
+        self.assertEqual(combat_hud_size(1.5, 1.25), (438, 570))
         self.assertEqual(hud_panel_height(112, 1.5), 112)
         self.assertEqual(hud_panel_height(112, 2.0), 118)
         self.assertEqual(hud_panel_height(88, 2.0, high_dpi_gain=24), 100)
 
     def test_main_combat_layout_reserves_high_dpi_subtitles_and_numbers(self) -> None:
         self.assertEqual(main_window_min_size(1.5), (780, 560))
-        self.assertEqual(main_window_min_size(2.0), (840, 600))
+        self.assertEqual(main_window_min_size(2.0), (840, 650))
         self.assertEqual(main_metric_card_height(1.5), 133)
         self.assertEqual(main_metric_card_height(2.0), 151)
         self.assertEqual(combat_table_numeric_width(1.5), 90)
@@ -144,8 +147,10 @@ class AppShellModelTests(unittest.TestCase):
 
     def test_main_window_presets_respect_minimum_and_screen_bounds(self) -> None:
         ordered = [TOOLBOX_WINDOW_PRESETS[name] for name in ("compact", "standard", "spacious")]
+        scales = [TOOLBOX_UI_SCALES[name] for name in ("compact", "standard", "spacious")]
         self.assertTrue(all(left[0] < right[0] for left, right in zip(ordered, ordered[1:])))
         self.assertTrue(all(left[1] < right[1] for left, right in zip(ordered, ordered[1:])))
+        self.assertTrue(all(left < right for left, right in zip(scales, scales[1:])))
         self.assertEqual(
             clamp_main_window_size(
                 900,
@@ -164,7 +169,7 @@ class AppShellModelTests(unittest.TestCase):
                 screen_height=1080,
                 tk_scaling=2.0,
             ),
-            (840, 600),
+            (840, 650),
         )
         self.assertEqual(
             clamp_main_window_size(
@@ -196,6 +201,51 @@ class AppShellModelTests(unittest.TestCase):
         )
         ToolboxShell._set_keyboard_scale(shell, 0.1)
         self.assertEqual(actions, ["restore", ("scale", 0.9), "refresh"])
+
+    def test_input_mode_action_restores_overlay_and_refreshes_preview(self) -> None:
+        actions: list[object] = []
+        keyboard = SimpleNamespace(
+            restore_interaction=lambda: actions.append("restore"),
+            set_display_mode=lambda mode: actions.append(("mode", mode)),
+        )
+        shell = SimpleNamespace(
+            keyboard=keyboard,
+            _draw_keyboard_preview=lambda: actions.append("preview"),
+            _refresh_module_statuses=lambda: actions.append("modules"),
+            _refresh_display_settings=lambda: actions.append("settings"),
+        )
+        ToolboxShell._set_input_display_mode(shell, "gamepad")
+        self.assertEqual(
+            actions,
+            ["restore", ("mode", "gamepad"), "preview", "modules", "settings"],
+        )
+
+    def test_hud_scale_action_persists_effective_scale_and_opens_hud(self) -> None:
+        actions: list[object] = []
+
+        class Hud:
+            ui_scale = 1.0
+
+            def set_ui_scale(self, value: float) -> None:
+                self.ui_scale = value
+                actions.append(("scale", value))
+
+            def show(self) -> None:
+                actions.append("show")
+
+        keyboard = SimpleNamespace(
+            set_hud_ui_scale=lambda value: actions.append(("save", value))
+        )
+        shell = SimpleNamespace(
+            hud=Hud(),
+            keyboard=keyboard,
+            _refresh_display_settings=lambda: actions.append("refresh"),
+        )
+        ToolboxShell._set_hud_scale(shell, 0.1)
+        self.assertEqual(
+            actions,
+            [("scale", 1.1), ("save", 1.1), "show", "refresh"],
+        )
 
 
 if __name__ == "__main__":

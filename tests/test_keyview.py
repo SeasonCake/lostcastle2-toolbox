@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from contextlib import redirect_stdout
 import io
+from itertools import combinations
 import json
 from pathlib import Path
 import random
@@ -146,6 +147,9 @@ class KeyViewTests(unittest.TestCase):
             list(keyview.LOST_CASTLE_KEYS) + ["ALT", "M", "ENTER", "RIGHT"],
             ["Q", "W", "E", "A", "S", "D", "Z", "X", "C", "SPACE"],
             ["TAB", "Q", "T", "A", "G", "M", "SPACE", "LEFT", "UP", "RIGHT"],
+            ["ESC", "RMB"],
+            ["F1", "RIGHT"],
+            ["BACKSPACE", "SHIFT", "LMB"],
             list(keyview.KEY_DEFINITIONS)[: keyview.MAX_DISPLAY_KEYS],
         )
         rng = random.Random(20260825)
@@ -176,6 +180,77 @@ class KeyViewTests(unittest.TestCase):
                             or ry + rh <= ly
                         )
                         self.assertFalse(overlaps, (left_key, right_key, selected, layout))
+
+    def test_every_two_key_distance_pair_stays_bounded_and_non_overlapping(self) -> None:
+        for selected in combinations(keyview.KEY_DEFINITIONS, 2):
+            for key_only in (False, True):
+                layout = keyview.layout_for_keys(selected, key_only=key_only)
+                self.assertEqual(set(layout), set(selected))
+                height = keyview.overlay_height(layout, key_only=key_only)
+                left, right = layout.values()
+                for x, y, width, key_height in (left, right):
+                    self.assertGreaterEqual(x, 0)
+                    self.assertGreaterEqual(y, 0)
+                    self.assertLessEqual(x + width, keyview.WINDOW_WIDTH)
+                    self.assertLessEqual(y + key_height, height)
+                lx, ly, lw, lh = left
+                rx, ry, rw, rh = right
+                self.assertTrue(
+                    lx + lw <= rx
+                    or rx + rw <= lx
+                    or ly + lh <= ry
+                    or ry + rh <= ly,
+                    (selected, layout),
+                )
+
+    def test_gamepad_layout_is_complete_bounded_and_non_overlapping(self) -> None:
+        for key_only in (False, True):
+            layout = keyview.gamepad_layout(key_only=key_only)
+            self.assertEqual(set(layout), set(keyview.GAMEPAD_LABELS))
+            height = keyview.overlay_height(layout, key_only=key_only)
+            rectangles = list(layout.items())
+            for key, (x, y, width, key_height) in rectangles:
+                self.assertGreaterEqual(x, 0, key)
+                self.assertGreaterEqual(y, 0, key)
+                self.assertLessEqual(x + width, keyview.WINDOW_WIDTH, key)
+                self.assertLessEqual(y + key_height, height, key)
+            for index, (left_key, (lx, ly, lw, lh)) in enumerate(rectangles):
+                for right_key, (rx, ry, rw, rh) in rectangles[index + 1 :]:
+                    overlaps = not (
+                        lx + lw <= rx
+                        or rx + rw <= lx
+                        or ly + lh <= ry
+                        or ry + rh <= ly
+                    )
+                    self.assertFalse(overlaps, (left_key, right_key, layout))
+
+    def test_xinput_state_maps_buttons_triggers_and_stick_motion(self) -> None:
+        class FakeXInput:
+            @staticmethod
+            def XInputGetState(index: int, pointer: object) -> int:
+                self.assertEqual(index, 0)
+                state = pointer._obj
+                state.gamepad.buttons = (
+                    keyview.XINPUT_BUTTONS["PAD_A"]
+                    | keyview.XINPUT_BUTTONS["PAD_LB"]
+                )
+                state.gamepad.left_trigger = 31
+                state.gamepad.right_thumb_x = 9000
+                return 0
+
+        with mock.patch.object(keyview, "XINPUT", FakeXInput()):
+            connected, active = keyview.read_gamepad_state()
+        self.assertTrue(connected)
+        self.assertTrue(active["PAD_A"])
+        self.assertTrue(active["PAD_LB"])
+        self.assertTrue(active["PAD_LT"])
+        self.assertTrue(active["PAD_RS"])
+        self.assertFalse(active["PAD_B"])
+
+        with mock.patch.object(keyview, "XINPUT", None):
+            connected, active = keyview.read_gamepad_state()
+        self.assertFalse(connected)
+        self.assertFalse(any(active.values()))
 
     def test_color_presets_are_complete(self) -> None:
         required = {
@@ -213,17 +288,26 @@ class KeyViewTests(unittest.TestCase):
             self.assertEqual(loaded["color_preset"], keyview.DEFAULT_COLOR_PRESET)
             self.assertEqual(loaded["ui_scale"], 1.0)
             self.assertEqual((loaded["toolbox_width"], loaded["toolbox_height"]), (900, 650))
+            self.assertEqual(loaded["input_display_mode"], "keyboard")
+            self.assertEqual(loaded["toolbox_ui_scale"], 1.0)
+            self.assertEqual(loaded["hud_ui_scale"], 1.0)
             json.loads(path.read_text(encoding="utf-8"))
 
     def test_settings_theme_fallback_and_scale_clamp(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "settings.json"
             path.write_text(
-                '{"color_preset":"missing","ui_scale":9}', encoding="utf-8"
+                '{"color_preset":"missing","ui_scale":9,'
+                '"input_display_mode":"unknown","toolbox_ui_scale":8,'
+                '"hud_ui_scale":0.1}',
+                encoding="utf-8",
             )
             loaded = keyview.load_settings(path)
             self.assertEqual(loaded["color_preset"], keyview.DEFAULT_COLOR_PRESET)
             self.assertEqual(loaded["ui_scale"], 1.8)
+            self.assertEqual(loaded["input_display_mode"], "keyboard")
+            self.assertEqual(loaded["toolbox_ui_scale"], 1.15)
+            self.assertEqual(loaded["hud_ui_scale"], 0.85)
 
     def test_toolbox_window_size_is_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

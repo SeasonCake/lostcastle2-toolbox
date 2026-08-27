@@ -33,7 +33,7 @@ py -3 -m PyInstaller `
     '.\keyview.py'
 
 $packageParent = Join-Path $projectRoot 'package'
-$packageRoot = Join-Path $packageParent '失落城堡2工具箱 1.5.1'
+$packageRoot = Join-Path $packageParent '失落城堡2工具箱 1.5.2'
 if (Test-Path -LiteralPath $packageRoot) {
     $resolvedPackageRoot = (Resolve-Path -LiteralPath $packageRoot).Path
     $expectedPackageRoot = [System.IO.Path]::GetFullPath($packageRoot)
