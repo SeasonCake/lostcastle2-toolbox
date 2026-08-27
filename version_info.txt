@@ -14,11 +14,11 @@ VSVersionInfo(
       StringTable(
         '080404B0',
         [StringStruct('CompanyName', 'Personal Tool'),
-         StringStruct('FileDescription', '失落城堡2按键显示器'),
+         StringStruct('FileDescription', '失落城堡2工具箱'),
          StringStruct('FileVersion', '1.5.0'),
-         StringStruct('InternalName', 'LostCastle2KeyView'),
-         StringStruct('OriginalFilename', '失落城堡2按键显示器.exe'),
-         StringStruct('ProductName', '失落城堡2按键显示器'),
+         StringStruct('InternalName', 'LostCastle2Toolbox'),
+         StringStruct('OriginalFilename', '失落城堡2工具箱.exe'),
+         StringStruct('ProductName', '失落城堡2工具箱'),
          StringStruct('ProductVersion', '1.5.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [2052, 1200])])
