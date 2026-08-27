@@ -59,6 +59,43 @@ Three fields prevent common counting errors:
 2. `trigger_event_id` and `trigger_kind` preserve causality without forcing the UI to understand each soul-stone proc.
 3. `aggregate` is decided by the bridge after nested-operation deduplication. The aggregator must not guess from `nesting_depth`.
 
+## Location identity
+
+`room_id` is a technical identity for ordering and deduplication. It is never a
+user-facing map label. A `room_started` event carries four independent values from
+the game's `StageMgr` state:
+
+| Event field | Game source | Meaning |
+| --- | --- | --- |
+| `stage_level` | `StageMgr.CurStageLevel` | Main progression level, `0..6` |
+| `scenario_id` | `StageMgr.CurScenario` | Route/map enum such as `MudSwamp` |
+| `room_index` | `StageMgr.CurRoomIndex` | Area index inside that map; `99/100/101` are special |
+| `map_file_name` | `StageMgr.CurRoomInfo.mapFileName` | Exact generated room asset for diagnosis |
+
+The compact UI renders `地图名 · 第 N 区` (or a special room label) and the main
+page additionally renders `第 N 阶段`. Scenario labels live in
+[`assets/game_locations.json`](../assets/game_locations.json),
+derived from the game's own `UI_UniformType.json::ScenarioName_*` table. Unknown
+scenario enums remain visible as `未知地图 · token`; they must never inherit a nearby
+known name. The current mapping is scoped to game package
+`DefaultPackage_2026-08-18-1017` and must be rechecked after a game update.
+
+The same package's `ScenarioConfigData.stageLevel` and `nextScenarioFlag` values
+define the active campaign route:
+
+| Stage | Active scenarios |
+| --- | --- |
+| 1 | `DarkForest` / 黑森林 |
+| 2 | `RuinedCemetery`, `SaltpetreDesert`, `MudSwamp` / 三选一 |
+| 3 | `CrystalMountain`, `IceCavern` / 二选一 |
+| 4 | `CastleBridge`, `Sewer` / 二选一 |
+| 5 | `MainCastle` / 黑城堡 |
+| 6 | `MageTower` / 法师塔 |
+
+`MagmaCave` still exists in the enum and localization table, but the verified
+package has no matching scenario config and no active route points to it. It remains
+a known label with no asserted stage instead of being presented as a current route.
+
 ## Counting rules
 
 - Dealt damage uses the verified settlement value; actual target HP loss and overkill remain separate diagnostics.
@@ -82,6 +119,10 @@ Adding a new item should normally be:
 
 New aggregator code is justified only for a new behavior class, not for another item name.
 
+The location registry follows the same maintenance rule: a new route normally adds
+one data entry. A new location hierarchy or room-index meaning justifies a contract
+change.
+
 ## Session and replay invariants
 
 - `(session_id, sequence)` is ordered and an `event_id` is idempotent.
@@ -91,9 +132,9 @@ New aggregator code is justified only for a new behavior class, not for another 
 
 ## Implementation stages
 
-1. **Foundation (current):** v2 schema, source registry, replay aggregator, tests and public repository hygiene.
-2. **Bridge v2:** convert the proven damage/HP observer into the event envelope and local transport.
-3. **Toolbox shell and HUD:** calculator-style main navigation, compact B-style combat HUD, A-style combat details, connection state, replay mode and stale/error states.
+1. **Foundation (complete):** v2 schema, source registry, replay aggregator, tests and public repository hygiene.
+2. **Toolbox shell and replay HUD (current):** calculator-style main navigation, compact combat HUD, full combat details and deterministic demo/replay states.
+3. **Bridge v2:** convert the proven damage/HP observer into the event envelope and local transport, then expose live/stale/error connection states.
 4. **Mana and defenses:** verify MP cost/recovery/blocked paths and shield/effect stacks, then add registry entries.
 5. **Calibration:** host/client, game-update compatibility, checkpoint differences and packaging.
 

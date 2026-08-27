@@ -1,2 +1,4 @@
 jsonschema>=4.20,<5
+pillow>=11,<13
 pyinstaller>=6,<7
+pywin32>=306,<400

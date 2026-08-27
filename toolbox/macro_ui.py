@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any
 
+from .app_shell import RoundedPanel
 from .macro_config import (
     EMERGENCY_KEY,
     EMERGENCY_MODIFIERS,
@@ -24,17 +25,17 @@ from .macro_model import (
 from .windows_input import MOUSE_FLAGS, VK_CODES, WindowsSendInputBackend
 
 
-BG = "#10151B"
-PANEL = "#171E26"
-CONTROL = "#222C37"
-CONTROL_HOVER = "#2D3946"
-OUTLINE = "#3B4857"
-TEXT = "#F2F6FA"
-MUTED = "#8E9CAC"
-ACCENT = "#E7BD5A"
-ACCENT_DARK = "#3B311A"
-GOOD = "#77D99B"
-BAD = "#FF837B"
+BG = "#F3EEE3"
+PANEL = "#FBF9F4"
+CONTROL = "#F3EBDD"
+CONTROL_HOVER = "#E8DDCD"
+OUTLINE = "#D7CAB7"
+TEXT = "#292725"
+MUTED = "#7F766B"
+ACCENT = "#D86F4C"
+ACCENT_DARK = "#D86F4C"
+GOOD = "#397B64"
+BAD = "#C34B37"
 
 MODE_LABELS = {
     "once": "按一次：执行一遍",
@@ -103,6 +104,9 @@ class MacroFeature:
         self._dirty = False
         self._emergency_down = False
         self._rearm_required = False
+        self._advanced_visible = False
+        self.advanced_frame: tk.Frame | None = None
+        self.advanced_button: tk.Button | None = None
         self._closed = False
         self._after_id = self.root.after(20, self._tick)
 
@@ -120,7 +124,7 @@ class MacroFeature:
         window.title("失落城堡2工具箱 · 宏")
         window.configure(bg=BG)
         window.geometry(self._initial_geometry(window))
-        window.minsize(780, 590)
+        window.minsize(780, 680)
         window.attributes("-topmost", False)
 
         header = tk.Frame(window, bg=BG, padx=20, pady=16)
@@ -148,30 +152,54 @@ class MacroFeature:
         )
         self.runtime_label.pack(side="right", pady=(8, 0))
 
-        notice = tk.Frame(window, bg="#211C10", padx=14, pady=9)
-        notice.pack(fill="x", padx=20)
+        notice_panel = RoundedPanel(
+            window,
+            fill="#EEE2D2",
+            outline="#DDCBB8",
+            height=48,
+            content_padx=14,
+            content_pady=5,
+        )
+        notice_panel.pack(fill="x", padx=20)
+        notice = notice_panel.content
         tk.Label(
             notice,
             text="紧急停止  Ctrl + Shift + F12",
-            bg="#211C10",
-            fg="#FFE08A",
+            bg="#EEE2D2",
+            fg="#7A573F",
             font=("Microsoft YaHei UI", 10, "bold"),
         ).pack(side="left")
         tk.Label(
             notice,
             text="切出游戏、退出或修改配置时也会立即停止并释放按键。",
-            bg="#211C10",
-            fg="#C4B98F",
+            bg="#EEE2D2",
+            fg=MUTED,
             font=("Microsoft YaHei UI", 8),
         ).pack(side="right")
 
         content = tk.Frame(window, bg=BG, padx=20, pady=14)
         content.pack(fill="both", expand=True)
-        left = tk.Frame(content, bg=PANEL, width=240, padx=12, pady=12)
-        left.pack(side="left", fill="y")
-        left.pack_propagate(False)
-        right = tk.Frame(content, bg=PANEL, padx=16, pady=14)
-        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
+        left_panel = RoundedPanel(
+            content,
+            fill=PANEL,
+            outline=OUTLINE,
+            height=520,
+            content_padx=12,
+            content_pady=12,
+        )
+        left_panel.configure(width=240)
+        left_panel.pack(side="left", fill="y")
+        left = left_panel.content
+        right_panel = RoundedPanel(
+            content,
+            fill=PANEL,
+            outline=OUTLINE,
+            height=520,
+            content_padx=16,
+            content_pady=14,
+        )
+        right_panel.pack(side="left", fill="both", expand=True, padx=(12, 0))
+        right = right_panel.content
 
         tk.Label(
             left,
@@ -182,10 +210,10 @@ class MacroFeature:
         ).pack(anchor="w", pady=(0, 8))
         self.profile_list = tk.Listbox(
             left,
-            bg="#121820",
+            bg="#F7F2E9",
             fg=TEXT,
-            selectbackground="#3A311B",
-            selectforeground="#FFE28A",
+            selectbackground="#E4D6C4",
+            selectforeground=TEXT,
             activestyle="none",
             highlightthickness=1,
             highlightbackground=OUTLINE,
@@ -196,19 +224,14 @@ class MacroFeature:
         self.profile_list.pack(fill="both", expand=True)
         self.profile_list.bind("<<ListboxSelect>>", self._on_profile_select)
 
-        self._button(left, "＋ 新建单次宏", lambda: self._new_profile("once")).pack(
+        self._button(left, "＋ 新建宏", lambda: self._new_profile("once"), accent=True).pack(
             fill="x", pady=(10, 0)
         )
-        self._button(
-            left, "＋ 新建按住宏", lambda: self._new_profile("hold_repeat")
-        ).pack(fill="x", pady=(5, 0))
-        self._button(
-            left, "＋ 新建开关宏", lambda: self._new_profile("toggle_repeat")
-        ).pack(fill="x", pady=(5, 0))
         self._button(left, "删除所选", self._delete_selected, danger=True).pack(
             fill="x", pady=(7, 0)
         )
 
+        self._advanced_visible = False
         self._build_editor(right)
 
         footer = tk.Frame(window, bg=BG, padx=20, pady=0)
@@ -253,7 +276,7 @@ class MacroFeature:
 
     def _initial_geometry(self, window: tk.Toplevel) -> str:
         width = min(980, max(780, window.winfo_screenwidth() - 120))
-        height = min(760, max(590, window.winfo_screenheight() - 120))
+        height = min(820, max(680, window.winfo_screenheight() - 100))
         x = max(20, (window.winfo_screenwidth() - width) // 2)
         y = max(20, (window.winfo_screenheight() - height) // 2)
         return f"{width}x{height}+{x}+{y}"
@@ -298,47 +321,65 @@ class MacroFeature:
         ).grid(row=1, column=3, sticky="e")
         top.grid_columnconfigure(0, weight=1)
 
-        trigger = tk.Frame(parent, bg="#131A22", padx=12, pady=10)
+        trigger = tk.Frame(parent, bg=CONTROL, padx=12, pady=10)
         trigger.pack(fill="x", pady=(12, 10))
         tk.Label(
             trigger,
-            text="触发方式",
-            bg="#131A22",
+            text="如何启动这个宏",
+            bg=CONTROL,
             fg=ACCENT,
             font=("Microsoft YaHei UI", 10, "bold"),
         ).grid(row=0, column=0, columnspan=6, sticky="w", pady=(0, 7))
+        tk.Label(trigger, text="主按键", bg=CONTROL, fg=MUTED).grid(
+            row=1, column=0, sticky="w", pady=(0, 3)
+        )
+        tk.Label(trigger, text="同时按（可选）", bg=CONTROL, fg=MUTED).grid(
+            row=1, column=1, columnspan=3, sticky="w", padx=(8, 0), pady=(0, 3)
+        )
+        tk.Label(trigger, text="运行方式", bg=CONTROL, fg=MUTED).grid(
+            row=1, column=4, sticky="w", padx=(16, 0), pady=(0, 3)
+        )
         self._combo(trigger, self.vars["trigger_key"], TRIGGER_KEYS, width=10).grid(
-            row=1, column=0, sticky="ew"
+            row=2, column=0, sticky="ew"
         )
         for column, modifier in enumerate(("CTRL", "ALT", "SHIFT"), start=1):
             tk.Checkbutton(
                 trigger,
                 text=modifier,
                 variable=self.modifier_vars[modifier],
-                bg="#131A22",
+                bg=CONTROL,
                 fg=TEXT,
-                activebackground="#131A22",
+                activebackground=CONTROL,
                 activeforeground=TEXT,
                 selectcolor=ACCENT_DARK,
                 highlightthickness=0,
                 bd=0,
                 font=("Segoe UI", 8, "bold"),
-            ).grid(row=1, column=column, padx=(8, 0))
+            ).grid(row=2, column=column, padx=(8, 0))
         self._combo(trigger, self.vars["mode"], tuple(MODE_IDS), width=22).grid(
-            row=1, column=4, sticky="e", padx=(16, 0)
+            row=2, column=4, sticky="e", padx=(16, 0)
         )
         trigger.grid_columnconfigure(4, weight=1)
 
-        limits = tk.Frame(trigger, bg="#131A22")
-        limits.grid(row=2, column=0, columnspan=6, sticky="ew", pady=(9, 0))
-        tk.Label(limits, text="最长运行 (ms)", bg="#131A22", fg=MUTED).pack(side="left")
+        self.advanced_button = self._button(
+            trigger,
+            "显示高级设置",
+            self._toggle_advanced_settings,
+            width=12,
+        )
+        self.advanced_button.grid(row=3, column=0, columnspan=5, sticky="w", pady=(9, 0))
+        limits = tk.Frame(trigger, bg=CONTROL)
+        self.advanced_frame = limits
+        limits.grid(row=4, column=0, columnspan=6, sticky="ew", pady=(9, 0))
+        tk.Label(limits, text="最长运行 (ms)", bg=CONTROL, fg=MUTED).pack(side="left")
         self._entry(limits, self.vars["max_runtime_ms"], width=9).pack(
             side="left", padx=(6, 18)
         )
-        tk.Label(limits, text="每轮间隔 (ms)", bg="#131A22", fg=MUTED).pack(side="left")
+        tk.Label(limits, text="每轮间隔 (ms)", bg=CONTROL, fg=MUTED).pack(side="left")
         self._entry(limits, self.vars["repeat_delay_ms"], width=9).pack(
             side="left", padx=(6, 0)
         )
+        limits.grid_remove()
 
         steps_header = tk.Frame(parent, bg=PANEL)
         steps_header.pack(fill="x", pady=(2, 6))
@@ -351,7 +392,7 @@ class MacroFeature:
         ).pack(side="left")
         tk.Label(
             steps_header,
-            text="按下的键必须在后续抬起；停止路径会兜底释放",
+            text="按执行顺序从上到下排列",
             bg=PANEL,
             fg=MUTED,
             font=("Microsoft YaHei UI", 8),
@@ -361,8 +402,8 @@ class MacroFeature:
         style.theme_use("clam")
         style.configure(
             "Macro.Treeview",
-            background="#121820",
-            fieldbackground="#121820",
+            background="#F7F2E9",
+            fieldbackground="#F7F2E9",
             foreground=TEXT,
             bordercolor=OUTLINE,
             rowheight=28,
@@ -375,16 +416,21 @@ class MacroFeature:
             relief="flat",
             font=("Microsoft YaHei UI", 8, "bold"),
         )
-        style.map("Macro.Treeview", background=[("selected", "#4A3D1D")])
+        style.map(
+            "Macro.Treeview",
+            background=[("selected", "#E4D6C4")],
+            foreground=[("selected", TEXT)],
+        )
         tree_host = tk.Frame(parent, bg=OUTLINE, padx=1, pady=1)
-        tree_host.pack(fill="both", expand=True)
         self.step_tree = ttk.Treeview(
             tree_host,
             columns=("index", "action", "key", "duration"),
             show="headings",
             selectmode="browse",
             style="Macro.Treeview",
-            height=6,
+            # Two visible rows are the supported minimum; the packed tree
+            # expands to show more rows whenever the editor has room.
+            height=2,
         )
         for column, title, width, anchor in (
             ("index", "#", 38, "center"),
@@ -395,25 +441,49 @@ class MacroFeature:
             self.step_tree.heading(column, text=title)
             self.step_tree.column(column, width=width, anchor=anchor, stretch=column == "action")
         self.step_tree.pack(fill="both", expand=True)
+        step_scrollbar = ttk.Scrollbar(
+            tree_host,
+            orient="vertical",
+            command=self.step_tree.yview,
+        )
+        self.step_tree.configure(yscrollcommand=step_scrollbar.set)
+        self.step_tree.pack_forget()
+        self.step_tree.pack(side="left", fill="both", expand=True)
+        step_scrollbar.pack(side="right", fill="y")
         self.step_tree.bind("<<TreeviewSelect>>", self._load_selected_step)
 
         editor = tk.Frame(parent, bg=PANEL)
-        editor.pack(fill="x", pady=(9, 0))
-        self._combo(editor, self.vars["step_action"], tuple(ACTION_IDS), width=10).pack(
-            side="left"
-        )
-        self._combo(editor, self.vars["step_key"], STEP_KEYS, width=10).pack(
-            side="left", padx=(7, 0)
-        )
-        self._entry(editor, self.vars["step_ms"], width=8).pack(side="left", padx=(7, 0))
-        tk.Label(editor, text="ms", bg=PANEL, fg=MUTED).pack(side="left", padx=(4, 10))
-        self._button(editor, "添加", self._add_step, accent=True, width=6).pack(side="left")
-        self._button(editor, "替换", self._replace_step, width=6).pack(side="left", padx=5)
-        self._button(editor, "删除", self._remove_step, danger=True, width=6).pack(side="left")
-        self._button(editor, "↑", lambda: self._move_step(-1), width=3).pack(
-            side="right", padx=(5, 0)
-        )
-        self._button(editor, "↓", lambda: self._move_step(1), width=3).pack(side="right")
+        editor.pack(side="bottom", fill="x", pady=(9, 0))
+        fields = tk.Frame(editor, bg=PANEL)
+        fields.pack(fill="x")
+        tk.Label(fields, text="动作", bg=PANEL, fg=MUTED).grid(row=0, column=0, sticky="w")
+        tk.Label(fields, text="按键", bg=PANEL, fg=MUTED).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        tk.Label(fields, text="时长 / 等待 (ms)", bg=PANEL, fg=MUTED).grid(row=0, column=2, sticky="w", padx=(8, 0))
+        self._combo(fields, self.vars["step_action"], tuple(ACTION_IDS), width=10).grid(row=1, column=0, sticky="ew")
+        self._combo(fields, self.vars["step_key"], STEP_KEYS, width=10).grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        self._entry(fields, self.vars["step_ms"], width=12).grid(row=1, column=2, sticky="ew", padx=(8, 0))
+        fields.grid_columnconfigure(0, weight=1)
+        fields.grid_columnconfigure(1, weight=1)
+        fields.grid_columnconfigure(2, weight=1)
+        actions = tk.Frame(editor, bg=PANEL)
+        actions.pack(fill="x", pady=(8, 0))
+        self._button(actions, "添加到末尾", self._add_step, accent=True, width=10).pack(side="left")
+        self._button(actions, "替换所选", self._replace_step, width=9).pack(side="left", padx=5)
+        self._button(actions, "删除所选", self._remove_step, danger=True, width=9).pack(side="left")
+        self._button(actions, "下移", lambda: self._move_step(1), width=6).pack(side="right")
+        self._button(actions, "上移", lambda: self._move_step(-1), width=6).pack(side="right", padx=(0, 5))
+        tree_host.pack(fill="both", expand=True)
+
+    def _toggle_advanced_settings(self) -> None:
+        if self.advanced_frame is None or self.advanced_button is None:
+            return
+        self._advanced_visible = not self._advanced_visible
+        if self._advanced_visible:
+            self.advanced_frame.grid()
+            self.advanced_button.configure(text="隐藏高级设置")
+        else:
+            self.advanced_frame.grid_remove()
+            self.advanced_button.configure(text="显示高级设置")
 
     def _button(
         self,
@@ -430,9 +500,9 @@ class MacroFeature:
             text=text,
             command=command,
             bg=ACCENT_DARK if accent else CONTROL,
-            fg="#FFE28A" if accent else BAD if danger else TEXT,
-            activebackground="#514321" if accent else CONTROL_HOVER,
-            activeforeground=TEXT,
+            fg="#FFFAF5" if accent else BAD if danger else TEXT,
+            activebackground="#C86040" if accent else CONTROL_HOVER,
+            activeforeground="#FFFAF5" if accent else TEXT,
             relief="flat",
             bd=0,
             padx=8,
@@ -452,7 +522,7 @@ class MacroFeature:
             bg=CONTROL,
             fg=TEXT,
             insertbackground=TEXT,
-            selectbackground="#5A4820",
+            selectbackground="#E4D6C4",
             relief="flat",
             bd=0,
             highlightthickness=1,
@@ -838,6 +908,9 @@ class MacroFeature:
         self.status_label = None
         self.runtime_label = None
         self.step_tree = None
+        self.advanced_frame = None
+        self.advanced_button = None
+        self._advanced_visible = False
         self.vars.clear()
         self.modifier_vars.clear()
         self._editing_steps.clear()

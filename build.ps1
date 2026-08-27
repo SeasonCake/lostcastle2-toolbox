@@ -13,6 +13,8 @@ py -3 -m PyInstaller `
     --name '失落城堡2按键显示器' `
     --icon '.\assets\keyview.ico' `
     --version-file '.\version_info.txt' `
+    --add-data '.\assets\combat_sources.json;assets' `
+    --add-data '.\assets\game_locations.json;assets' `
     '.\keyview.py'
 
 $packageRoot = Join-Path $projectRoot 'package\失落城堡2工具箱'

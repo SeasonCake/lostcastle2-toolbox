@@ -16,10 +16,12 @@ import tkinter.font as tkfont
 from typing import Any
 import winreg
 
+from toolbox.app_shell import ToolboxShell, seed_demo_combat
+from toolbox.combat_aggregator import CombatAggregator, ScenarioRegistry, SourceRegistry
 from toolbox.macro_ui import MacroFeature
 
 
-APP_NAME = "失落城堡2按键显示器"
+APP_NAME = "失落城堡2工具箱"
 APP_VERSION = "1.4.1"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -34,6 +36,9 @@ APP_DIR = (
     Path(sys.executable).resolve().parent
     if getattr(sys, "frozen", False)
     else Path(__file__).resolve().parent
+)
+RESOURCE_DIR = Path(
+    getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)
 )
 CONFIG_DIR = Path(os.environ.get("KEYVIEW_CONFIG_DIR", APP_DIR / "config"))
 CONFIG_FILE = CONFIG_DIR / "settings.json"
@@ -722,7 +727,14 @@ class KeyViewApp:
     ACTIVE_TEXT = COLOR_PRESETS[DEFAULT_COLOR_PRESET]["active_text"]
     DANGER = "#FF7C73"
 
-    def __init__(self, root: tk.Tk, *, demo: bool = False) -> None:
+    def __init__(
+        self,
+        root: tk.Misc,
+        *,
+        demo: bool = False,
+        macro_feature: MacroFeature | None = None,
+        on_request_close: Any | None = None,
+    ) -> None:
         self.root = root
         self.demo = demo
         self.started_at = time.monotonic()
@@ -753,7 +765,9 @@ class KeyViewApp:
         self.settings_vars: dict[str, tk.Variable] = {}
         self.key_toggle_buttons: dict[str, tk.Button] = {}
         self.theme_buttons: dict[str, tk.Button] = {}
-        self.macro_feature = MacroFeature(root, CONFIG_DIR)
+        self._owns_macro_feature = macro_feature is None
+        self.macro_feature = macro_feature or MacroFeature(root, CONFIG_DIR)
+        self._on_request_close = on_request_close
 
         root.title(os.environ.get("KEYVIEW_WINDOW_TITLE", APP_NAME))
         root.overrideredirect(True)
@@ -1214,7 +1228,10 @@ class KeyViewApp:
         self.menu.add_command(label="恢复默认位置", command=self.reset_position)
         self.menu.add_command(label="重新定位游戏程序…", command=self.choose_game_path)
         self.menu.add_separator()
-        self.menu.add_command(label="退出", command=self.close)
+        self.menu.add_command(
+            label="关闭按键显示" if self._on_request_close is not None else "退出",
+            command=self.close,
+        )
 
     def _show_context_menu(self, event: tk.Event[Any]) -> None:
         self.menu.tk_popup(event.x_root, event.y_root)
@@ -2081,8 +2098,15 @@ class KeyViewApp:
             pass
 
     def close(self) -> None:
+        if self._on_request_close is not None:
+            self._on_request_close()
+            return
+        self.shutdown()
+
+    def shutdown(self) -> None:
         self._save_current_settings()
-        self.macro_feature.close()
+        if self._owns_macro_feature:
+            self.macro_feature.close()
         if self.settings_window is not None:
             self.settings_window.destroy()
         self.background_window.destroy()
@@ -2097,10 +2121,21 @@ def ensure_single_instance() -> int | None:
     if not handle:
         return None
     if kernel32.GetLastError() == 183:
-        user32.MessageBoxW(None, "按键显示器已经在运行。\n可按 F8 显示窗口。", APP_NAME, 0x40)
+        user32.MessageBoxW(None, "失落城堡 2 工具箱已经在运行。", APP_NAME, 0x40)
         kernel32.CloseHandle(handle)
         return None
     return int(handle)
+
+
+def parse_window_size(value: str) -> tuple[int, int]:
+    try:
+        width_text, height_text = value.lower().split("x", 1)
+        width, height = int(width_text), int(height_text)
+    except (ValueError, AttributeError) as exception:
+        raise argparse.ArgumentTypeError("窗口尺寸必须使用 WIDTHxHEIGHT") from exception
+    if width < 640 or height < 480:
+        raise argparse.ArgumentTypeError("窗口尺寸至少为 640x480")
+    return width, height
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -2108,7 +2143,47 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--demo", action="store_true", help="循环演示按键高亮")
     parser.add_argument("--show-settings", action="store_true", help="启动后打开设置")
     parser.add_argument("--show-macros", action="store_true", help="启动后打开宏设置")
-    parser.add_argument("--start-hidden", action="store_true", help="启动后隐藏，供恢复键检查")
+    parser.add_argument("--show-keyboard", action="store_true", help="启动后同时显示按键悬浮窗")
+    parser.add_argument(
+        "--show-page",
+        choices=("home", "combat", "keyboard", "macro", "settings"),
+        default="home",
+        help="开发验证：主窗口直接打开指定页面",
+    )
+    parser.add_argument(
+        "--show-combat-hud",
+        action="store_true",
+        help="开发验证：启动后直接打开战斗 HUD",
+    )
+    parser.add_argument(
+        "--demo-large-values",
+        action="store_true",
+        help="开发验证：演示千万级战斗数值的字号适配",
+    )
+    parser.add_argument(
+        "--demo-scenario",
+        default="MudSwamp",
+        help="开发验证：战斗演示使用的游戏 Scenario 枚举名",
+    )
+    parser.add_argument(
+        "--demo-room-index",
+        type=int,
+        default=4,
+        choices=range(0, 102),
+        metavar="0..101",
+        help="开发验证：战斗演示使用的区域序号",
+    )
+    parser.add_argument(
+        "--window-size",
+        type=parse_window_size,
+        help="开发验证：主窗口尺寸，例如 780x560",
+    )
+    parser.add_argument(
+        "--tk-scaling",
+        type=float,
+        help="开发验证：设置 Tk 字体/控件缩放",
+    )
+    parser.add_argument("--start-hidden", action="store_true", help="兼容旧版；按键悬浮窗默认隐藏")
     parser.add_argument("--exit-after", type=float, default=0.0, help="若干秒后自动退出")
     parser.add_argument("--self-test", action="store_true", help="运行无界面结构检查")
     return parser.parse_args(argv)
@@ -2134,7 +2209,7 @@ def self_test() -> int:
                 "version": APP_VERSION,
                 "available_key_count": len(KEY_DEFINITIONS),
                 "default_key_count": len(LOST_CASTLE_KEYS),
-                "game_exe": str(game_exe) if game_exe else None,
+                "game_exe_found": game_exe is not None,
             },
             ensure_ascii=False,
         )
@@ -2151,15 +2226,85 @@ def main(argv: list[str] | None = None) -> int:
     if mutex is None:
         return 0
     root = tk.Tk()
-    app = KeyViewApp(root, demo=args.demo)
+    root.withdraw()
+    if args.tk_scaling is not None:
+        root.tk.call("tk", "scaling", max(0.75, min(2.5, args.tk_scaling)))
+    macro_feature = MacroFeature(root, CONFIG_DIR)
+    keyboard_root = tk.Toplevel(root)
+    keyboard_app: KeyViewApp
+    keyboard_app = KeyViewApp(
+        keyboard_root,
+        demo=args.demo,
+        macro_feature=macro_feature,
+        on_request_close=lambda: (
+            keyboard_app.toggle_visible() if keyboard_app.visible else None
+        ),
+    )
+    keyboard_app.toggle_visible()
+    registry = SourceRegistry.from_file(
+        RESOURCE_DIR / "assets" / "combat_sources.json"
+    )
+    scenario_registry = ScenarioRegistry.from_file(
+        RESOURCE_DIR / "assets" / "game_locations.json"
+    )
+    combat_aggregator = CombatAggregator(
+        registry=registry,
+        scenario_registry=scenario_registry,
+    )
+    if args.demo or args.demo_large_values:
+        seed_demo_combat(
+            combat_aggregator,
+            scale=1000 if args.demo_large_values else 1,
+            scenario_id=args.demo_scenario,
+            room_index=args.demo_room_index,
+        )
+    shell: ToolboxShell | None = None
+    closing = False
+
+    def close_all() -> None:
+        nonlocal closing
+        if closing:
+            return
+        closing = True
+        if shell is not None:
+            shell.close()
+        keyboard_app.shutdown()
+        macro_feature.close()
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
+
+    def keyboard_preview() -> list[tuple[str, str, tuple[int, int, int, int]]]:
+        return [
+            (key_id, KEY_DEFINITIONS[key_id][0], geometry)
+            for key_id, geometry in keyboard_app.current_layout.items()
+        ]
+
+    shell = ToolboxShell(
+        root,
+        keyboard=keyboard_app,
+        macro_feature=macro_feature,
+        combat_aggregator=combat_aggregator,
+        keyboard_preview_provider=keyboard_preview,
+        launch_game=keyboard_app.launch_game,
+        choose_game_path=keyboard_app.choose_game_path,
+        close_command=close_all,
+    )
+    if args.window_size is not None:
+        root.geometry(f"{args.window_size[0]}x{args.window_size[1]}")
+    root.deiconify()
+    shell.show_page(args.show_page)
     if args.show_settings:
-        root.after(250, app.open_settings)
+        root.after(250, lambda: (shell.show_page("keyboard"), keyboard_app.open_settings()))
     if args.show_macros:
-        root.after(250, app.macro_feature.open_window)
-    if args.start_hidden:
-        root.after(250, app.toggle_visible)
+        root.after(250, lambda: (shell.show_page("macro"), macro_feature.open_window()))
+    if args.show_keyboard and not args.start_hidden:
+        root.after(250, keyboard_app.toggle_visible)
+    if args.show_combat_hud:
+        root.after(250, shell.hud.show)
     if args.exit_after > 0:
-        root.after(round(args.exit_after * 1000), app.close)
+        root.after(round(args.exit_after * 1000), close_all)
     try:
         root.mainloop()
     finally:

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import argparse
+from contextlib import redirect_stdout
+import io
 import json
 from pathlib import Path
 import random
@@ -11,6 +14,22 @@ import keyview
 
 
 class KeyViewTests(unittest.TestCase):
+    def test_self_test_reports_game_presence_without_exposing_local_path(self) -> None:
+        private_path = Path("private-install") / "LostCastle2.exe"
+        output = io.StringIO()
+        with mock.patch.object(keyview, "resolve_game_exe", return_value=private_path):
+            with redirect_stdout(output):
+                self.assertEqual(keyview.self_test(), 0)
+        payload = json.loads(output.getvalue())
+        self.assertTrue(payload["game_exe_found"])
+        self.assertNotIn("game_exe", payload)
+        self.assertNotIn(str(private_path), output.getvalue())
+
+    def test_window_size_parser_accepts_bounded_qa_geometry(self) -> None:
+        self.assertEqual(keyview.parse_window_size("780x560"), (780, 560))
+        with self.assertRaises(argparse.ArgumentTypeError):
+            keyview.parse_window_size("500x300")
+
     def test_z_order_helper_detects_only_candidate_above_reference(self) -> None:
         previous = {40: 30, 30: 20, 20: 10, 10: 0}
         getter = lambda hwnd: previous.get(hwnd, 0)

@@ -129,7 +129,9 @@ B2 组（单人 + 噩梦娃娃，0.4.0 归属正控）详见 [`artifacts/damage-
 
 ### D4：外部 HUD
 
-- 默认显示本局总伤害、当前房间、最近 10 秒 DPS、Boss 伤害。
+- 默认显示本局总伤害、当前地图与地图内区域、最近 10 秒 DPS、Boss 伤害。
+- 位置链路固定为 `StageMgr.CurStageLevel + CurScenario + CurRoomIndex + CurRoomInfo.mapFileName`；HUD 显示“官方地图名 · 第 N 区/特殊区域”，主战斗页另显示“第 N 阶段”，技术 `room_id` 不作为用户文案。
+- 当前包路线已由各地图 `ScenarioConfigData.stageLevel/nextScenarioFlag` 复核：黑森林 → 第 2 阶段三选一 → 第 3 阶段二选一 → 第 4 阶段二选一 → 黑城堡 → 法师塔。`MagmaCave/地热洞窟` 只有枚举和本地化、没有当前地图配置或现行入口，不列为当前路线。
 - 支持紧凑、纯净、侧边收起和点击穿透。
 - 组件拆分（武器、召唤物、DOT）只在归属证据完整后开放。
 

@@ -11,7 +11,7 @@ The repository currently contains:
 - a read-only combat research probe;
 - versioned contracts and a replayable aggregator for damage, healing, mana, effects, and shields.
 
-The next implementation stage is a calculator-style main toolbox window. It will manage the keyboard overlay, macros, and a compact combat HUD; full combat details live in the main window. The v2 event contract keeps game observation, aggregation, and presentation separate so new items normally require a source-registry entry instead of new UI logic.
+The application now starts in a calculator-style main toolbox window. It manages the keyboard overlay, macros, and a compact combat HUD; full combat details live in the main window. The v2 event contract keeps game observation, aggregation, and presentation separate so new items normally require a source-registry entry instead of new UI logic.
 
 ## Project status
 
@@ -22,7 +22,7 @@ The next implementation stage is a calculator-style main toolbox window. It will
 | Damage and HP semantics | Runtime-validated on the recorded game build |
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Contract-ready; runtime hooks pending |
-| External combat HUD | Planned next |
+| Main toolbox and external combat HUD | Implemented with replay/demo data; live bridge pending |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
@@ -36,10 +36,18 @@ py -3 -m unittest discover -s tests -p "test_*.py" -v
 py -3 keyview.py --self-test
 ```
 
-Run the overlay from source:
+Run the toolbox from source:
 
 ```powershell
 py -3 keyview.py
+```
+
+Code-driven UI review can open a page or overlay without moving the mouse:
+
+```powershell
+py -3 keyview.py --demo --show-page combat --show-combat-hud
+py -3 keyview.py --demo-large-values --show-page combat --window-size 780x560 --tk-scaling 1.5
+py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo-scenario CastleBridge --demo-room-index 100
 ```
 
 Build the Windows package:
