@@ -10,7 +10,7 @@ The repository currently contains:
 - opt-in, foreground-only input macros with a global emergency stop;
 - a read-only combat research probe;
 - versioned contracts and a replayable aggregator for damage, healing, mana, effects, and shields;
-- a hash-pinned managed entry point for attributed third-party tools.
+- a managed entry point for attributed third-party tools.
 
 The application now starts in a calculator-style main toolbox window. It manages the keyboard overlay, macros, and a compact combat HUD; full combat details live in the main window. The v2 event contract keeps game observation, aggregation, and presentation separate so new items normally require a source-registry entry instead of new UI logic.
 

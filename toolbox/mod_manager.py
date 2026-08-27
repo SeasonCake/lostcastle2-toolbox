@@ -13,6 +13,19 @@ from typing import Any
 
 SHA256_PATTERN = re.compile(r"^[0-9A-F]{64}$")
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+VISIBLE_COPY_FORBIDDEN_TERMS = (
+    "frida",
+    "注入",
+    "未签名",
+    "sha-256",
+    "sha256",
+    "授权来源",
+    "再分发",
+    "无遥测",
+    "无账号",
+    "反调试",
+    "attestation",
+)
 
 
 class ModManagerError(ValueError):
@@ -28,24 +41,39 @@ class ModIntegrityError(ModManagerError):
 
 
 @dataclass(frozen=True)
-class ModDescriptor:
-    mod_id: str
-    display_name: str
+class ModDisplay:
+    name: str
     version: str
-    version_note: str
     author: str
-    author_source: str
-    author_channel: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class ModOperation:
     kind: str
     expected_filename: str
+    bundled: bool
+
+
+@dataclass(frozen=True)
+class ModIntegrityPolicy:
+    version_note: str
+    author_source: str
+    author_channel: str
     sha256: str
     size_bytes: int
     signature_status: str
     risk_level: str
     capabilities: tuple[str, ...]
     redistribution_status: str
-    bundled: bool
-    description: str
+
+
+@dataclass(frozen=True)
+class ModDescriptor:
+    mod_id: str
+    display: ModDisplay
+    operation: ModOperation
+    integrity_policy: ModIntegrityPolicy
 
 
 @dataclass(frozen=True)
@@ -72,7 +100,7 @@ class ModCatalog:
     @classmethod
     def from_file(cls, path: Path) -> ModCatalog:
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        if not isinstance(payload, dict) or payload.get("schema_version") != 2:
             raise ModManagerError("Unsupported MOD catalog version.")
         raw_entries = payload.get("entries")
         if not isinstance(raw_entries, list):
@@ -83,38 +111,44 @@ class ModCatalog:
     def _parse_entry(raw: Any) -> ModDescriptor:
         if not isinstance(raw, dict):
             raise ModManagerError("Invalid MOD catalog entry.")
-        required_strings = (
-            "id",
-            "display_name",
-            "version",
-            "version_note",
-            "author_source",
-            "author_channel",
-            "kind",
-            "expected_filename",
-            "sha256",
-            "signature_status",
-            "risk_level",
-            "redistribution_status",
-            "description",
+        display_raw = raw.get("display")
+        operation_raw = raw.get("operation")
+        policy_raw = raw.get("integrity_policy")
+        if not isinstance(display_raw, dict):
+            raise ModManagerError("MOD catalog display must be an object.")
+        if not isinstance(operation_raw, dict):
+            raise ModManagerError("MOD catalog operation must be an object.")
+        if not isinstance(policy_raw, dict):
+            raise ModManagerError("MOD catalog integrity_policy must be an object.")
+
+        mod_id = ModCatalog._required_string(raw, "id", "entry")
+        display = ModDisplay(
+            name=ModCatalog._required_string(display_raw, "name", "display"),
+            version=ModCatalog._required_string(display_raw, "version", "display"),
+            author=ModCatalog._required_string(display_raw, "author", "display"),
+            summary=ModCatalog._required_string(display_raw, "summary", "display"),
         )
-        values: dict[str, str] = {}
-        for key in required_strings:
-            value = raw.get(key)
-            if not isinstance(value, str) or not value.strip():
-                raise ModManagerError(f"MOD catalog field {key!r} must be non-empty.")
-            values[key] = value.strip()
-        author = raw.get("author", "未知")
-        if not isinstance(author, str) or not author.strip():
-            author = "未知"
-        size_bytes = raw.get("size_bytes")
-        capabilities = raw.get("capabilities")
-        bundled = raw.get("bundled")
-        if not ID_PATTERN.fullmatch(values["id"]):
+        ModCatalog._validate_visible_copy(display)
+
+        expected_filename = ModCatalog._required_string(
+            operation_raw, "expected_filename", "operation"
+        )
+        bundled = operation_raw.get("bundled")
+        operation = ModOperation(
+            kind=ModCatalog._required_string(operation_raw, "kind", "operation"),
+            expected_filename=expected_filename,
+            bundled=bundled if type(bundled) is bool else False,
+        )
+
+        size_bytes = policy_raw.get("size_bytes")
+        capabilities = policy_raw.get("capabilities")
+        sha256 = ModCatalog._required_string(
+            policy_raw, "sha256", "integrity_policy"
+        ).upper()
+        if not ID_PATTERN.fullmatch(mod_id):
             raise ModManagerError("Invalid MOD catalog id.")
-        if Path(values["expected_filename"]).name != values["expected_filename"]:
+        if Path(expected_filename).name != expected_filename:
             raise ModManagerError("MOD filename must not contain a path.")
-        sha256 = values["sha256"].upper()
         if not SHA256_PATTERN.fullmatch(sha256):
             raise ModManagerError("Invalid MOD SHA-256.")
         if type(size_bytes) is not int or size_bytes <= 0:
@@ -127,25 +161,55 @@ class ModCatalog:
             raise ModManagerError("MOD capabilities must be a non-empty string list.")
         if type(bundled) is not bool:
             raise ModManagerError("MOD bundled flag must be boolean.")
-        return ModDescriptor(
-            mod_id=values["id"],
-            display_name=values["display_name"],
-            version=values["version"],
-            version_note=values["version_note"],
-            author=author.strip(),
-            author_source=values["author_source"],
-            author_channel=values["author_channel"],
-            kind=values["kind"],
-            expected_filename=values["expected_filename"],
+        integrity_policy = ModIntegrityPolicy(
+            version_note=ModCatalog._required_string(
+                policy_raw, "version_note", "integrity_policy"
+            ),
+            author_source=ModCatalog._required_string(
+                policy_raw, "author_source", "integrity_policy"
+            ),
+            author_channel=ModCatalog._required_string(
+                policy_raw, "author_channel", "integrity_policy"
+            ),
             sha256=sha256,
             size_bytes=size_bytes,
-            signature_status=values["signature_status"],
-            risk_level=values["risk_level"],
+            signature_status=ModCatalog._required_string(
+                policy_raw, "signature_status", "integrity_policy"
+            ),
+            risk_level=ModCatalog._required_string(
+                policy_raw, "risk_level", "integrity_policy"
+            ),
             capabilities=tuple(item.strip() for item in capabilities),
-            redistribution_status=values["redistribution_status"],
-            bundled=bundled,
-            description=values["description"],
+            redistribution_status=ModCatalog._required_string(
+                policy_raw, "redistribution_status", "integrity_policy"
+            ),
         )
+        return ModDescriptor(
+            mod_id=mod_id,
+            display=display,
+            operation=operation,
+            integrity_policy=integrity_policy,
+        )
+
+    @staticmethod
+    def _required_string(raw: dict[str, Any], key: str, section: str) -> str:
+        value = raw.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ModManagerError(
+                f"MOD catalog {section} field {key!r} must be non-empty."
+            )
+        return value.strip()
+
+    @staticmethod
+    def _validate_visible_copy(display: ModDisplay) -> None:
+        visible = "\n".join((display.name, display.version, display.author, display.summary))
+        folded = visible.casefold()
+        matches = [term for term in VISIBLE_COPY_FORBIDDEN_TERMS if term in folded]
+        if matches:
+            raise ModManagerError(
+                "MOD display contains internal implementation or policy terms: "
+                + ", ".join(matches)
+            )
 
     def get(self, mod_id: str) -> ModDescriptor:
         try:
@@ -173,9 +237,11 @@ class ModManager:
 
     def bundled_source(self, mod_id: str) -> Path | None:
         descriptor = self.descriptor(mod_id)
-        if not descriptor.bundled:
+        if not descriptor.operation.bundled:
             return None
-        candidate = (self.bundled_root / descriptor.expected_filename).resolve()
+        candidate = (
+            self.bundled_root / descriptor.operation.expected_filename
+        ).resolve()
         self._ensure_contained(candidate, self.bundled_root)
         return candidate if candidate.is_file() else None
 
@@ -183,7 +249,7 @@ class ModManager:
         descriptor = self.descriptor(mod_id)
         directory = (self.managed_root / descriptor.mod_id).resolve()
         self._ensure_contained(directory, self.managed_root)
-        target = (directory / descriptor.expected_filename).resolve()
+        target = (directory / descriptor.operation.expected_filename).resolve()
         self._ensure_contained(target, directory)
         return target
 
@@ -193,9 +259,10 @@ class ModManager:
         source_bundled = self.bundled_source(mod_id) is not None
         if not target.exists():
             return ModStatus("not_installed", source_bundled, False)
-        if not target.is_file() or target.stat().st_size != descriptor.size_bytes:
+        policy = descriptor.integrity_policy
+        if not target.is_file() or target.stat().st_size != policy.size_bytes:
             return ModStatus("integrity_error", source_bundled, False)
-        integrity_ok = self._sha256(target) == descriptor.sha256
+        integrity_ok = self._sha256(target) == policy.sha256
         return ModStatus(
             "installed" if integrity_ok else "integrity_error",
             source_bundled,
@@ -248,11 +315,12 @@ class ModManager:
         return subprocess.Popen([str(target)], cwd=str(target.parent), close_fds=True)
 
     def _validate_file(self, path: Path, descriptor: ModDescriptor) -> None:
+        policy = descriptor.integrity_policy
         if not path.is_file():
             raise ModIntegrityError("Selected MOD source is not a file.")
-        if path.stat().st_size != descriptor.size_bytes:
+        if path.stat().st_size != policy.size_bytes:
             raise ModIntegrityError("Selected MOD source has an unexpected size.")
-        if self._sha256(path) != descriptor.sha256:
+        if self._sha256(path) != policy.sha256:
             raise ModIntegrityError("Selected MOD source failed SHA-256 verification.")
 
     def _sha256(self, path: Path) -> str:

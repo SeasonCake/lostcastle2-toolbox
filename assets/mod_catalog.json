@@ -1,28 +1,34 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "entries": [
     {
       "id": "soul-stone-trainer",
-      "display_name": "灵魂石修改器",
-      "version": "1.2",
-      "version_note": "文件/标题 1.2；内嵌核心 v5.0；以 SHA-256 识别",
-      "author": "恨你不见",
-      "author_source": "程序内标题与用户提供信息",
-      "author_channel": "bilibili / QQ 昵称",
-      "kind": "external_trainer",
-      "expected_filename": "LostCastle2SoulStoneTrainer v1.2.exe",
-      "sha256": "025FB6CD01E79F9F2D8018BA9BF4FF592DE43EF2A7EDFD2E7A22F3C1842DF645",
-      "size_bytes": 72428059,
-      "signature_status": "unsigned",
-      "risk_level": "high",
-      "capabilities": [
-        "Frida IL2CPP 注入",
-        "灵魂石与成就写入",
-        "游戏资源替换"
-      ],
-      "redistribution_status": "author_approved_for_free_bundle_via_maintainer_2026-08-27",
-      "bundled": true,
-      "description": "生成和管理灵魂石"
+      "display": {
+        "name": "灵魂石修改器",
+        "version": "1.2",
+        "author": "恨你不见",
+        "summary": "生成和管理灵魂石"
+      },
+      "operation": {
+        "kind": "external_trainer",
+        "expected_filename": "LostCastle2SoulStoneTrainer v1.2.exe",
+        "bundled": true
+      },
+      "integrity_policy": {
+        "version_note": "文件/标题 1.2；内嵌核心 v5.0；以 SHA-256 识别",
+        "author_source": "程序内标题与用户提供信息",
+        "author_channel": "bilibili / QQ 昵称",
+        "sha256": "025FB6CD01E79F9F2D8018BA9BF4FF592DE43EF2A7EDFD2E7A22F3C1842DF645",
+        "size_bytes": 72428059,
+        "signature_status": "unsigned",
+        "risk_level": "high",
+        "capabilities": [
+          "Frida IL2CPP 注入",
+          "灵魂石与成就写入",
+          "游戏资源替换"
+        ],
+        "redistribution_status": "author_approved_for_free_bundle_via_maintainer_2026-08-27"
+      }
     }
   ]
 }

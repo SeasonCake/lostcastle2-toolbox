@@ -1477,7 +1477,7 @@ class ToolboxShell:
         title.pack(side="left", fill="x", expand=True)
         tk.Label(
             title,
-            text=f"{descriptor.display_name}  v{descriptor.version}",
+            text=f"{descriptor.display.name}  v{descriptor.display.version}",
             bg=SURFACE,
             fg=TEXT,
             anchor="w",
@@ -1485,7 +1485,7 @@ class ToolboxShell:
         ).pack(fill="x")
         tk.Label(
             title,
-            text=f"作者：{descriptor.author}",
+            text=f"作者：{descriptor.display.author}",
             bg=SURFACE,
             fg=MUTED,
             anchor="w",
@@ -1502,7 +1502,7 @@ class ToolboxShell:
 
         tk.Label(
             card,
-            text=descriptor.description,
+            text=descriptor.display.summary,
             bg=SURFACE,
             fg=TEXT,
             anchor="w",
@@ -1542,7 +1542,7 @@ class ToolboxShell:
         if source is None:
             selected = filedialog.askopenfilename(
                 parent=self.root,
-                title=f"选择 {descriptor.expected_filename}",
+                title=f"选择 {descriptor.operation.expected_filename}",
                 filetypes=(("Windows 应用程序", "*.exe"), ("所有文件", "*.*")),
             )
             if not selected:
@@ -1579,7 +1579,7 @@ class ToolboxShell:
     @staticmethod
     def _mod_error_text(error: Exception | None) -> str:
         if isinstance(error, ModIntegrityError):
-            return "所选文件与登记版本不一致；大小或 SHA-256 校验失败。"
+            return "所选文件与登记版本不一致；请重新选择对应版本。"
         if isinstance(error, (ModManagerError, OSError)):
             return "无法完成 MOD 操作；请确认文件仍存在且目录可写。"
         return "MOD 管理发生未预期错误，未启动第三方程序。"
@@ -1589,7 +1589,7 @@ class ToolboxShell:
         confirmed = messagebox.askyesno(
             "启动第三方修改器",
             (
-                f"即将启动“{descriptor.display_name}”。\n\n"
+                f"即将启动“{descriptor.display.name}”。\n\n"
                 "该工具会修改游戏数据。是否继续？"
             ),
             parent=self.root,
