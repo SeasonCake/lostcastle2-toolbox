@@ -55,14 +55,14 @@ class ModManagerTests(unittest.TestCase):
             root / "bundled",
         )
 
-    def test_public_catalog_records_author_hash_and_non_bundled_status(self) -> None:
+    def test_public_catalog_records_author_hash_and_bundle_permission(self) -> None:
         catalog = ModCatalog.from_file(PROJECT_ROOT / "assets" / "mod_catalog.json")
         entry = catalog.get("soul-stone-trainer")
         self.assertEqual(entry.author, "恨你不见")
         self.assertEqual(entry.version, "1.2")
         self.assertIn("v5.0", entry.version_note)
-        self.assertFalse(entry.bundled)
-        self.assertEqual(entry.redistribution_status, "permission_not_documented")
+        self.assertTrue(entry.bundled)
+        self.assertIn("author_approved", entry.redistribution_status)
         self.assertEqual(len(entry.sha256), 64)
         self.assertNotIn("C:\\", json.dumps(entry.__dict__, ensure_ascii=False))
 
@@ -97,6 +97,26 @@ class ModManagerTests(unittest.TestCase):
             self.assertEqual(manager.status("fixture-tool").state, "integrity_error")
             self.assertTrue(manager.uninstall("fixture-tool"))
             self.assertFalse(target.exists())
+
+    def test_bundled_source_configures_without_a_file_picker(self) -> None:
+        content = b"bundled fixture"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            payload = catalog_payload(content)
+            payload["entries"][0]["bundled"] = True  # type: ignore[index]
+            catalog_path = root / "catalog.json"
+            catalog_path.write_text(json.dumps(payload), encoding="utf-8")
+            bundled = root / "bundled"
+            bundled.mkdir()
+            (bundled / "fixture.exe").write_bytes(content)
+            manager = ModManager(
+                ModCatalog.from_file(catalog_path),
+                root / "managed",
+                bundled,
+            )
+            target = manager.install("fixture-tool")
+            self.assertTrue(target.is_file())
+            self.assertTrue(manager.status("fixture-tool").installed)
 
     def test_catalog_rejects_path_traversal(self) -> None:
         payload = catalog_payload(b"x")

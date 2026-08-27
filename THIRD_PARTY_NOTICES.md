@@ -10,6 +10,6 @@ Third-party tools listed by Lost Castle 2 Toolbox are not covered by this reposi
 - Version evidence: the filename and outer window title say `1.2`, while the embedded core identifies itself as `v5.0`; the fixed SHA-256 above is the authoritative file identity.
 - Observed form: unsigned PyInstaller executable using Frida IL2CPP injection, with features that can change game memory, resources, and achievements.
 - Embedded notice: free sharing; resale, commercial use, and repackaging for sale are prohibited.
-- Redistribution status: no explicit open-source license or public redistribution permission was found in the supplied file. The binary is therefore **not committed or bundled** by this repository. Users must select their own copy; the toolbox accepts only the exact registered hash.
+- Redistribution status: the maintainer confirmed the author approved inclusion in the free public package on 2026-08-27. Attribution remains required; resale and commercial use remain prohibited.
 
-The toolbox stores an opt-in managed copy under its ignored local `config` directory. Removing the entry deletes only that managed copy, not the user's download or game files. Launching the third-party program always requires an explicit confirmation.
+The packaged binary is pinned to the exact size and SHA-256 above. The toolbox configures a local copy and requires explicit confirmation before launch.

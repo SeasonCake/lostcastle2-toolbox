@@ -20,9 +20,9 @@
         "灵魂石与成就写入",
         "游戏资源替换"
       ],
-      "redistribution_status": "permission_not_documented",
-      "bundled": false,
-      "description": "第三方独立修改器；由用户选择原文件，盒子校验后保存受管副本。"
+      "redistribution_status": "author_approved_for_free_bundle_via_maintainer_2026-08-27",
+      "bundled": true,
+      "description": "生成和管理灵魂石"
     }
   ]
 }

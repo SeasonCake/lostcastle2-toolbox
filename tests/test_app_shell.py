@@ -6,11 +6,11 @@ from pathlib import Path
 
 from toolbox.app_shell import (
     boss_damage_share,
+    clamp_main_window_size,
     combat_state_label,
     combat_hud_size,
     combat_table_numeric_width,
     format_location_label,
-    format_file_size,
     format_metric,
     format_room_area,
     format_stage_location,
@@ -87,7 +87,6 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(format_metric(0), "0")
         self.assertEqual(format_metric(34_328), "34,328")
         self.assertEqual(format_metric(1.25), "1.2")
-        self.assertEqual(format_file_size(72_428_059), "69.1 MiB")
 
     def test_room_area_uses_game_special_indices(self) -> None:
         self.assertEqual(format_room_area(0), "入口")
@@ -136,6 +135,38 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(main_metric_card_height(2.0), 151)
         self.assertEqual(combat_table_numeric_width(1.5), 90)
         self.assertEqual(combat_table_numeric_width(2.0), 105)
+
+    def test_main_window_presets_respect_minimum_and_screen_bounds(self) -> None:
+        self.assertEqual(
+            clamp_main_window_size(
+                900,
+                650,
+                screen_width=1920,
+                screen_height=1080,
+                tk_scaling=1.5,
+            ),
+            (900, 650),
+        )
+        self.assertEqual(
+            clamp_main_window_size(
+                400,
+                300,
+                screen_width=1920,
+                screen_height=1080,
+                tk_scaling=2.0,
+            ),
+            (840, 600),
+        )
+        self.assertEqual(
+            clamp_main_window_size(
+                1400,
+                1000,
+                screen_width=1280,
+                screen_height=800,
+                tk_scaling=1.5,
+            ),
+            (1200, 720),
+        )
 
 
 if __name__ == "__main__":

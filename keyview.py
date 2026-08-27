@@ -540,6 +540,8 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
         "selected_keys": list(LOST_CASTLE_KEYS),
         "color_preset": DEFAULT_COLOR_PRESET,
         "ui_scale": 1.0,
+        "toolbox_width": 900,
+        "toolbox_height": 650,
         "always_on_top": True,
         "game_path": str(DEFAULT_GAME_EXE),
     }
@@ -569,6 +571,13 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
         color_preset if color_preset in COLOR_PRESETS else DEFAULT_COLOR_PRESET
     )
     defaults["ui_scale"] = min(1.8, max(0.6, float(defaults.get("ui_scale", 1.0))))
+    try:
+        toolbox_width = int(defaults.get("toolbox_width", 900))
+        toolbox_height = int(defaults.get("toolbox_height", 650))
+    except (TypeError, ValueError):
+        toolbox_width, toolbox_height = 900, 650
+    defaults["toolbox_width"] = min(1400, max(780, toolbox_width))
+    defaults["toolbox_height"] = min(1000, max(560, toolbox_height))
     defaults["show_background"] = bool(defaults.get("show_background", True))
     defaults["key_only"] = bool(defaults.get("key_only", False))
     return defaults
@@ -752,6 +761,8 @@ class KeyViewApp:
         self.selected_keys = list(self.settings["selected_keys"])
         self.color_preset = str(self.settings["color_preset"])
         self.ui_scale = float(self.settings["ui_scale"])
+        self.toolbox_width = int(self.settings["toolbox_width"])
+        self.toolbox_height = int(self.settings["toolbox_height"])
         self.applied_scale = 1.0
         self.canvas_font_bases: dict[int, tuple[str, int, str, str]] = {}
         self.resize_origin: tuple[int, int, float] | None = None
@@ -945,6 +956,20 @@ class KeyViewApp:
             self.ui_scale_value.configure(text=f"{round(self.ui_scale * 100)}%")
         if save:
             self._save_current_settings()
+
+    def set_ui_scale(self, value: float) -> None:
+        self._set_ui_scale(value)
+
+    @property
+    def toolbox_window_size(self) -> tuple[int, int]:
+        return self.toolbox_width, self.toolbox_height
+
+    def set_toolbox_window_size(self, width: int, height: int) -> None:
+        self.toolbox_width = min(1400, max(780, int(width)))
+        self.toolbox_height = min(1000, max(560, int(height)))
+        self.settings["toolbox_width"] = self.toolbox_width
+        self.settings["toolbox_height"] = self.toolbox_height
+        self._save_current_settings()
 
     def _shell_hwnd(self, widget: tk.Misc) -> int:
         widget.update_idletasks()
@@ -2096,6 +2121,8 @@ class KeyViewApp:
                 "selected_keys": self.selected_keys,
                 "color_preset": self.color_preset,
                 "ui_scale": self.ui_scale,
+                "toolbox_width": self.toolbox_width,
+                "toolbox_height": self.toolbox_height,
                 "always_on_top": self.always_on_top,
             }
         )
@@ -2318,6 +2345,7 @@ def main(argv: list[str] | None = None) -> int:
         launch_game=keyboard_app.launch_game,
         choose_game_path=keyboard_app.choose_game_path,
         close_command=close_all,
+        persist_window_geometry=args.window_size is None,
     )
     if combat_client is not None:
         combat_client.start()

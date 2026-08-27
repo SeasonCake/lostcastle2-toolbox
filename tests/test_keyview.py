@@ -184,6 +184,7 @@ class KeyViewTests(unittest.TestCase):
             self.assertEqual(loaded["selected_keys"], ["W", "A"])
             self.assertEqual(loaded["color_preset"], keyview.DEFAULT_COLOR_PRESET)
             self.assertEqual(loaded["ui_scale"], 1.0)
+            self.assertEqual((loaded["toolbox_width"], loaded["toolbox_height"]), (900, 650))
             json.loads(path.read_text(encoding="utf-8"))
 
     def test_settings_theme_fallback_and_scale_clamp(self) -> None:
@@ -195,6 +196,28 @@ class KeyViewTests(unittest.TestCase):
             loaded = keyview.load_settings(path)
             self.assertEqual(loaded["color_preset"], keyview.DEFAULT_COLOR_PRESET)
             self.assertEqual(loaded["ui_scale"], 1.8)
+
+    def test_toolbox_window_size_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "settings.json"
+            path.write_text(
+                '{"toolbox_width":99999,"toolbox_height":12}',
+                encoding="utf-8",
+            )
+            loaded = keyview.load_settings(path)
+            self.assertEqual((loaded["toolbox_width"], loaded["toolbox_height"]), (1400, 560))
+
+    def test_toolbox_window_size_setter_updates_persisted_state(self) -> None:
+        app = object.__new__(keyview.KeyViewApp)
+        app.settings = {}
+        with mock.patch.object(keyview.KeyViewApp, "_save_current_settings") as save:
+            app.set_toolbox_window_size(1080, 760)
+        self.assertEqual(app.toolbox_window_size, (1080, 760))
+        self.assertEqual(
+            (app.settings["toolbox_width"], app.settings["toolbox_height"]),
+            (1080, 760),
+        )
+        save.assert_called_once()
 
     def test_v1_settings_migrate_opacity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

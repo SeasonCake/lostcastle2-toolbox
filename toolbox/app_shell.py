@@ -29,6 +29,12 @@ BLUE = "#3F739A"
 GOLD = "#B4790D"
 HUD_TRANSPARENT = "#010203"
 
+TOOLBOX_WINDOW_PRESETS = {
+    "compact": (780, 560),
+    "standard": (900, 650),
+    "spacious": (1080, 760),
+}
+
 
 MODE_SHORT_LABELS = {
     "once": "单次",
@@ -60,8 +66,21 @@ def combat_state_color(state: str) -> str:
     return MUTED
 
 
-def format_file_size(size_bytes: int) -> str:
-    return f"{size_bytes / (1024 * 1024):.1f} MiB"
+def clamp_main_window_size(
+    width: int,
+    height: int,
+    *,
+    screen_width: int,
+    screen_height: int,
+    tk_scaling: float,
+) -> tuple[int, int]:
+    minimum_width, minimum_height = main_window_min_size(tk_scaling)
+    maximum_width = max(minimum_width, screen_width - 80)
+    maximum_height = max(minimum_height, screen_height - 80)
+    return (
+        min(maximum_width, max(minimum_width, int(width))),
+        min(maximum_height, max(minimum_height, int(height))),
+    )
 
 
 class KeyboardModule(Protocol):
@@ -71,10 +90,15 @@ class KeyboardModule(Protocol):
     ui_scale: float
     background_opacity: float
     game_process_id: int | None
+    toolbox_window_size: tuple[int, int]
 
     def toggle_visible(self) -> None: ...
 
     def open_settings(self) -> None: ...
+
+    def set_ui_scale(self, value: float) -> None: ...
+
+    def set_toolbox_window_size(self, width: int, height: int) -> None: ...
 
 
 class MacroModule(Protocol):
@@ -411,7 +435,7 @@ class RoundedPanel(tk.Canvas):
         fill: str = SURFACE,
         outline: str = BORDER,
         radius: int = 12,
-        height: int = 76,
+        height: int | None = 76,
         content_padx: int = 10,
         content_pady: int = 8,
     ) -> None:
@@ -421,12 +445,13 @@ class RoundedPanel(tk.Canvas):
             bg=parent_bg,
             highlightthickness=0,
             bd=0,
-            height=height,
+            height=height or 1,
         )
         self._fill = fill
         self._outline = outline
         self._radius = radius
         self._inset = max(6, radius // 2)
+        self._auto_height = height is None
         self.content = tk.Frame(
             self,
             bg=fill,
@@ -441,6 +466,13 @@ class RoundedPanel(tk.Canvas):
             tags=("content",),
         )
         self.bind("<Configure>", self._redraw)
+        if self._auto_height:
+            self.content.bind("<Configure>", self._resize_to_content)
+
+    def _resize_to_content(self, _event: tk.Event[Any] | None = None) -> None:
+        target = max(2, self.content.winfo_reqheight() + self._inset * 2)
+        if int(float(self.cget("height"))) != target:
+            self.configure(height=target)
 
     def _redraw(self, event: tk.Event[Any]) -> None:
         width = max(2, int(event.width))
@@ -490,11 +522,14 @@ class RoundedPanel(tk.Canvas):
         )
         self.tag_lower(surface)
         self.coords(self._content_window, self._inset, self._inset)
-        self.itemconfigure(
-            self._content_window,
-            width=max(1, width - self._inset * 2),
-            height=max(1, height - self._inset * 2),
-        )
+        dimensions: dict[str, int] = {
+            "width": max(1, width - self._inset * 2),
+        }
+        if not self._auto_height:
+            dimensions["height"] = max(1, height - self._inset * 2)
+        self.itemconfigure(self._content_window, **dimensions)
+        if self._auto_height:
+            self.after_idle(self._resize_to_content)
 
 
 class CombatHudWindow:
@@ -846,6 +881,7 @@ class ToolboxShell:
         launch_game: Callable[[], None],
         choose_game_path: Callable[[], None],
         close_command: Callable[[], None],
+        persist_window_geometry: bool = True,
     ) -> None:
         self.root = root
         self.keyboard = keyboard
@@ -857,6 +893,7 @@ class ToolboxShell:
         self.launch_game = launch_game
         self.choose_game_path = choose_game_path
         self.close_command = close_command
+        self.persist_window_geometry = persist_window_geometry
         self.hud = CombatHudWindow(root, combat_aggregator)
         self.pages: dict[str, tk.Frame] = {}
         self.nav_buttons: dict[str, tk.Button] = {}
@@ -870,7 +907,7 @@ class ToolboxShell:
 
         root.title("失落城堡 2 工具箱")
         root.configure(bg=BG)
-        root.geometry(self._initial_geometry(root))
+        root.geometry(self._initial_geometry(root, *keyboard.toolbox_window_size))
         root.minsize(*main_window_min_size(float(root.tk.call("tk", "scaling"))))
         root.protocol("WM_DELETE_WINDOW", close_command)
         self._configure_tree_style()
@@ -919,13 +956,6 @@ class ToolboxShell:
             fg=TEXT,
             font=("Microsoft YaHei UI", 17, "bold"),
         ).pack(anchor="w")
-        tk.Label(
-            title,
-            text="按键显示 · 前台宏 · 战斗统计 · MOD 管理",
-            bg="#F8F4EB",
-            fg=MUTED,
-            font=("Microsoft YaHei UI", 8),
-        ).pack(anchor="w", pady=(3, 0))
         self._button(header, "启动游戏", self.launch_game, accent=True, width=10).pack(
             side="right"
         )
@@ -985,14 +1015,6 @@ class ToolboxShell:
 
         footer = tk.Frame(self.root, bg="#F8F4EB", padx=18, pady=7)
         footer.pack(fill="x")
-        self.labels["footer"] = tk.Label(
-            footer,
-            text="工具箱本体：本地运行 · 无账号 · 无遥测",
-            bg="#F8F4EB",
-            fg=MUTED,
-            font=("Microsoft YaHei UI", 8),
-        )
-        self.labels["footer"].pack(side="left")
         tk.Button(
             footer,
             text="退出工具箱",
@@ -1034,13 +1056,14 @@ class ToolboxShell:
             fg=TEXT,
             font=("Microsoft YaHei UI", 15, "bold"),
         ).pack(anchor="w")
-        tk.Label(
-            copy,
-            text=subtitle,
-            bg=BG,
-            fg=MUTED,
-            font=("Microsoft YaHei UI", 8),
-        ).pack(anchor="w", pady=(3, 0))
+        if subtitle:
+            tk.Label(
+                copy,
+                text=subtitle,
+                bg=BG,
+                fg=MUTED,
+                font=("Microsoft YaHei UI", 8),
+            ).pack(anchor="w", pady=(3, 0))
         if action is not None:
             self._button(row, action[0], action[1], accent=True, width=12).pack(side="right")
 
@@ -1437,37 +1460,14 @@ class ToolboxShell:
 
     def _build_mod_page(self) -> None:
         page = self._new_page("mods")
-        self._page_heading(
-            page,
-            "MOD 管理",
-            "只管理盒子创建的受管副本；不会扫描或删除下载目录中的原文件。",
-        )
-        warning = tk.Frame(page, bg="#F4E4D8", padx=11, pady=8)
-        warning.pack(fill="x", pady=(0, 10))
-        tk.Label(
-            warning,
-            text="第三方高风险工具",
-            bg="#F4E4D8",
-            fg=RED,
-            font=("Microsoft YaHei UI", 8, "bold"),
-        ).pack(anchor="w")
-        tk.Label(
-            warning,
-            text="独立修改器可能注入游戏、改写资源或写入不可逆成就；盒子只校验、保存副本并按你的点击启动。",
-            bg="#F4E4D8",
-            fg="#7A573F",
-            anchor="w",
-            justify="left",
-            wraplength=650,
-            font=("Microsoft YaHei UI", 8),
-        ).pack(fill="x", pady=(3, 0))
+        self._page_heading(page, "MOD 管理", "")
 
         descriptor = self.mod_manager.catalog.entries[0]
         panel = RoundedPanel(
             page,
-            height=258,
+            height=None,
             content_padx=14,
-            content_pady=7,
+            content_pady=12,
         )
         panel.pack(fill="x")
         card = panel.content
@@ -1485,7 +1485,7 @@ class ToolboxShell:
         ).pack(fill="x")
         tk.Label(
             title,
-            text=f"作者：{descriptor.author}  ·  {descriptor.author_channel}",
+            text=f"作者：{descriptor.author}",
             bg=SURFACE,
             fg=MUTED,
             anchor="w",
@@ -1506,37 +1506,11 @@ class ToolboxShell:
             bg=SURFACE,
             fg=TEXT,
             anchor="w",
-            justify="left",
-            wraplength=640,
             font=("Microsoft YaHei UI", 8),
-        ).pack(fill="x", pady=(7, 4))
-        metadata = (
-            f"类型：独立修改器（{descriptor.capabilities[0]}）\n"
-            f"版本：{descriptor.version_note}\n"
-            f"文件：未签名 · {format_file_size(descriptor.size_bytes)} · "
-            f"SHA-256 {descriptor.sha256[:12]}…{descriptor.sha256[-8:]}\n"
-            "收录方式：本版不捆绑二进制；选择作者原文件并通过完整哈希后配置"
-        )
-        tk.Label(
-            card,
-            text=metadata,
-            bg=SURFACE,
-            fg=MUTED,
-            anchor="w",
-            justify="left",
-            font=("Microsoft YaHei UI", 8),
-        ).pack(fill="x")
+        ).pack(fill="x", pady=(10, 0))
 
         actions = tk.Frame(card, bg=SURFACE)
-        actions.pack(side="bottom", fill="x", pady=(7, 0))
-        self.labels["mod_action_hint"] = tk.Label(
-            actions,
-            text="删除只移除盒子受管副本。",
-            bg=SURFACE,
-            fg=MUTED,
-            font=("Microsoft YaHei UI", 8),
-        )
-        self.labels["mod_action_hint"].pack(side="left", fill="x", expand=True)
+        actions.pack(side="bottom", fill="x")
         self.mod_buttons["remove"] = self._button(
             actions,
             "删除副本",
@@ -1575,7 +1549,6 @@ class ToolboxShell:
                 return
             source = Path(selected)
         self._mod_busy = True
-        self.labels["mod_action_hint"].configure(text="正在复制并校验完整 SHA-256…")
         self._refresh_mod_page()
 
         def install() -> None:
@@ -1597,10 +1570,9 @@ class ToolboxShell:
         except queue.Empty:
             return
         self._mod_busy = False
-        self.labels["mod_action_hint"].configure(text="删除只移除盒子受管副本。")
         self._refresh_mod_page()
         if success:
-            messagebox.showinfo("配置完成", "第三方工具已复制到盒子的受管目录并通过哈希校验。", parent=self.root)
+            messagebox.showinfo("配置完成", "MOD 已配置。", parent=self.root)
         else:
             messagebox.showerror("配置失败", self._mod_error_text(error), parent=self.root)
 
@@ -1609,7 +1581,7 @@ class ToolboxShell:
         if isinstance(error, ModIntegrityError):
             return "所选文件与登记版本不一致；大小或 SHA-256 校验失败。"
         if isinstance(error, (ModManagerError, OSError)):
-            return "无法完成受管副本操作；请确认文件仍存在且目录可写。"
+            return "无法完成 MOD 操作；请确认文件仍存在且目录可写。"
         return "MOD 管理发生未预期错误，未启动第三方程序。"
 
     def _launch_mod(self, mod_id: str) -> None:
@@ -1618,8 +1590,7 @@ class ToolboxShell:
             "启动第三方修改器",
             (
                 f"即将启动“{descriptor.display_name}”。\n\n"
-                "该未签名程序会使用 Frida 注入，并可能修改游戏资源或不可逆成就。"
-                "它不是本项目源码的一部分。是否继续？"
+                "该工具会修改游戏数据。是否继续？"
             ),
             parent=self.root,
         )
@@ -1635,7 +1606,7 @@ class ToolboxShell:
             return
         if not messagebox.askyesno(
             "删除盒子副本",
-            "只删除盒子受管目录中的这一份文件；下载目录原件和游戏目录均保持不变。是否继续？",
+            "删除已配置的本地副本？",
             parent=self.root,
         ):
             return
@@ -1646,7 +1617,7 @@ class ToolboxShell:
             return
         self._refresh_mod_page()
         if removed:
-            messagebox.showinfo("已删除", "盒子受管副本已删除，原始下载文件未改动。", parent=self.root)
+            messagebox.showinfo("已删除", "本地副本已删除。", parent=self.root)
 
     def _refresh_mod_page(self) -> None:
         descriptor = self.mod_manager.catalog.entries[0]
@@ -1654,7 +1625,7 @@ class ToolboxShell:
         if self._mod_busy:
             label, color = "● 配置中", GOLD
         elif status.state == "installed":
-            label, color = "● 已配置 · 校验通过", GREEN
+            label, color = "● 已配置", GREEN
         elif status.state == "integrity_error":
             label, color = "● 副本校验失败", RED
         else:
@@ -1674,22 +1645,85 @@ class ToolboxShell:
 
     def _build_settings_page(self) -> None:
         page = self._new_page("settings")
-        self._page_heading(page, "工具箱设置", "只放跨模块入口，具体选项回到对应模块。")
+        self._page_heading(page, "设置", "")
+
+        display_panel = RoundedPanel(
+            page,
+            height=None,
+            content_padx=12,
+            content_pady=5,
+        )
+        display_panel.pack(fill="x", pady=(0, 9))
+        display = display_panel.content
+        self._display_control_row(
+            display,
+            "主窗口",
+            "toolbox_window_size",
+            (
+                ("紧凑", lambda: self._set_toolbox_window_preset("compact")),
+                ("标准", lambda: self._set_toolbox_window_preset("standard")),
+                ("宽敞", lambda: self._set_toolbox_window_preset("spacious")),
+            ),
+        )
+        tk.Frame(display, bg="#E2D9CC", height=1).pack(fill="x")
+        self._display_control_row(
+            display,
+            "按键显示缩放",
+            "keyboard_scale",
+            (
+                ("缩小", lambda: self._set_keyboard_scale(-0.1)),
+                ("重置", lambda: self._set_keyboard_scale(0.0)),
+                ("放大", lambda: self._set_keyboard_scale(0.1)),
+            ),
+        )
+
         settings_panel = RoundedPanel(
             page,
-            # Four natural-height rows plus separators and rounded-panel
-            # insets. A smaller fixed canvas forces only the final row to
-            # shrink, clipping both its description and action button.
-            height=316,
+            height=None,
             content_padx=12,
-            content_pady=4,
+            content_pady=2,
         )
         settings_panel.pack(fill="x")
         panel = settings_panel.content
-        self._settings_row(panel, "游戏程序", "定位 LostCastle2.exe", "重新定位", self.choose_game_path)
-        self._settings_row(panel, "按键显示", "键位、透明度、缩放、配色与快捷键", "打开设置", self.keyboard.open_settings)
-        self._settings_row(panel, "按键宏", "方案、触发组合、步骤与安全限制", "编辑宏", self.macro_feature.open_window)
-        self._settings_row(panel, "战斗统计", "本地只读事件、回放与显示", "打开 HUD", self.hud.show, last=True)
+        self._settings_row(panel, "游戏程序", "", "重新定位", self.choose_game_path)
+        self._settings_row(panel, "按键显示", "", "完整设置", self.keyboard.open_settings)
+        self._settings_row(panel, "按键宏", "", "编辑宏", self.macro_feature.open_window)
+        self._settings_row(panel, "战斗统计", "", "打开 HUD", self.hud.show, last=True)
+
+    def _display_control_row(
+        self,
+        parent: tk.Frame,
+        title: str,
+        value_key: str,
+        actions: tuple[tuple[str, Callable[[], None]], ...],
+    ) -> None:
+        row = tk.Frame(parent, bg=SURFACE, pady=4)
+        row.pack(fill="x")
+        copy = tk.Frame(row, bg=SURFACE)
+        copy.pack(side="left", fill="x", expand=True)
+        tk.Label(
+            copy,
+            text=title,
+            bg=SURFACE,
+            fg=TEXT,
+            anchor="w",
+            font=("Microsoft YaHei UI", 9, "bold"),
+        ).pack(side="left")
+        self.labels[value_key] = tk.Label(
+            copy,
+            text="—",
+            bg=SURFACE,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 8),
+        )
+        self.labels[value_key].pack(side="left", padx=(10, 0))
+        controls = tk.Frame(row, bg=SURFACE)
+        controls.pack(side="right")
+        for index, (label, command) in enumerate(actions):
+            self._button(controls, label, command, width=6).pack(
+                side="left",
+                padx=(0 if index == 0 else 5, 0),
+            )
 
     def _settings_row(
         self,
@@ -1701,15 +1735,48 @@ class ToolboxShell:
         *,
         last: bool = False,
     ) -> None:
-        row = tk.Frame(parent, bg=SURFACE, pady=10)
+        row = tk.Frame(parent, bg=SURFACE, pady=5)
         row.pack(fill="x")
         copy = tk.Frame(row, bg=SURFACE)
         copy.pack(side="left", fill="x", expand=True)
         tk.Label(copy, text=title, bg=SURFACE, fg=TEXT, anchor="w", font=("Microsoft YaHei UI", 9, "bold")).pack(fill="x")
-        tk.Label(copy, text=detail, bg=SURFACE, fg=MUTED, anchor="w", font=("Microsoft YaHei UI", 8)).pack(fill="x", pady=(3, 0))
+        if detail:
+            tk.Label(copy, text=detail, bg=SURFACE, fg=MUTED, anchor="w", font=("Microsoft YaHei UI", 8)).pack(fill="x", pady=(3, 0))
         self._button(row, action_text, command, width=11).pack(side="right")
         if not last:
             tk.Frame(parent, bg="#E2D9CC", height=1).pack(fill="x")
+
+    def _set_toolbox_window_preset(self, preset: str) -> None:
+        requested_width, requested_height = TOOLBOX_WINDOW_PRESETS[preset]
+        width, height = clamp_main_window_size(
+            requested_width,
+            requested_height,
+            screen_width=self.root.winfo_screenwidth(),
+            screen_height=self.root.winfo_screenheight(),
+            tk_scaling=float(self.root.tk.call("tk", "scaling")),
+        )
+        x = min(max(0, self.root.winfo_x()), max(0, self.root.winfo_screenwidth() - width))
+        y = min(max(0, self.root.winfo_y()), max(0, self.root.winfo_screenheight() - height))
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        self.root.update_idletasks()
+        self.keyboard.set_toolbox_window_size(width, height)
+        self._refresh_display_settings()
+
+    def _set_keyboard_scale(self, change: float) -> None:
+        target = 1.0 if abs(change) < 0.001 else self.keyboard.ui_scale + change
+        self.keyboard.set_ui_scale(target)
+        self._refresh_display_settings()
+
+    def _refresh_display_settings(self) -> None:
+        width, height = self.root.winfo_width(), self.root.winfo_height()
+        if width <= 1 or height <= 1:
+            width, height = self.keyboard.toolbox_window_size
+        self.labels["toolbox_window_size"].configure(
+            text=f"{width} × {height}"
+        )
+        self.labels["keyboard_scale"].configure(
+            text=f"{round(self.keyboard.ui_scale * 100)}%"
+        )
 
     def _button(
         self,
@@ -1766,6 +1833,7 @@ class ToolboxShell:
         self._refresh_combat()
         self._refresh_macro_rows()
         self._refresh_mod_page()
+        self._refresh_display_settings()
         self._draw_keyboard_preview()
         self.hud.refresh()
 
@@ -2014,12 +2082,26 @@ class ToolboxShell:
                 self.root.after_cancel(self._after_id)
             except tk.TclError:
                 pass
+        if self.persist_window_geometry:
+            try:
+                if self.root.state() == "normal":
+                    self.keyboard.set_toolbox_window_size(
+                        self.root.winfo_width(),
+                        self.root.winfo_height(),
+                    )
+            except tk.TclError:
+                pass
         self.hud.close()
 
     @staticmethod
-    def _initial_geometry(root: tk.Tk) -> str:
-        width = min(930, max(780, root.winfo_screenwidth() - 180))
-        height = min(700, max(560, root.winfo_screenheight() - 150))
+    def _initial_geometry(root: tk.Tk, requested_width: int, requested_height: int) -> str:
+        width, height = clamp_main_window_size(
+            requested_width,
+            requested_height,
+            screen_width=root.winfo_screenwidth(),
+            screen_height=root.winfo_screenheight(),
+            tk_scaling=float(root.tk.call("tk", "scaling")),
+        )
         x = max(20, (root.winfo_screenwidth() - width) // 2)
         y = max(20, (root.winfo_screenheight() - height) // 2)
         return f"{width}x{height}+{x}+{y}"

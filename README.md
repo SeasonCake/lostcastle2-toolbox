@@ -60,7 +60,7 @@ Build the Windows package:
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The MOD page currently registers Soul Stone Trainer 1.2 by community author **恨你不见**. It is an unsigned Frida-based external trainer, not part of this project's read-only bridge. No explicit public redistribution permission was found, so its 72 MB executable is not committed or bundled. Users select their own copy and the toolbox accepts only the pinned size and SHA-256; removal affects only the toolbox-managed copy. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, with configure, launch, and local-copy removal controls. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Safety and scope
 
