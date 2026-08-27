@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "verified_game_package": "DefaultPackage_2026-08-18-1017",
+  "enum_source": "LC2.Core.dll::LC2.Scenario",
+  "localization_source": "StreamingAssets/Localization/UI_UniformType.json::ScenarioName_*",
+  "route_source": "DefaultPackage_2026-08-18-1017 map bundles::ScenarioConfigData.stageLevel + nextScenarioFlag",
+  "active_campaign_routes": {
+    "1": ["DarkForest"],
+    "2": ["RuinedCemetery", "SaltpetreDesert", "MudSwamp"],
+    "3": ["CrystalMountain", "IceCavern"],
+    "4": ["CastleBridge", "Sewer"],
+    "5": ["MainCastle"],
+    "6": ["MageTower"]
+  },
+  "localized_but_not_active_in_verified_package": ["MagmaCave"],
+  "entries": {
+    "Camp": {
+      "enum_value": 1,
+      "stage_level": 0,
+      "label_zh_cn": "营地",
+      "label_en": "Camp"
+    },
+    "DarkForest": {
+      "enum_value": 2,
+      "stage_level": 1,
+      "label_zh_cn": "黑森林",
+      "label_en": "Black Forest"
+    },
+    "RuinedCemetery": {
+      "enum_value": 4,
+      "stage_level": 2,
+      "label_zh_cn": "废村",
+      "label_en": "Abandoned Village"
+    },
+    "SaltpetreDesert": {
+      "enum_value": 8,
+      "stage_level": 2,
+      "label_zh_cn": "硝石荒漠",
+      "label_en": "Saltpeter Desert"
+    },
+    "MudSwamp": {
+      "enum_value": 16,
+      "stage_level": 2,
+      "label_zh_cn": "泥鱼沼泽",
+      "label_en": "Mudfish Swamp"
+    },
+    "CrystalMountain": {
+      "enum_value": 32,
+      "stage_level": 3,
+      "label_zh_cn": "结晶山",
+      "label_en": "Crystal Mountain"
+    },
+    "MagmaCave": {
+      "enum_value": 64,
+      "stage_level": null,
+      "label_zh_cn": "地热洞窟",
+      "label_en": "Geothermal Cave"
+    },
+    "IceCavern": {
+      "enum_value": 128,
+      "stage_level": 3,
+      "label_zh_cn": "冰窖洞窟",
+      "label_en": "Frozen Cave"
+    },
+    "CastleBridge": {
+      "enum_value": 256,
+      "stage_level": 4,
+      "label_zh_cn": "黑城堡大桥",
+      "label_en": "Black Castle Bridge"
+    },
+    "MainCastle": {
+      "enum_value": 512,
+      "stage_level": 5,
+      "label_zh_cn": "黑城堡",
+      "label_en": "Black Castle"
+    },
+    "MageTower": {
+      "enum_value": 1024,
+      "stage_level": 6,
+      "label_zh_cn": "法师塔",
+      "label_en": "Mage Tower"
+    },
+    "Sewer": {
+      "enum_value": 2048,
+      "stage_level": 4,
+      "label_zh_cn": "城堡地牢",
+      "label_en": "Castle Dungeon"
+    },
+    "Random": {
+      "enum_value": 536870912,
+      "stage_level": null,
+      "label_zh_cn": "未知地区",
+      "label_en": "Unknown"
+    },
+    "TrainingRoom": {
+      "enum_value": 1073741824,
+      "stage_level": 0,
+      "label_zh_cn": "训练场",
+      "label_en": "Training Course"
+    }
+  }
+}

@@ -86,6 +86,45 @@ class ContractTests(unittest.TestCase):
                 "status": "live",
             }
         )
+        validator.validate(
+            {
+                **common,
+                "event_id": "qa-session:5",
+                "sequence": 5,
+                "event_type": "status",
+                "status": "room_started",
+                "room_id": "L2:MudSwamp:4:Map_MS_Battle_A003",
+                "stage_level": 2,
+                "scenario_id": "MudSwamp",
+                "room_index": 4,
+                "map_file_name": "Map_MS_Battle_A003",
+            }
+        )
+
+        invalid_room_start = {
+            **common,
+            "event_id": "qa-session:6",
+            "sequence": 6,
+            "event_type": "status",
+            "status": "room_started",
+        }
+        with self.assertRaises(ValidationError):
+            validator.validate(invalid_room_start)
+
+        invalid_room_index = {
+            **common,
+            "event_id": "qa-session:7",
+            "sequence": 7,
+            "event_type": "status",
+            "status": "room_started",
+            "room_id": "L2:MudSwamp:42:invalid",
+            "stage_level": 2,
+            "scenario_id": "MudSwamp",
+            "room_index": 42,
+            "map_file_name": "invalid",
+        }
+        with self.assertRaises(ValidationError):
+            validator.validate(invalid_room_index)
 
         invalid_resource = {
             **common,
@@ -110,6 +149,45 @@ class ContractTests(unittest.TestCase):
         Draft202012Validator(schema).validate(registry)
         self.assertEqual(registry["entries"]["ExhaustProps#Banana_0"]["label"], "香蕉")
         self.assertEqual(registry["entries"]["P4-019"]["effect_kind"], "shield_charge")
+
+    def test_game_location_registry_matches_current_game_names_and_routes(self) -> None:
+        registry = json.loads(
+            (PROJECT_ROOT / "assets" / "game_locations.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(registry["schema_version"], 1)
+        self.assertEqual(
+            registry["localization_source"],
+            "StreamingAssets/Localization/UI_UniformType.json::ScenarioName_*",
+        )
+        self.assertEqual(
+            registry["active_campaign_routes"],
+            {
+                "1": ["DarkForest"],
+                "2": ["RuinedCemetery", "SaltpetreDesert", "MudSwamp"],
+                "3": ["CrystalMountain", "IceCavern"],
+                "4": ["CastleBridge", "Sewer"],
+                "5": ["MainCastle"],
+                "6": ["MageTower"],
+            },
+        )
+        entries = registry["entries"]
+        self.assertEqual(entries["DarkForest"]["label_zh_cn"], "黑森林")
+        self.assertEqual(entries["RuinedCemetery"]["label_zh_cn"], "废村")
+        self.assertEqual(entries["MudSwamp"]["stage_level"], 2)
+        self.assertEqual(entries["SaltpetreDesert"]["stage_level"], 2)
+        self.assertEqual(entries["CrystalMountain"]["stage_level"], 3)
+        self.assertEqual(entries["IceCavern"]["stage_level"], 3)
+        self.assertEqual(entries["CastleBridge"]["stage_level"], 4)
+        self.assertEqual(entries["Sewer"]["stage_level"], 4)
+        self.assertEqual(entries["MainCastle"]["stage_level"], 5)
+        self.assertEqual(entries["MageTower"]["stage_level"], 6)
+        self.assertIsNone(entries["MagmaCave"]["stage_level"])
+        self.assertEqual(
+            registry["localized_but_not_active_in_verified_package"],
+            ["MagmaCave"],
+        )
 
     def test_damage_event_contract_has_required_identity_and_damage_fields(self) -> None:
         schema = json.loads(

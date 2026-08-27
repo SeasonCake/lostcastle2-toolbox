@@ -37,6 +37,42 @@
       "category": "defensive.shield_charge",
       "resource": "none",
       "effect_kind": "shield_charge"
+    },
+    "combat.player.normal": {
+      "label": "玩家普通伤害",
+      "category": "damage.player.normal",
+      "resource": "none",
+      "effect_kind": "none"
+    },
+    "combat.player.element": {
+      "label": "玩家元素伤害",
+      "category": "damage.player.element",
+      "resource": "none",
+      "effect_kind": "none"
+    },
+    "combat.summon": {
+      "label": "召唤物伤害",
+      "category": "damage.summon",
+      "resource": "none",
+      "effect_kind": "none"
+    },
+    "resource.self_damage": {
+      "label": "宝藏或技能自伤",
+      "category": "resource.self_damage",
+      "resource": "hp",
+      "effect_kind": "none"
+    },
+    "resource.skill_cost": {
+      "label": "技能法力消耗",
+      "category": "resource.skill_cost",
+      "resource": "mp",
+      "effect_kind": "none"
+    },
+    "resource.mana_recovery": {
+      "label": "法力恢复",
+      "category": "resource.mana_recovery",
+      "resource": "mp",
+      "effect_kind": "none"
     }
   }
 }

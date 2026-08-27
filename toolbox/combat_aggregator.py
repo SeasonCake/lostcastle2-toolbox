@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 SCHEMA_VERSION = 2
 DEFAULT_DPS_WINDOW_MS = 10_000
+VALID_ROOM_INDICES = frozenset((*range(0, 11), 99, 100, 101))
 
 
 class CombatEventError(ValueError):
@@ -73,6 +74,108 @@ class SourceRegistry:
         return SourceInfo(key, f"未知来源 · {key}", "unknown")
 
 
+@dataclass(frozen=True)
+class ScenarioInfo:
+    scenario_id: str
+    label_zh_cn: str
+    label_en: str
+    enum_value: int | None = None
+    stage_level: int | None = None
+    known: bool = False
+
+
+class ScenarioRegistry:
+    """Versioned map-name data, kept separate from room/session identity."""
+
+    def __init__(
+        self,
+        entries: Mapping[str, ScenarioInfo] | None = None,
+        active_campaign_routes: Mapping[int, tuple[str, ...]] | None = None,
+    ) -> None:
+        self._entries = dict(entries or {})
+        self._active_campaign_routes = dict(active_campaign_routes or {})
+
+    @classmethod
+    def from_file(cls, path: Path) -> ScenarioRegistry:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("schema_version") != 1:
+            raise CombatEventError("Unsupported game location registry version.")
+        raw_entries = payload.get("entries")
+        if not isinstance(raw_entries, dict):
+            raise CombatEventError("Game location registry entries must be an object.")
+        entries: dict[str, ScenarioInfo] = {}
+        for scenario_id, raw in raw_entries.items():
+            if not isinstance(scenario_id, str) or not scenario_id or not isinstance(raw, dict):
+                raise CombatEventError("Invalid game location registry entry.")
+            label_zh_cn = raw.get("label_zh_cn")
+            label_en = raw.get("label_en")
+            stage_level = raw.get("stage_level")
+            enum_value = raw.get("enum_value")
+            if not isinstance(label_zh_cn, str) or not label_zh_cn:
+                raise CombatEventError(f"Invalid Chinese location label for {scenario_id!r}.")
+            if not isinstance(label_en, str) or not label_en:
+                raise CombatEventError(f"Invalid English location label for {scenario_id!r}.")
+            if stage_level is not None and (
+                type(stage_level) is not int or not 0 <= stage_level <= 6
+            ):
+                raise CombatEventError(f"Invalid stage level for {scenario_id!r}.")
+            if enum_value is not None and type(enum_value) is not int:
+                raise CombatEventError(f"Invalid scenario enum value for {scenario_id!r}.")
+            entries[scenario_id] = ScenarioInfo(
+                scenario_id=scenario_id,
+                label_zh_cn=label_zh_cn,
+                label_en=label_en,
+                enum_value=enum_value,
+                stage_level=stage_level,
+                known=True,
+            )
+        raw_routes = payload.get("active_campaign_routes")
+        if not isinstance(raw_routes, dict):
+            raise CombatEventError("Active campaign routes must be an object.")
+        active_campaign_routes: dict[int, tuple[str, ...]] = {}
+        for raw_stage_level, raw_scenario_ids in raw_routes.items():
+            try:
+                stage_level = int(raw_stage_level)
+            except (TypeError, ValueError) as exception:
+                raise CombatEventError("Invalid campaign route stage level.") from exception
+            if str(stage_level) != raw_stage_level or not 1 <= stage_level <= 6:
+                raise CombatEventError("Invalid campaign route stage level.")
+            if (
+                not isinstance(raw_scenario_ids, list)
+                or not raw_scenario_ids
+                or not all(
+                    isinstance(scenario_id, str) and scenario_id
+                    for scenario_id in raw_scenario_ids
+                )
+                or len(raw_scenario_ids) != len(set(raw_scenario_ids))
+            ):
+                raise CombatEventError(
+                    f"Invalid campaign route list for stage {stage_level}."
+                )
+            for scenario_id in raw_scenario_ids:
+                scenario = entries.get(scenario_id)
+                if scenario is None or scenario.stage_level != stage_level:
+                    raise CombatEventError(
+                        f"Campaign route {scenario_id!r} does not match stage {stage_level}."
+                    )
+            active_campaign_routes[stage_level] = tuple(raw_scenario_ids)
+        if set(active_campaign_routes) != set(range(1, 7)):
+            raise CombatEventError("Campaign routes must define stages 1 through 6.")
+        return cls(entries, active_campaign_routes)
+
+    def route_ids_for_stage(self, stage_level: int) -> tuple[str, ...]:
+        return self._active_campaign_routes.get(stage_level, ())
+
+    def resolve(self, scenario_id: str | None) -> ScenarioInfo:
+        key = scenario_id if scenario_id not in {None, "", "null"} else "<none>"
+        known = self._entries.get(key)
+        if known is not None:
+            return known
+        if key == "<none>":
+            return ScenarioInfo(key, "未知地图", "Unknown map")
+        return ScenarioInfo(key, f"未知地图 · {key}", f"Unknown map · {key}")
+
+
 @dataclass
 class SourceTotals:
     damage_dealt: int = 0
@@ -91,6 +194,11 @@ class CombatSnapshot:
     session_id: str | None
     connection_state: str
     current_room_id: str | None
+    current_stage_level: int | None
+    current_scenario_id: str | None
+    current_scenario_label: str | None
+    current_room_index: int | None
+    current_map_file_name: str | None
     last_sequence: int | None
     last_monotonic_ms: int | None
     total_damage: int
@@ -121,6 +229,7 @@ class CombatSnapshot:
 @dataclass
 class CombatAggregator:
     registry: SourceRegistry = field(default_factory=SourceRegistry)
+    scenario_registry: ScenarioRegistry = field(default_factory=ScenarioRegistry)
     dps_window_ms: int = DEFAULT_DPS_WINDOW_MS
 
     def __post_init__(self) -> None:
@@ -132,6 +241,11 @@ class CombatAggregator:
         self.session_id = session_id
         self.connection_state = "disconnected"
         self.current_room_id: str | None = None
+        self.current_stage_level: int | None = None
+        self.current_scenario_id: str | None = None
+        self.current_scenario_label: str | None = None
+        self.current_room_index: int | None = None
+        self.current_map_file_name: str | None = None
         self.last_sequence: int | None = None
         self.last_monotonic_ms: int | None = None
         self._seen_event_ids: set[str] = set()
@@ -237,6 +351,11 @@ class CombatAggregator:
             session_id=self.session_id,
             connection_state=self.connection_state,
             current_room_id=self.current_room_id,
+            current_stage_level=self.current_stage_level,
+            current_scenario_id=self.current_scenario_id,
+            current_scenario_label=self.current_scenario_label,
+            current_room_index=self.current_room_index,
+            current_map_file_name=self.current_map_file_name,
             last_sequence=self.last_sequence,
             last_monotonic_ms=self.last_monotonic_ms,
             total_damage=self.total_damage,
@@ -284,6 +403,26 @@ class CombatAggregator:
             raise CombatEventError("monotonic_ms must be a non-negative integer")
         if not isinstance(event["aggregate"], bool):
             raise CombatEventError("aggregate must be boolean")
+        if event["event_type"] == "status" and event.get("status") == "room_started":
+            self._validate_room_started(event)
+
+    @staticmethod
+    def _validate_room_started(event: Mapping[str, Any]) -> None:
+        room_id = event.get("room_id")
+        stage_level = event.get("stage_level")
+        room_index = event.get("room_index")
+        scenario_id = event.get("scenario_id")
+        map_file_name = event.get("map_file_name")
+        if not isinstance(room_id, str) or not room_id:
+            raise CombatEventError("room_started requires a non-empty room_id.")
+        if type(stage_level) is not int or not 0 <= stage_level <= 6:
+            raise CombatEventError("room_started has an invalid stage_level.")
+        if type(room_index) is not int or room_index not in VALID_ROOM_INDICES:
+            raise CombatEventError("room_started has an invalid room_index.")
+        if not isinstance(scenario_id, str) or not scenario_id:
+            raise CombatEventError("room_started requires a scenario_id.")
+        if not isinstance(map_file_name, str) or not map_file_name:
+            raise CombatEventError("room_started requires a map_file_name.")
 
     def _source_key(self, event: Mapping[str, Any]) -> str:
         token = event.get("source_token")
@@ -377,7 +516,13 @@ class CombatAggregator:
         elif status in {"connecting", "disconnected", "stale", "error"}:
             self.connection_state = status
         if status == "room_started":
-            self.current_room_id = event.get("room_id")
+            self.current_room_id = str(event["room_id"])
+            self.current_stage_level = int(event["stage_level"])
+            self.current_room_index = int(event["room_index"])
+            self.current_scenario_id = str(event["scenario_id"])
+            scenario = self.scenario_registry.resolve(self.current_scenario_id)
+            self.current_scenario_label = scenario.label_zh_cn
+            self.current_map_file_name = str(event["map_file_name"])
 
     def _prune_recent_damage(self, now_ms: int) -> None:
         cutoff = now_ms - self.dps_window_ms

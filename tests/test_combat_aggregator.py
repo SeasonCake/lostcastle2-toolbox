@@ -5,6 +5,8 @@ import unittest
 
 from toolbox.combat_aggregator import (
     CombatAggregator,
+    CombatEventError,
+    ScenarioRegistry,
     SequenceError,
     SessionMismatchError,
     SourceRegistry,
@@ -33,7 +35,13 @@ def common_event(event_type: str, sequence: int, **fields: object) -> dict[str, 
 class CombatAggregatorTests(unittest.TestCase):
     def setUp(self) -> None:
         registry = SourceRegistry.from_file(PROJECT_ROOT / "assets" / "combat_sources.json")
-        self.aggregator = CombatAggregator(registry=registry)
+        scenario_registry = ScenarioRegistry.from_file(
+            PROJECT_ROOT / "assets" / "game_locations.json"
+        )
+        self.aggregator = CombatAggregator(
+            registry=registry,
+            scenario_registry=scenario_registry,
+        )
         self.aggregator.ingest(
             common_event("status", 0, monotonic_ms=0, status="session_started")
         )
@@ -231,6 +239,76 @@ class CombatAggregatorTests(unittest.TestCase):
         )
         self.assertEqual(self.aggregator.snapshot(monotonic_ms=10_999).recent_dps, 9)
         self.assertEqual(self.aggregator.snapshot(monotonic_ms=11_001).recent_dps, 0)
+
+    def test_room_started_keeps_stage_scenario_room_and_map_identity_separate(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                room_id="L4:CastleBridge:100:Map_CB_Boss_KnightMaster",
+                status="room_started",
+                stage_level=4,
+                scenario_id="CastleBridge",
+                room_index=100,
+                map_file_name="Map_CB_Boss_KnightMaster",
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.current_stage_level, 4)
+        self.assertEqual(snapshot.current_scenario_label, "黑城堡大桥")
+        self.assertEqual(snapshot.current_room_index, 100)
+        self.assertEqual(snapshot.current_map_file_name, "Map_CB_Boss_KnightMaster")
+
+    def test_scenario_registry_preserves_current_branch_routes(self) -> None:
+        self.assertEqual(
+            self.aggregator.scenario_registry.route_ids_for_stage(2),
+            ("RuinedCemetery", "SaltpetreDesert", "MudSwamp"),
+        )
+        self.assertEqual(
+            self.aggregator.scenario_registry.route_ids_for_stage(3),
+            ("CrystalMountain", "IceCavern"),
+        )
+        self.assertEqual(
+            self.aggregator.scenario_registry.route_ids_for_stage(4),
+            ("CastleBridge", "Sewer"),
+        )
+
+    def test_room_started_rejects_invalid_location_identity(self) -> None:
+        with self.assertRaises(CombatEventError):
+            self.aggregator.ingest(
+                common_event(
+                    "status",
+                    1,
+                    room_id="L2:MudSwamp:42:invalid",
+                    status="room_started",
+                    stage_level=2,
+                    scenario_id="MudSwamp",
+                    room_index=42,
+                    map_file_name="invalid",
+                )
+            )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.connection_state, "live")
+        self.assertEqual(snapshot.last_sequence, 0)
+        self.assertIsNone(snapshot.current_room_id)
+
+    def test_unknown_scenario_remains_visible_instead_of_using_a_wrong_name(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                room_id="L6:FutureMap:1:Map_FM_Battle_001",
+                status="room_started",
+                stage_level=6,
+                scenario_id="FutureMap",
+                room_index=1,
+                map_file_name="Map_FM_Battle_001",
+            )
+        )
+        self.assertEqual(
+            self.aggregator.snapshot().current_scenario_label,
+            "未知地图 · FutureMap",
+        )
 
 
 if __name__ == "__main__":

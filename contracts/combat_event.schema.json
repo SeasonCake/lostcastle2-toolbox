@@ -32,6 +32,10 @@
     "sequence": { "type": "integer", "minimum": 0 },
     "monotonic_ms": { "type": "integer", "minimum": 0 },
     "room_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+    "stage_level": { "type": ["integer", "null"], "minimum": 0, "maximum": 6 },
+    "scenario_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+    "room_index": { "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 99, 100, 101, null] },
+    "map_file_name": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 },
     "aggregate": {
       "type": "boolean",
       "description": "Bridge 已裁决该事件是否进入总量；UI/聚合器不得从 depth 自行猜测。"
@@ -182,6 +186,25 @@
     {
       "if": { "properties": { "event_type": { "const": "status" } } },
       "then": { "required": ["status"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "status" },
+          "status": { "const": "room_started" }
+        },
+        "required": ["event_type", "status"]
+      },
+      "then": {
+        "required": ["room_id", "stage_level", "scenario_id", "room_index", "map_file_name"],
+        "properties": {
+          "room_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "stage_level": { "type": "integer", "minimum": 0, "maximum": 6 },
+          "scenario_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "room_index": { "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 99, 100, 101] },
+          "map_file_name": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+      }
     }
   ]
 }
