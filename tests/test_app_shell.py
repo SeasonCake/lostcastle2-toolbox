@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from pathlib import Path
 
 from toolbox.app_shell import (
+    TOOLBOX_WINDOW_PRESETS,
+    ToolboxShell,
     boss_damage_share,
     clamp_main_window_size,
     combat_state_label,
@@ -12,6 +15,7 @@ from toolbox.app_shell import (
     combat_table_numeric_width,
     format_location_label,
     format_metric,
+    format_whole_metric,
     format_room_area,
     format_stage_location,
     macro_rows,
@@ -87,6 +91,8 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(format_metric(0), "0")
         self.assertEqual(format_metric(34_328), "34,328")
         self.assertEqual(format_metric(1.25), "1.2")
+        self.assertEqual(format_whole_metric(52.8), "53")
+        self.assertEqual(format_whole_metric(15.8), "16")
 
     def test_room_area_uses_game_special_indices(self) -> None:
         self.assertEqual(format_room_area(0), "入口")
@@ -137,6 +143,9 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(combat_table_numeric_width(2.0), 105)
 
     def test_main_window_presets_respect_minimum_and_screen_bounds(self) -> None:
+        ordered = [TOOLBOX_WINDOW_PRESETS[name] for name in ("compact", "standard", "spacious")]
+        self.assertTrue(all(left[0] < right[0] for left, right in zip(ordered, ordered[1:])))
+        self.assertTrue(all(left[1] < right[1] for left, right in zip(ordered, ordered[1:])))
         self.assertEqual(
             clamp_main_window_size(
                 900,
@@ -167,6 +176,26 @@ class AppShellModelTests(unittest.TestCase):
             ),
             (1200, 720),
         )
+
+    def test_keyboard_scale_action_restores_and_reveals_overlay_before_resizing(self) -> None:
+        actions: list[object] = []
+
+        class Keyboard:
+            ui_scale = 0.8
+
+            def restore_interaction(self) -> None:
+                actions.append("restore")
+
+            def set_ui_scale(self, value: float) -> None:
+                actions.append(("scale", value))
+                self.ui_scale = value
+
+        shell = SimpleNamespace(
+            keyboard=Keyboard(),
+            _refresh_display_settings=lambda: actions.append("refresh"),
+        )
+        ToolboxShell._set_keyboard_scale(shell, 0.1)
+        self.assertEqual(actions, ["restore", ("scale", 0.9), "refresh"])
 
 
 if __name__ == "__main__":

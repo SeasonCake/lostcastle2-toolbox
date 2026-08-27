@@ -30,9 +30,9 @@ GOLD = "#B4790D"
 HUD_TRANSPARENT = "#010203"
 
 TOOLBOX_WINDOW_PRESETS = {
-    "compact": (780, 560),
-    "standard": (900, 650),
-    "spacious": (1080, 760),
+    "compact": (840, 600),
+    "standard": (1000, 720),
+    "spacious": (1160, 840),
 }
 
 
@@ -89,6 +89,8 @@ class KeyboardModule(Protocol):
     color_preset: str
     ui_scale: float
     background_opacity: float
+    click_through: bool
+    key_only: bool
     game_process_id: int | None
     toolbox_window_size: tuple[int, int]
 
@@ -97,6 +99,8 @@ class KeyboardModule(Protocol):
     def open_settings(self) -> None: ...
 
     def set_ui_scale(self, value: float) -> None: ...
+
+    def restore_interaction(self) -> None: ...
 
     def set_toolbox_window_size(self, width: int, height: int) -> None: ...
 
@@ -171,6 +175,13 @@ def format_metric(value: float | int) -> str:
     if numeric.is_integer():
         return f"{int(numeric):,}"
     return f"{numeric:,.1f}".rstrip("0").rstrip(".")
+
+
+def format_whole_metric(value: float | int) -> str:
+    """Format player-visible resource values using the game's integer presentation."""
+
+    numeric = max(0.0, float(value))
+    return f"{int(numeric + 0.5):,}"
 
 
 def format_room_area(room_index: int | None) -> str | None:
@@ -818,18 +829,22 @@ class CombatHudWindow:
             self._draw_boss_share()
             _set_metric_label(
                 self.labels["hp_loss"],
-                format_metric(snapshot.hp_damage_taken + snapshot.hp_loss_other),
+                format_whole_metric(snapshot.taken_settlement_damage),
                 base_size=17,
                 characters_at_base=7,
             )
-            self.labels["healing"].configure(text=f"回复 +{format_metric(snapshot.effective_healing)}")
+            self.labels["healing"].configure(
+                text=f"回复 +{format_whole_metric(snapshot.effective_healing)}"
+            )
             _set_metric_label(
                 self.labels["mp_spent"],
-                format_metric(snapshot.mp_spent),
+                format_whole_metric(snapshot.mp_spent),
                 base_size=17,
                 characters_at_base=7,
             )
-            self.labels["mp_gained"].configure(text=f"恢复 +{format_metric(snapshot.mp_gained)}")
+            self.labels["mp_gained"].configure(
+                text=f"恢复 +{format_whole_metric(snapshot.mp_gained)}"
+            )
             _set_metric_label(
                 self.labels["dps"],
                 format_metric(snapshot.recent_dps),
@@ -1674,6 +1689,7 @@ class ToolboxShell:
                 ("缩小", lambda: self._set_keyboard_scale(-0.1)),
                 ("重置", lambda: self._set_keyboard_scale(0.0)),
                 ("放大", lambda: self._set_keyboard_scale(0.1)),
+                ("恢复拖动", self._restore_keyboard_interaction),
             ),
         )
 
@@ -1755,6 +1771,7 @@ class ToolboxShell:
             screen_height=self.root.winfo_screenheight(),
             tk_scaling=float(self.root.tk.call("tk", "scaling")),
         )
+        self.root.state("normal")
         x = min(max(0, self.root.winfo_x()), max(0, self.root.winfo_screenwidth() - width))
         y = min(max(0, self.root.winfo_y()), max(0, self.root.winfo_screenheight() - height))
         self.root.geometry(f"{width}x{height}+{x}+{y}")
@@ -1763,8 +1780,16 @@ class ToolboxShell:
         self._refresh_display_settings()
 
     def _set_keyboard_scale(self, change: float) -> None:
+        # A scale command is also an explicit request to inspect the overlay.
+        # Bring it back to an interactive, visible state before resizing so the
+        # user gets immediate feedback instead of changing an off-screen/hidden layer.
+        self.keyboard.restore_interaction()
         target = 1.0 if abs(change) < 0.001 else self.keyboard.ui_scale + change
         self.keyboard.set_ui_scale(target)
+        self._refresh_display_settings()
+
+    def _restore_keyboard_interaction(self) -> None:
+        self.keyboard.restore_interaction()
         self._refresh_display_settings()
 
     def _refresh_display_settings(self) -> None:
@@ -1774,8 +1799,14 @@ class ToolboxShell:
         self.labels["toolbox_window_size"].configure(
             text=f"{width} × {height}"
         )
+        modes = []
+        if self.keyboard.key_only:
+            modes.append("纯净")
+        if self.keyboard.click_through:
+            modes.append("穿透")
+        suffix = f" · {' / '.join(modes)}" if modes else " · 可拖动"
         self.labels["keyboard_scale"].configure(
-            text=f"{round(self.keyboard.ui_scale * 100)}%"
+            text=f"{round(self.keyboard.ui_scale * 100)}%{suffix}"
         )
 
     def _button(
@@ -1851,8 +1882,8 @@ class ToolboxShell:
         self.labels["combat_summary"].configure(
             text=(
                 f"总伤害 {format_metric(snapshot.total_damage)}\n"
-                f"掉血 / 回复 {format_metric(snapshot.hp_damage_taken + snapshot.hp_loss_other)} / "
-                f"{format_metric(snapshot.effective_healing)}"
+                f"承伤 / 回复 {format_whole_metric(snapshot.taken_settlement_damage)} / "
+                f"{format_whole_metric(snapshot.effective_healing)}"
             )
         )
         self.labels["keyboard_status"].configure(
@@ -1907,7 +1938,6 @@ class ToolboxShell:
             ),
             fg=combat_state_color(snapshot.connection_state),
         )
-        hp_loss = snapshot.hp_damage_taken + snapshot.hp_loss_other
         _set_metric_label(
             self.labels["combat_damage"],
             format_metric(snapshot.total_damage),
@@ -1917,18 +1947,22 @@ class ToolboxShell:
         self.labels["combat_boss"].configure(text=f"Boss {format_metric(snapshot.boss_damage)}")
         _set_metric_label(
             self.labels["combat_hp"],
-            format_metric(hp_loss),
+            format_whole_metric(snapshot.taken_settlement_damage),
             base_size=22,
             characters_at_base=10,
         )
-        self.labels["combat_heal"].configure(text=f"回复 +{format_metric(snapshot.effective_healing)}")
+        self.labels["combat_heal"].configure(
+            text=f"回复 +{format_whole_metric(snapshot.effective_healing)}"
+        )
         _set_metric_label(
             self.labels["combat_mp"],
-            format_metric(snapshot.mp_spent),
+            format_whole_metric(snapshot.mp_spent),
             base_size=22,
             characters_at_base=10,
         )
-        self.labels["combat_mp_gain"].configure(text=f"恢复 +{format_metric(snapshot.mp_gained)}")
+        self.labels["combat_mp_gain"].configure(
+            text=f"恢复 +{format_whole_metric(snapshot.mp_gained)}"
+        )
         for item_id in self.combat_tree.get_children():
             self.combat_tree.delete(item_id)
         ranked = sorted(
@@ -1948,9 +1982,9 @@ class ToolboxShell:
                 values=(
                     values.get("label", "未知来源"),
                     format_metric(values.get("damage_dealt", 0)),
-                    format_metric(values.get("effective_healing", 0)),
-                    format_metric(values.get("mp_spent", 0)),
-                    format_metric(values.get("mp_gained", 0)),
+                    format_whole_metric(values.get("effective_healing", 0)),
+                    format_whole_metric(values.get("mp_spent", 0)),
+                    format_whole_metric(values.get("mp_gained", 0)),
                 ),
             )
         self.labels["combat_detail_hint"].configure(
@@ -1958,11 +1992,11 @@ class ToolboxShell:
         )
         self.labels["combat_totals"].configure(
             text=(
-                f"官方承伤 {format_metric(snapshot.taken_settlement_damage)} · "
-                f"实际战斗掉血 {format_metric(snapshot.hp_damage_taken)} · "
-                f"其他掉血/自伤 {format_metric(snapshot.hp_loss_other)} · "
-                f"减伤 {format_metric(snapshot.mitigated_damage)} · "
-                f"治疗溢出 {format_metric(snapshot.resource_overflow)}"
+                f"官方承伤 {format_whole_metric(snapshot.taken_settlement_damage)} · "
+                f"实际战斗掉血 {format_whole_metric(snapshot.hp_damage_taken)} · "
+                f"其他掉血/自伤 {format_whole_metric(snapshot.hp_loss_other)} · "
+                f"减伤 {format_whole_metric(snapshot.mitigated_damage)} · "
+                f"治疗溢出 {format_whole_metric(snapshot.resource_overflow)}"
             )
         )
 

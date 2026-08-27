@@ -17,7 +17,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.1.0";
+    public const string PluginVersion = "0.2.0";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
@@ -26,7 +26,10 @@ public sealed class Plugin : BasePlugin
     private static Stack<int> HpStack;
     [ThreadStatic]
     private static Stack<long> PlayerHpObservationStack;
+    [ThreadStatic]
+    private static Stack<long> PlayerMpObservationStack;
     private static long _nextPlayerHpOperationId;
+    private static long _nextPlayerMpOperationId;
 
     private Harmony _harmony;
     private static CombatPipeServer Bridge;
@@ -41,6 +44,16 @@ public sealed class Plugin : BasePlugin
     }
 
     internal sealed class PlayerHpChangeState
+    {
+        public Creature Owner { get; init; }
+        public float Before { get; init; }
+        public float MaxBefore { get; init; }
+        public long OperationId { get; init; }
+        public long? ParentOperationId { get; init; }
+        public int Depth { get; init; }
+    }
+
+    internal sealed class PlayerMpChangeState
     {
         public Creature Owner { get; init; }
         public float Before { get; init; }
@@ -343,6 +356,107 @@ public sealed class Plugin : BasePlugin
         stack.Pop();
     }
 
+    internal static PlayerMpChangeState BeginPlayerMpObservation(CreatureRuntimeData runtime)
+    {
+        var owner = runtime?.OwnerCreature;
+        if (!IsPlayerRootCreature(owner))
+        {
+            return null;
+        }
+        var (before, maxBefore) = ReadMp(owner);
+        if (before is null || maxBefore is null)
+        {
+            return null;
+        }
+        var stack = PlayerMpObservationStack ??= new Stack<long>();
+        var operationId = Interlocked.Increment(ref _nextPlayerMpOperationId);
+        var state = new PlayerMpChangeState
+        {
+            Owner = owner,
+            Before = before.Value,
+            MaxBefore = maxBefore.Value,
+            OperationId = operationId,
+            ParentOperationId = stack.Count > 0 ? stack.Peek() : null,
+            Depth = stack.Count,
+        };
+        stack.Push(operationId);
+        return state;
+    }
+
+    internal static void EndPlayerMpObservation(
+        float requestedDelta,
+        PlayerMpChangeState state)
+    {
+        if (state is null)
+        {
+            return;
+        }
+        try
+        {
+            var (after, maxAfter) = ReadMp(state.Owner);
+            if (after is null || maxAfter is null)
+            {
+                return;
+            }
+            var requested = Finite(requestedDelta);
+            var effective = Finite(after.Value - state.Before);
+            if (Math.Abs(requested) <= 0.0001 && Math.Abs(effective) <= 0.0001)
+            {
+                return;
+            }
+            var operation = effective < -0.0001
+                ? "spend"
+                : effective > 0.0001
+                    ? "gain"
+                    : "attempt";
+            var sourceToken = requested < 0 || effective < 0
+                ? "resource.skill_cost"
+                : "resource.mana_recovery";
+            var atCapacity = after.Value >= maxAfter.Value - 0.0001f;
+            var blocked = Math.Abs(effective) <= 0.0001 && Math.Abs(requested) > 0.0001;
+            var overflow = requested > 0 && atCapacity
+                ? Math.Max(0.0, requested - Math.Max(0.0, effective))
+                : 0.0;
+            Bridge?.Emit(
+                "resource_change",
+                aggregate: state.Depth == 0,
+                "runtime.creature_mp_change",
+                new Dictionary<string, object>
+                {
+                    ["resource"] = "mp",
+                    ["resource_operation"] = operation,
+                    ["requested_delta"] = requested,
+                    ["effective_delta"] = effective,
+                    ["value_before"] = Finite(state.Before),
+                    ["value_after"] = Finite(after.Value),
+                    ["max_before"] = Finite(state.MaxBefore),
+                    ["max_after"] = Finite(maxAfter.Value),
+                    ["blocked"] = blocked,
+                    ["overflow"] = overflow,
+                    ["source_token"] = sourceToken,
+                    ["parent_operation_id"] = state.ParentOperationId,
+                    ["nesting_depth"] = state.Depth,
+                });
+        }
+        catch
+        {
+            Bridge?.FailSession("mp_resource_conversion_failed");
+        }
+        finally
+        {
+            var stack = PlayerMpObservationStack;
+            if (stack is null || stack.Count == 0 || stack.Peek() != state.OperationId)
+            {
+                stack?.Clear();
+                Bridge?.FailSession("mp_resource_stack_mismatch");
+            }
+            else
+            {
+                stack.Pop();
+            }
+        }
+    }
+
     private static RoomLocation CaptureRoomLocation()
     {
         try
@@ -545,6 +659,16 @@ public sealed class Plugin : BasePlugin
         return (runtime.CurHP.GetDecrypted(), runtime.MaxHP.GetDecrypted());
     }
 
+    private static (float? Current, float? Max) ReadMp(Creature creature)
+    {
+        var runtime = creature?.RuntimeData;
+        if (runtime is null)
+        {
+            return (null, null);
+        }
+        return (runtime.CurMP.GetDecrypted(), runtime.MaxMP.GetDecrypted());
+    }
+
     private static double Finite(float value) =>
         float.IsFinite(value) ? value : 0.0;
 
@@ -568,6 +692,22 @@ internal static class PlayerHpChangePatch
         string changeSourceStr,
         Plugin.PlayerHpChangeState __state) =>
         Plugin.EndPlayerHpChange(deltaValue, changeSourceStr, __state, "runtime.creature_hp_change");
+}
+
+[HarmonyPatch(typeof(CreatureRuntimeData), nameof(CreatureRuntimeData.ChangeCurrentMp))]
+internal static class PlayerMpChangePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(
+        CreatureRuntimeData __instance,
+        out Plugin.PlayerMpChangeState __state) =>
+        __state = Plugin.BeginPlayerMpObservation(__instance);
+
+    [HarmonyPostfix]
+    private static void Postfix(
+        float deltaValue,
+        Plugin.PlayerMpChangeState __state) =>
+        Plugin.EndPlayerMpObservation(deltaValue, __state);
 }
 
 [HarmonyPatch(typeof(HeroRuntimeData), nameof(HeroRuntimeData.ChangeCurrentHp))]

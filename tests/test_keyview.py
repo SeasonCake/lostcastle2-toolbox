@@ -14,6 +14,34 @@ import keyview
 
 
 class KeyViewTests(unittest.TestCase):
+    def test_restore_interaction_recovers_hidden_pure_click_through_overlay(self) -> None:
+        actions: list[object] = []
+
+        class Root:
+            def lift(self) -> None:
+                actions.append("lift")
+
+        app = mock.Mock()
+        app.click_through = True
+        app.key_only = True
+        app.visible = False
+        app.root = Root()
+        app._set_click_through.side_effect = lambda value: setattr(app, "click_through", value)
+        app._set_clean_mode.side_effect = lambda value, save=False: setattr(app, "key_only", value)
+        app.toggle_visible.side_effect = lambda: setattr(app, "visible", True)
+
+        keyview.KeyViewApp.restore_interaction(app)
+
+        app._set_click_through.assert_called_once_with(False)
+        app._set_clean_mode.assert_called_once_with(False, save=False)
+        app.toggle_visible.assert_called_once_with()
+        app._sync_background_layer.assert_called_once_with()
+        app._save_current_settings.assert_called_once_with()
+        self.assertTrue(app.visible)
+        self.assertFalse(app.key_only)
+        self.assertFalse(app.click_through)
+        self.assertEqual(actions, ["lift"])
+
     def test_self_test_reports_game_presence_without_exposing_local_path(self) -> None:
         private_path = Path("private-install") / "LostCastle2.exe"
         output = io.StringIO()

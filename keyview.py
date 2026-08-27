@@ -29,7 +29,7 @@ from toolbox.mod_manager import ModCatalog, ModManager
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.5.1"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
     os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
@@ -947,8 +947,9 @@ class KeyViewApp:
         if abs(next_scale - self.ui_scale) < 0.001:
             return
         self.ui_scale = next_scale
-        self._scale_canvas_contents(self.ui_scale)
-        self._resize_windows_to_scale()
+        # Rebuild from unscaled geometry so repeated controls cannot accumulate
+        # canvas drift or leave the foreground/background layers at different sizes.
+        self._apply_display_mode(save=False)
         variable = self.settings_vars.get("ui_scale")
         if variable is not None:
             variable.set(round(self.ui_scale * 100))
@@ -2055,6 +2056,17 @@ class KeyViewApp:
 
     def toggle_click_through(self) -> None:
         self._set_click_through(not self.click_through)
+
+    def restore_interaction(self) -> None:
+        if self.click_through:
+            self._set_click_through(False)
+        if self.key_only:
+            self._set_clean_mode(False, save=False)
+        if not self.visible:
+            self.toggle_visible()
+        self.root.lift()
+        self._sync_background_layer()
+        self._save_current_settings()
 
     def _set_clean_mode(self, enabled: bool, *, save: bool = True) -> None:
         enabled = bool(enabled)
