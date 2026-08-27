@@ -26,6 +26,7 @@ def catalog_payload(content: bytes) -> dict[str, object]:
                 "id": "fixture-tool",
                 "display_name": "Fixture Tool",
                 "version": "1.0",
+                "version_note": "fixture version",
                 "author": "Fixture Author",
                 "author_source": "test fixture",
                 "author_channel": "local",
@@ -59,6 +60,7 @@ class ModManagerTests(unittest.TestCase):
         entry = catalog.get("soul-stone-trainer")
         self.assertEqual(entry.author, "恨你不见")
         self.assertEqual(entry.version, "1.2")
+        self.assertIn("v5.0", entry.version_note)
         self.assertFalse(entry.bundled)
         self.assertEqual(entry.redistribution_status, "permission_not_documented")
         self.assertEqual(len(entry.sha256), 64)

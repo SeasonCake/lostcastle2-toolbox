@@ -32,6 +32,7 @@ class ModDescriptor:
     mod_id: str
     display_name: str
     version: str
+    version_note: str
     author: str
     author_source: str
     author_channel: str
@@ -86,6 +87,7 @@ class ModCatalog:
             "id",
             "display_name",
             "version",
+            "version_note",
             "author_source",
             "author_channel",
             "kind",
@@ -129,6 +131,7 @@ class ModCatalog:
             mod_id=values["id"],
             display_name=values["display_name"],
             version=values["version"],
+            version_note=values["version_note"],
             author=author.strip(),
             author_source=values["author_source"],
             author_channel=values["author_channel"],

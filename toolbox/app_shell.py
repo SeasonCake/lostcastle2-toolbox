@@ -1467,7 +1467,7 @@ class ToolboxShell:
             page,
             height=258,
             content_padx=14,
-            content_pady=12,
+            content_pady=7,
         )
         panel.pack(fill="x")
         card = panel.content
@@ -1509,9 +1509,10 @@ class ToolboxShell:
             justify="left",
             wraplength=640,
             font=("Microsoft YaHei UI", 8),
-        ).pack(fill="x", pady=(11, 6))
+        ).pack(fill="x", pady=(7, 4))
         metadata = (
             f"类型：独立修改器（{descriptor.capabilities[0]}）\n"
+            f"版本：{descriptor.version_note}\n"
             f"文件：未签名 · {format_file_size(descriptor.size_bytes)} · "
             f"SHA-256 {descriptor.sha256[:12]}…{descriptor.sha256[-8:]}\n"
             "收录方式：本版不捆绑二进制；选择作者原文件并通过完整哈希后配置"
@@ -1527,7 +1528,7 @@ class ToolboxShell:
         ).pack(fill="x")
 
         actions = tk.Frame(card, bg=SURFACE)
-        actions.pack(side="bottom", fill="x", pady=(10, 0))
+        actions.pack(side="bottom", fill="x", pady=(7, 0))
         self.labels["mod_action_hint"] = tk.Label(
             actions,
             text="删除只移除盒子受管副本。",
