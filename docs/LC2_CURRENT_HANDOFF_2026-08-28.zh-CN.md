@@ -21,10 +21,11 @@
 | `Plugin.cs` SHA-256 | `34995B87138F6CC0ED5C096459FEF7DAC1D6EF2B80CD557802A364F6CDD9AE6B` |
 | Harmony Patch 数 | `14`；0.3.4 的 `ResetDataBy` 探针已删除 |
 
-0.4.1 候选、PDB 和 0.4.0 exact rollback 位于 [`artifacts/runtime-deploy/2026-08-28-bridge-0.4.1`](../artifacts/runtime-deploy/2026-08-28-bridge-0.4.1/)。当前游戏目录已逐字节核验为 0.4.1。
+本文所有 `artifacts/runtime-deploy/...` 定位都指向本机被 `.gitignore` 排除的二进制/回滚证据，fresh clone 不包含，故只作本机恢复定位，不声称是仓库链接。
 
-0.3.6 候选、PDB、回滚和完整运行 receipt 位于：
-[`artifacts/runtime-deploy/2026-08-28-bridge-0.3.6`](../artifacts/runtime-deploy/2026-08-28-bridge-0.3.6/)。
+0.4.1 候选、PDB 和 0.4.0 exact rollback 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.4.1/`。当前游戏目录已逐字节核验为 0.4.1。
+
+0.3.6 候选、PDB、回滚和完整运行 receipt 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.6/`。
 
 ## 已确认结果
 
@@ -94,14 +95,14 @@
 - 全刻印全共鸣 1.4.0 作者为空容，属于 BepInEx/Harmony DLL，与外置灵魂石修改器不是同一种实现；它与金币编辑器都占用 F5，当前只记录、未加入可安装列表。
 - 最近伤害保留平均 DPS 语义，小数保留一位；标题改为“近 10 秒平均秒伤”。
 - 新结算样本：工具箱/游戏总伤害 `79751/67497`，Boss `32489/20235`，两项同多 `12254`；商店人偶在真实 Boss 前已经产生 Boss 数值。0.3.8 在已有 room map 上把 `_Shop_` dealt 事件改为 `aggregate=false`，事件本身仍保留，Hook 仍为 14。
-- 0.3.8 已编译、95 个 Python 测试通过并在游戏进程为 0 时精确部署；0.3.7 rollback 位于 [`artifacts/runtime-deploy/2026-08-28-bridge-0.3.8`](../artifacts/runtime-deploy/2026-08-28-bridge-0.3.8/)。实机正负控尚未执行。
+- 0.3.8 已编译、95 个 Python 测试通过并在游戏进程为 0 时精确部署；0.3.7 rollback 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.8/`。实机正负控尚未执行。
 - 0.3.8 启动门已通过：BepInEx 明确加载 `LC2 Combat Bridge 0.3.8`，本地 pipe live。
 - 0.3.8 自伤缺口样本：折断的妖刀诅咒会把当前生命值 15% 转为伤势生命并被描述为一次受击；截图时玩家 `167/190`，HUD 承伤仍为 `0`，恢复 `+6` 正常。当时源码在 `requested<=0` 或 `effective<0` 时丢弃 HP 观察；诅咒房是否复用同一路径仍未确认。
 - 同局最终再次证伪 0.3.8：工具箱/游戏总伤害 `45310/39710`，工具箱/游戏 Boss `5600/0`，差额精确等于错误 Boss；双方官方承伤均 `35`。桌面 1.5.4 不是原因。
 - 0.3.9 已删除 `_Shop_` 文件名推断，改用 interop 静态确认的公开 `StageMgr.IsNonBattleRoom()`；非战斗房 dealt 保留事件但不聚合。
 - 0.3.9 对 HP 变化记录 `InsideDamageResolution`：官方 DamageProcess 内的负 delta 仍由官方承伤表示；外部直接负 delta 发为 `resource_operation=loss` 并进入 `hp_loss_other`。无新增 Hook。
 - 主窗口/HUD 将主值命名为用户可理解的“受击承伤”，恢复继续独立显示；内部仍保持结算口径与实际掉血分列。探索性的自伤 HUD/表格/汇总字段已撤回，未完成 receipt 闭合前不作为产品指标。
-- 0.3.9 已编译，最终 Python 全套 `96 passed`，并在游戏进程为 0 时部署；0.3.8 exact rollback 位于 [`artifacts/runtime-deploy/2026-08-28-bridge-0.3.9`](../artifacts/runtime-deploy/2026-08-28-bridge-0.3.9/)。
+- 0.3.9 已编译，最终 Python 全套 `96 passed`，并在游戏进程为 0 时部署；0.3.8 exact rollback 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.9/`。
 - 0.3.9 实机房间过滤已闭合：BepInEx 加载/pipe live；作者确认人偶不再误计，最终工具箱与游戏均为总伤害 `59627`、官方承伤 `84`、Boss `20054`。
 - 作者又使用“灭世之槊”（持有时每秒燃烧生命上限 15%）。旧桌面 1.5.4 紧凑 HUD 只显示官方承伤，来源表也没有自伤列或唯一自伤 token；截图不能裁决内部 `hp_loss_other`。不再要求作者从旧 UI 反复查找。
 - 可维护的后续方案只接受统一关联：玩家 HP/RedHp 变化绑定 hit/operation；同 hit 有官方 `OnTakeDamage` 归官方承伤，无官方事件才归自伤/诅咒。若伤势生命绕过普通 HP 入口，最多新增一个统一 `HeroRuntimeData.RedHp` 入口，不允许逐道具 Hook。
