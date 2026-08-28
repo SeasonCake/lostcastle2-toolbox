@@ -15,6 +15,24 @@ and centered on the author's visible and functional request. The workspace-level
   must not redesign neighboring UI or add unrelated safety, licensing, cloud, account,
   activation, telemetry, protection, or release work.
 
+## End-to-end continuity and runtime conditions
+
+- If the author selects an endpoint such as “build the next desktop candidate” or
+  “deploy this frozen Bridge candidate and smoke-test it”, continue through the local
+  reversible source, focused tests, build, receipt, rollback, deployment and smoke
+  steps needed for that endpoint. Do not ask again at each boundary. Push, public
+  release, third-party redistribution, destructive cleanup and a different product
+  scope remain separate.
+- A required game exit, real key press, combat action or screenshot is an author input
+  or runtime condition, not a new authorization gate. State it once with the exact
+  resume condition while continuing other safe work.
+- After a restart or stale PID, recover from the current handoff and durable receipts;
+  recreate local collectors/jobs when equivalent. Never claim a reminder or scheduled
+  continuation without an automation ID/status receipt.
+- Repeated reconnects or image-heavy slowdown trigger a fresh successor after current
+  source, installed DLL, package and open-issue identities are recorded. The successor
+  reads the canonical handoff and live files, not the full screenshot history.
+
 ## UI and product copy
 
 - This is an Operate surface. Prefer familiar controls and compact task information.
@@ -66,4 +84,12 @@ py -3 keyview.py --self-test
 ```
 
 Packaging is a separate stage. A source/test change does not authorize `build.ps1`,
-desktop replacement, push, publication, or runtime deployment.
+desktop replacement, push, publication, or runtime deployment unless the author's
+selected endpoint already includes that exact stage.
+
+Before replacing a game DLL, query process state as structured data using exact process
+name and executable path. An absent result must be observed twice; missing fields,
+formatted blank rows, stale handles, collector state or room/session state mean
+`unknown/hold`, not “game exited”. Freeze an exact rollback and candidate hash before
+the copy, then read back the installed identity. Do not infer process state from
+`Format-Table` output.
