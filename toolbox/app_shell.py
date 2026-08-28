@@ -8,11 +8,17 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 from typing import Any, Callable, Iterable, Mapping, Protocol
+import webbrowser
 
 from .combat_aggregator import CombatAggregator, CombatSnapshot
 from .combat_transport import CombatEventPump
 from .macro_model import MacroProfile
-from .mod_manager import ModIntegrityError, ModManager, ModManagerError
+from .mod_manager import (
+    ModGamePathRequired,
+    ModIntegrityError,
+    ModManager,
+    ModManagerError,
+)
 
 
 BG = "#F3EEE3"
@@ -28,17 +34,21 @@ RED = "#C34B37"
 BLUE = "#3F739A"
 GOLD = "#B4790D"
 HUD_TRANSPARENT = "#010203"
+TOOLBOX_AUTHOR = "加菲_barista"
+TOOLBOX_REPOSITORY_URL = "https://github.com/SeasonCake/lostcastle2-toolbox"
+TAKEN_DAMAGE_LABEL = "受击承伤"
 
 TOOLBOX_WINDOW_PRESETS = {
     "compact": (840, 650),
     "standard": (1000, 720),
-    "spacious": (1160, 840),
+    "spacious": (1280, 900),
 }
 TOOLBOX_UI_SCALES = {
     "compact": 0.9,
     "standard": 1.0,
     "spacious": 1.15,
 }
+DEFAULT_TOOLBOX_WINDOW_PRESET = "spacious"
 
 
 MODE_SHORT_LABELS = {
@@ -46,6 +56,10 @@ MODE_SHORT_LABELS = {
     "hold_repeat": "按住循环",
     "toggle_repeat": "开关循环",
 }
+
+
+def toolbox_author_label() -> str:
+    return f"作者：{TOOLBOX_AUTHOR}"
 
 
 def combat_state_label(state: str, *, compact: bool = False) -> str:
@@ -263,7 +277,7 @@ def hud_panel_height(
 
 def main_window_min_size(tk_scaling: float) -> tuple[int, int]:
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
-    return 780 + round(120 * high_dpi), 560 + round(180 * high_dpi)
+    return 780 + round(120 * high_dpi), 610 + round(180 * high_dpi)
 
 
 def main_metric_card_height(tk_scaling: float) -> int:
@@ -271,9 +285,15 @@ def main_metric_card_height(tk_scaling: float) -> int:
     return 133 + round(36 * high_dpi)
 
 
-def combat_table_numeric_width(tk_scaling: float) -> int:
+def combat_table_numeric_width(tk_scaling: float, ui_scale: float = 1.0) -> int:
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
-    return 90 + round(30 * high_dpi)
+    base_width = 90 + round(30 * high_dpi)
+    return round(base_width * max(1.0, min(1.15, float(ui_scale))))
+
+
+def combat_table_source_width(tk_scaling: float) -> int:
+    high_dpi = max(0.0, min(1.0, (float(tk_scaling) - 1.25) / 0.75))
+    return 110 + round(22 * high_dpi)
 
 
 def metric_font_size(
@@ -336,7 +356,6 @@ def _set_fitting_text(
 ) -> None:
     size = base_size
     available_width = int(label.winfo_width()) - 6
-    rendered_text = text
     if available_width > 20:
         measured_font = tkfont.Font(
             root=label,
@@ -346,19 +365,11 @@ def _set_fitting_text(
         while size > minimum_size and measured_font.measure(text) > available_width:
             size -= 1
             measured_font.configure(size=size)
-        if measured_font.measure(text) > available_width:
-            for kept_characters in range(len(text) - 1, 0, -1):
-                left = (kept_characters + 1) // 2
-                right = kept_characters // 2
-                candidate = text[:left] + "…" + (text[-right:] if right else "")
-                if measured_font.measure(candidate) <= available_width:
-                    rendered_text = candidate
-                    break
-            else:
-                rendered_text = "…"
     elif len(text) > 12:
         size = max(minimum_size, base_size - 1)
-    label.configure(text=rendered_text, font=("Microsoft YaHei UI", size))
+    # Location identity is operational data. Keep the complete scenario/area
+    # text visible; the recent card reserves a dedicated column for it below.
+    label.configure(text=text, font=("Microsoft YaHei UI", size))
 
 
 def seed_demo_combat(
@@ -841,7 +852,7 @@ class CombatHudWindow:
         )
         tk.Label(
             hp,
-            text="承受伤害",
+            text=TAKEN_DAMAGE_LABEL,
             bg="#FCFAF6",
             fg=MUTED,
             anchor="w",
@@ -907,11 +918,14 @@ class CombatHudWindow:
         )
         row = tk.Frame(cell, bg="#FCFAF6")
         row.pack(fill="both", expand=True)
+        row.grid_columnconfigure(0, weight=1)
+        row.grid_columnconfigure(1, weight=0, minsize=self._px(150))
+        row.grid_rowconfigure(0, weight=1)
         copy = tk.Frame(row, bg="#FCFAF6")
-        copy.pack(side="left", fill="both", expand=True)
+        copy.grid(row=0, column=0, sticky="nsew")
         tk.Label(
             copy,
-            text="最近 10 秒",
+            text="近 10 秒平均秒伤",
             bg="#FCFAF6",
             fg=MUTED,
             anchor="w",
@@ -934,7 +948,12 @@ class CombatHudWindow:
             anchor="e",
             font=self._font("Microsoft YaHei UI", 8),
         )
-        self.labels["room"].pack(side="right", padx=(self._px(8), 0))
+        self.labels["room"].grid(
+            row=0,
+            column=1,
+            sticky="e",
+            padx=(self._px(8), 0),
+        )
 
     def refresh(self) -> None:
         if self.window is None:
@@ -1059,7 +1078,7 @@ class ToolboxShell:
         self.nav_buttons: dict[str, tk.Button] = {}
         self.labels: dict[str, tk.Label] = {}
         self._macro_row_descriptions: list[str] = []
-        self.mod_buttons: dict[str, tk.Button] = {}
+        self.mod_buttons: dict[str, dict[str, tk.Button]] = {}
         self.input_mode_buttons: dict[str, tk.Button] = {}
         self._mod_busy = False
         self._mod_results: queue.Queue[tuple[bool, Exception | None]] = queue.Queue()
@@ -1260,6 +1279,29 @@ class ToolboxShell:
         footer = tk.Frame(self.root, bg="#F8F4EB", padx=18, pady=7)
         footer.pack(fill="x")
         self._main_roots.append(footer)
+        footer_meta = tk.Frame(footer, bg="#F8F4EB")
+        footer_meta.pack(side="left")
+        tk.Label(
+            footer_meta,
+            text=toolbox_author_label(),
+            bg="#F8F4EB",
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 8),
+        ).pack(side="left")
+        tk.Button(
+            footer_meta,
+            text="GitHub 仓库",
+            command=self._open_repository,
+            bg="#F8F4EB",
+            fg=BLUE,
+            activebackground="#EEE5D8",
+            activeforeground=BLUE,
+            relief="flat",
+            bd=0,
+            padx=8,
+            cursor="hand2",
+            font=("Microsoft YaHei UI", 8),
+        ).pack(side="left", padx=(8, 0))
         tk.Button(
             footer,
             text="退出工具箱",
@@ -1413,7 +1455,7 @@ class ToolboxShell:
             text="—",
             bg=SURFACE,
             fg=TEXT,
-            width=24,
+            width=36,
             anchor="e",
             justify="right",
             font=("Microsoft YaHei UI", 8),
@@ -1456,7 +1498,7 @@ class ToolboxShell:
         for column in range(3):
             cards.grid_columnconfigure(column, weight=1, uniform="combat")
         self._metric_card(cards, 0, "造成伤害", "combat_damage", "combat_boss", GOLD)
-        self._metric_card(cards, 1, "承受伤害", "combat_hp", "combat_heal", RED)
+        self._metric_card(cards, 1, TAKEN_DAMAGE_LABEL, "combat_hp", "combat_heal", RED)
         self._metric_card(cards, 2, "法力消耗", "combat_mp", "combat_mp_gain", BLUE)
 
         detail_panel = RoundedPanel(
@@ -1495,11 +1537,18 @@ class ToolboxShell:
             # to show more rows whenever the page has room.
             height=3,
         )
-        numeric_width = combat_table_numeric_width(
-            float(self.root.tk.call("tk", "scaling"))
+        tk_scaling = float(self.root.tk.call("tk", "scaling"))
+        numeric_width = max(
+            combat_table_numeric_width(tk_scaling, self.main_ui_scale),
+            tkfont.Font(
+                root=self.root,
+                family="Microsoft YaHei UI",
+                size=max(7, round(9 * self.main_ui_scale)),
+            ).measure("999,999,999")
+            + 18,
         )
         for column, title, width, anchor in (
-            ("source", "来源", 160, "w"),
+            ("source", "来源", combat_table_source_width(tk_scaling), "w"),
             ("damage", "伤害", numeric_width, "e"),
             ("healing", "有效回复", numeric_width, "e"),
             ("mp_spent", "法力消耗", numeric_width, "e"),
@@ -1517,7 +1566,7 @@ class ToolboxShell:
         combat_scrollbar.pack(side="right", fill="y")
         self.labels["combat_totals"] = tk.Label(
             detail,
-            text="承伤、实际掉血、自伤、减伤与治疗溢出会分列，不互相替代。",
+            text=f"{TAKEN_DAMAGE_LABEL}、实际战斗掉血、减伤与治疗溢出会分列，不互相替代。",
             bg=SURFACE,
             fg=MUTED,
             anchor="w",
@@ -1721,77 +1770,81 @@ class ToolboxShell:
         page = self._new_page("mods")
         self._page_heading(page, "MOD 管理", "")
 
-        descriptor = self.mod_manager.catalog.entries[0]
-        panel = RoundedPanel(
-            page,
-            height=None,
-            content_padx=14,
-            content_pady=12,
-        )
-        panel.pack(fill="x")
-        card = panel.content
-        top = tk.Frame(card, bg=SURFACE)
-        top.pack(fill="x")
-        title = tk.Frame(top, bg=SURFACE)
-        title.pack(side="left", fill="x", expand=True)
-        tk.Label(
-            title,
-            text=f"{descriptor.display.name}  v{descriptor.display.version}",
-            bg=SURFACE,
-            fg=TEXT,
-            anchor="w",
-            font=("Microsoft YaHei UI", 12, "bold"),
-        ).pack(fill="x")
-        tk.Label(
-            title,
-            text=f"作者：{descriptor.display.author}",
-            bg=SURFACE,
-            fg=MUTED,
-            anchor="w",
-            font=("Microsoft YaHei UI", 8),
-        ).pack(fill="x", pady=(3, 0))
-        self.labels["mod_status"] = tk.Label(
-            top,
-            text="● 正在检查",
-            bg=SURFACE,
-            fg=MUTED,
-            font=("Microsoft YaHei UI", 8, "bold"),
-        )
-        self.labels["mod_status"].pack(side="right", padx=(12, 0))
+        for index, descriptor in enumerate(self.mod_manager.catalog.entries):
+            panel = RoundedPanel(
+                page,
+                height=None,
+                content_padx=14,
+                content_pady=12,
+            )
+            panel.pack(fill="x", pady=(0, 9 if index < len(self.mod_manager.catalog.entries) - 1 else 0))
+            card = panel.content
+            top = tk.Frame(card, bg=SURFACE)
+            top.pack(fill="x")
+            title = tk.Frame(top, bg=SURFACE)
+            title.pack(side="left", fill="x", expand=True)
+            tk.Label(
+                title,
+                text=f"{descriptor.display.name}  v{descriptor.display.version}",
+                bg=SURFACE,
+                fg=TEXT,
+                anchor="w",
+                font=("Microsoft YaHei UI", 12, "bold"),
+            ).pack(fill="x")
+            tk.Label(
+                title,
+                text=f"作者：{descriptor.display.author}",
+                bg=SURFACE,
+                fg=MUTED,
+                anchor="w",
+                font=("Microsoft YaHei UI", 8),
+            ).pack(fill="x", pady=(3, 0))
+            status_key = f"mod_status:{descriptor.mod_id}"
+            self.labels[status_key] = tk.Label(
+                top,
+                text="● 正在检查",
+                bg=SURFACE,
+                fg=MUTED,
+                font=("Microsoft YaHei UI", 8, "bold"),
+            )
+            self.labels[status_key].pack(side="right", padx=(12, 0))
 
-        tk.Label(
-            card,
-            text=descriptor.display.summary,
-            bg=SURFACE,
-            fg=TEXT,
-            anchor="w",
-            font=("Microsoft YaHei UI", 8),
-        ).pack(fill="x", pady=(10, 0))
+            tk.Label(
+                card,
+                text=descriptor.display.summary,
+                bg=SURFACE,
+                fg=TEXT,
+                anchor="w",
+                font=("Microsoft YaHei UI", 8),
+            ).pack(fill="x", pady=(10, 0))
 
-        actions = tk.Frame(card, bg=SURFACE)
-        actions.pack(side="bottom", fill="x")
-        self.mod_buttons["remove"] = self._button(
-            actions,
-            "删除副本",
-            lambda: self._remove_mod(descriptor.mod_id),
-            width=10,
-        )
-        self.mod_buttons["remove"].pack(side="right")
-        self.mod_buttons["launch"] = self._button(
-            actions,
-            "启动",
-            lambda: self._launch_mod(descriptor.mod_id),
-            width=8,
-        )
-        self.mod_buttons["launch"].pack(side="right", padx=(0, 6))
-        self.mod_buttons["configure"] = self._button(
-            actions,
-            "一键配置",
-            lambda: self._configure_mod(descriptor.mod_id),
-            accent=True,
-            width=10,
-        )
-        self.mod_buttons["configure"].pack(side="right", padx=(0, 6))
+            actions = tk.Frame(card, bg=SURFACE)
+            actions.pack(side="bottom", fill="x")
+            buttons: dict[str, tk.Button] = {}
+            buttons["remove"] = self._button(
+                actions,
+                "卸载" if descriptor.operation.kind == "bepinex_plugin" else "删除副本",
+                lambda current_id=descriptor.mod_id: self._remove_mod(current_id),
+                width=10,
+            )
+            buttons["remove"].pack(side="right")
+            if descriptor.operation.launchable:
+                buttons["launch"] = self._button(
+                    actions,
+                    "启动",
+                    lambda current_id=descriptor.mod_id: self._launch_mod(current_id),
+                    width=8,
+                )
+                buttons["launch"].pack(side="right", padx=(0, 6))
+            buttons["configure"] = self._button(
+                actions,
+                "一键安装" if descriptor.operation.kind == "bepinex_plugin" else "一键配置",
+                lambda current_id=descriptor.mod_id: self._configure_mod(current_id),
+                accent=True,
+                width=10,
+            )
+            buttons["configure"].pack(side="right", padx=(0, 6))
+            self.mod_buttons[descriptor.mod_id] = buttons
 
     def _configure_mod(self, mod_id: str) -> None:
         if self._mod_busy:
@@ -1799,14 +1852,27 @@ class ToolboxShell:
         descriptor = self.mod_manager.descriptor(mod_id)
         source = self.mod_manager.bundled_source(mod_id)
         if source is None:
+            archive = descriptor.operation.archive_source
+            filetypes = [("MOD 文件", "*.dll")]
+            if archive is not None:
+                filetypes[0] = ("MOD 文件", "*.dll *.7z *.zip *.rar")
+            if descriptor.operation.kind == "external_trainer":
+                filetypes[0] = ("Windows 应用程序", "*.exe")
+            filetypes.append(("所有文件", "*.*"))
             selected = filedialog.askopenfilename(
                 parent=self.root,
-                title=f"选择 {descriptor.operation.expected_filename}",
-                filetypes=(("Windows 应用程序", "*.exe"), ("所有文件", "*.*")),
+                title=f"选择 {descriptor.display.name} 文件",
+                filetypes=tuple(filetypes),
             )
             if not selected:
                 return
             source = Path(selected)
+        if descriptor.operation.kind == "bepinex_plugin" and not messagebox.askyesno(
+            "安装游戏插件",
+            f"将“{descriptor.display.name}”安装到游戏插件目录。\n\n安装后需重启游戏，是否继续？",
+            parent=self.root,
+        ):
+            return
         self._mod_busy = True
         self._refresh_mod_page()
 
@@ -1839,6 +1905,8 @@ class ToolboxShell:
     def _mod_error_text(error: Exception | None) -> str:
         if isinstance(error, ModIntegrityError):
             return "所选文件与登记版本不一致；请重新选择对应版本。"
+        if isinstance(error, ModGamePathRequired):
+            return "未找到可用的游戏或 BepInEx 目录；请先在设置中定位游戏程序。"
         if isinstance(error, (ModManagerError, OSError)):
             return "无法完成 MOD 操作；请确认文件仍存在且目录可写。"
         return "MOD 管理发生未预期错误，未启动第三方程序。"
@@ -1863,9 +1931,11 @@ class ToolboxShell:
     def _remove_mod(self, mod_id: str) -> None:
         if self._mod_busy:
             return
+        descriptor = self.mod_manager.descriptor(mod_id)
+        is_plugin = descriptor.operation.kind == "bepinex_plugin"
         if not messagebox.askyesno(
-            "删除盒子副本",
-            "删除已配置的本地副本？",
+            "卸载游戏插件" if is_plugin else "删除盒子副本",
+            "从游戏插件目录卸载？" if is_plugin else "删除已配置的本地副本？",
             parent=self.root,
         ):
             return
@@ -1876,31 +1946,42 @@ class ToolboxShell:
             return
         self._refresh_mod_page()
         if removed:
-            messagebox.showinfo("已删除", "本地副本已删除。", parent=self.root)
+            messagebox.showinfo(
+                "已卸载" if is_plugin else "已删除",
+                "游戏插件已卸载。" if is_plugin else "本地副本已删除。",
+                parent=self.root,
+            )
 
     def _refresh_mod_page(self) -> None:
-        descriptor = self.mod_manager.catalog.entries[0]
-        status = self.mod_manager.status(descriptor.mod_id)
-        if self._mod_busy:
-            label, color = "● 配置中", GOLD
-        elif status.state == "installed":
-            label, color = "● 已配置", GREEN
-        elif status.state == "integrity_error":
-            label, color = "● 副本校验失败", RED
-        else:
-            label, color = "● 未配置", MUTED
-        self.labels["mod_status"].configure(text=label, fg=color)
-        any_copy = status.state != "not_installed"
-        self.mod_buttons["configure"].configure(
-            text="重新配置" if any_copy else "一键配置",
-            state="disabled" if self._mod_busy else "normal",
-        )
-        self.mod_buttons["launch"].configure(
-            state="normal" if status.installed and not self._mod_busy else "disabled"
-        )
-        self.mod_buttons["remove"].configure(
-            state="normal" if any_copy and not self._mod_busy else "disabled"
-        )
+        for descriptor in self.mod_manager.catalog.entries:
+            status = self.mod_manager.status(descriptor.mod_id)
+            is_plugin = descriptor.operation.kind == "bepinex_plugin"
+            if self._mod_busy:
+                label, color = "● 操作中", GOLD
+            elif status.state == "installed":
+                label, color = ("● 已安装" if is_plugin else "● 已配置"), GREEN
+            elif status.state == "integrity_error":
+                label, color = "● 文件校验失败", RED
+            elif status.state == "game_not_configured":
+                label, color = "● 未定位游戏", MUTED
+            else:
+                label, color = ("● 未安装" if is_plugin else "● 未配置"), MUTED
+            self.labels[f"mod_status:{descriptor.mod_id}"].configure(text=label, fg=color)
+            any_copy = status.state in {"installed", "integrity_error"}
+            buttons = self.mod_buttons[descriptor.mod_id]
+            configure_label = "重新安装" if is_plugin else "重新配置"
+            default_label = "一键安装" if is_plugin else "一键配置"
+            buttons["configure"].configure(
+                text=configure_label if any_copy else default_label,
+                state="disabled" if self._mod_busy else "normal",
+            )
+            if "launch" in buttons:
+                buttons["launch"].configure(
+                    state="normal" if status.installed and not self._mod_busy else "disabled"
+                )
+            buttons["remove"].configure(
+                state="normal" if any_copy and not self._mod_busy else "disabled"
+            )
 
     def _build_settings_page(self) -> None:
         page = self._new_page("settings")
@@ -1970,6 +2051,15 @@ class ToolboxShell:
         self._settings_row(panel, "按键显示", "", "完整设置", self.keyboard.open_settings)
         self._settings_row(panel, "按键宏", "", "编辑宏", self.macro_feature.open_window)
         self._settings_row(panel, "战斗统计", "", "打开 HUD", self.hud.show, last=True)
+
+    def _open_repository(self) -> None:
+        if webbrowser.open(TOOLBOX_REPOSITORY_URL, new=2):
+            return
+        messagebox.showerror(
+            "无法打开仓库",
+            f"请手动访问：\n{TOOLBOX_REPOSITORY_URL}",
+            parent=self.root,
+        )
 
     def _display_control_row(
         self,
@@ -2174,7 +2264,8 @@ class ToolboxShell:
         self.labels["combat_summary"].configure(
             text=(
                 f"总伤害 {format_metric(snapshot.total_damage)}\n"
-                f"承伤 / 回复 {format_whole_metric(snapshot.taken_settlement_damage)} / "
+                f"{TAKEN_DAMAGE_LABEL} / 回复 "
+                f"{format_whole_metric(snapshot.taken_settlement_damage)} / "
                 f"{format_whole_metric(snapshot.effective_healing)}"
             )
         )
@@ -2298,9 +2389,8 @@ class ToolboxShell:
         )
         self.labels["combat_totals"].configure(
             text=(
-                f"官方承伤 {format_whole_metric(snapshot.taken_settlement_damage)} · "
+                f"{TAKEN_DAMAGE_LABEL} {format_whole_metric(snapshot.taken_settlement_damage)} · "
                 f"实际战斗掉血 {format_whole_metric(snapshot.hp_damage_taken)} · "
-                f"其他掉血/自伤 {format_whole_metric(snapshot.hp_loss_other)} · "
                 f"减伤 {format_whole_metric(snapshot.mitigated_damage)} · "
                 f"治疗溢出 {format_whole_metric(snapshot.resource_overflow)}"
             )

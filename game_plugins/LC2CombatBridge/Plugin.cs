@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using BepInEx;
+using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
 using Il2CppInterop.Runtime;
@@ -17,7 +18,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.3.0";
+    public const string PluginVersion = "0.4.1";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
@@ -28,11 +29,26 @@ public sealed class Plugin : BasePlugin
     private static Stack<long> PlayerHpObservationStack;
     [ThreadStatic]
     private static Stack<long> PlayerMpObservationStack;
+    [ThreadStatic]
+    private static long? OfficialManaRecoveryRootOperationId;
+    [ThreadStatic]
+    private static double OfficialManaRecoveryCovered;
     private static long _nextPlayerHpOperationId;
     private static long _nextPlayerMpOperationId;
+    private static bool _awaitingMapEntry = true;
+    private static bool _inActiveMap;
+    private static bool _manaRecoveryArmed;
+    private static float? _lastObservedPlayerMp;
+    private static double _diagnosticManaSpent;
+    private static double _diagnosticManaGained;
+    private static int _diagnosticManaSpendEvents;
+    private static int _diagnosticManaGainEvents;
 
     private Harmony _harmony;
     private static CombatPipeServer Bridge;
+    private static ManualLogSource RuntimeLog;
+    private static Player RegisteredRecoveryPlayer;
+    private static Il2CppSystem.Action<CreatureEvent.OnRecoverMana> RecoverManaCallback;
 
     private sealed class HitHpSnapshot
     {
@@ -51,6 +67,7 @@ public sealed class Plugin : BasePlugin
         public long OperationId { get; init; }
         public long? ParentOperationId { get; init; }
         public int Depth { get; init; }
+        public bool InsideDamageResolution { get; init; }
     }
 
     internal sealed class PlayerMpChangeState
@@ -65,6 +82,7 @@ public sealed class Plugin : BasePlugin
 
     public override void Load()
     {
+        RuntimeLog = Log;
         Bridge = new CombatPipeServer(Log);
         Bridge.Start();
         _harmony = new Harmony(PluginGuid);
@@ -74,39 +92,144 @@ public sealed class Plugin : BasePlugin
 
     public override bool Unload()
     {
+        UnregisterRecoverManaCallback();
         _harmony?.UnpatchSelf();
         Bridge?.Dispose();
         Bridge = null;
+        RuntimeLog = null;
         return true;
     }
 
     internal static void BeginRound()
     {
-        Bridge?.BeginGameSession();
-        PublishCurrentRoom();
+        EnsureRecoverManaCallback();
+        // This hook also fires while returning to camp. Defer the reset until a
+        // validated non-camp room start proves that the next map has begun.
+        _awaitingMapEntry = true;
+        _inActiveMap = false;
+        _manaRecoveryArmed = false;
+        ResetOfficialManaRecoveryCoverage();
+        SyncPlayerMpObservation();
+        LogRoomDiagnostic("round_start");
     }
 
     internal static void EndRound()
     {
+        LogManaSummary("round_end");
+        LogRoomDiagnostic("round_end");
+        _awaitingMapEntry = true;
+        _inActiveMap = false;
+        _manaRecoveryArmed = false;
+        ResetOfficialManaRecoveryCoverage();
+        _lastObservedPlayerMp = null;
         Bridge?.EndGameSession();
     }
 
     internal static void BeginRoom()
     {
-        PublishCurrentRoom();
+        EnsureRecoverManaCallback();
+        var room = CaptureActiveMapLocation();
+        LogRoomDiagnostic("change_room_end", room);
+        if (room is null)
+        {
+            return;
+        }
+        ActivateMapSession(room);
     }
 
-    private static void PublishCurrentRoom()
+    private static bool EnsureActiveMapSession()
     {
-        var room = CaptureRoomLocation();
-        if (room is not null)
+        if (_inActiveMap)
         {
-            Bridge?.PublishRoomStarted(room);
+            return true;
         }
+        var room = CaptureActiveMapLocation();
+        if (room is null)
+        {
+            return false;
+        }
+        ActivateMapSession(room);
+        return true;
+    }
+
+    private static void ActivateMapSession(RoomLocation room)
+    {
+        if (_awaitingMapEntry || !_inActiveMap)
+        {
+            _awaitingMapEntry = false;
+            _manaRecoveryArmed = false;
+            ResetOfficialManaRecoveryCoverage();
+            SyncPlayerMpObservation();
+            ResetDiagnosticManaTotals();
+            LogManaSummary("session_start");
+            Bridge?.BeginGameSession();
+        }
+        _inActiveMap = true;
+        Bridge?.PublishRoomStarted(room);
+    }
+
+    private static RoomLocation CaptureActiveMapLocation()
+    {
+        try
+        {
+            return StageMgr.Instance?.IsInCamp is false ? CaptureRoomLocation() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void EnsureRecoverManaCallback()
+    {
+        try
+        {
+            var player = PlayerManager.Instance?.LocalPlayer;
+            if (player is null || RegisteredRecoveryPlayer?.Pointer == player.Pointer)
+            {
+                return;
+            }
+            UnregisterRecoverManaCallback();
+            RecoverManaCallback ??=
+                (Il2CppSystem.Action<CreatureEvent.OnRecoverMana>)
+                (Action<CreatureEvent.OnRecoverMana>)EmitOfficialManaRecovery;
+            player.RegisterCreatureEventCallback<CreatureEvent.OnRecoverMana>(
+                RecoverManaCallback,
+                0);
+            RegisteredRecoveryPlayer = player;
+        }
+        catch (Exception exception)
+        {
+            RuntimeLog?.LogWarning(
+                $"Mana recovery callback unavailable: {exception.GetType().Name}");
+        }
+    }
+
+    private static void UnregisterRecoverManaCallback()
+    {
+        if (RegisteredRecoveryPlayer is null || RecoverManaCallback is null)
+        {
+            RegisteredRecoveryPlayer = null;
+            return;
+        }
+        try
+        {
+            RegisteredRecoveryPlayer
+                .UnRegisterCreatureEventCallback<CreatureEvent.OnRecoverMana>(
+                    RecoverManaCallback,
+                    0);
+        }
+        catch
+        {
+            // The player may already be disposed during room or plugin teardown.
+        }
+        RegisteredRecoveryPlayer = null;
     }
 
     internal static void EndRoom(SettlementDataMgr settlement)
     {
+        LogManaSummary("room_end");
+        LogRoomDiagnostic("room_end");
         try
         {
             var room = settlement?.RoomBattleDataDto;
@@ -186,6 +309,11 @@ public sealed class Plugin : BasePlugin
             HpSnapshots.TryGetValue(hit.ID, out snapshot);
             HpSnapshots.Remove(hit.ID);
         }
+        var defender = hit.mBeAtker;
+        if (direction == "taken" && !IsPlayerRootCreature(TryCreature(defender)))
+        {
+            return;
+        }
         if (snapshot?.Before is null)
         {
             Bridge?.FailSession("damage_snapshot_missing");
@@ -205,7 +333,6 @@ public sealed class Plugin : BasePlugin
                 ? CeilingToInt(originalDamage)
                 : CeilingToInt(appliedHpDamage);
             var attributes = DamageAttributes(hit);
-            var defender = hit.mBeAtker;
             var isBoss = BossFlag(defender);
             var fields = new Dictionary<string, object>
             {
@@ -230,7 +357,11 @@ public sealed class Plugin : BasePlugin
                 ["parent_operation_id"] = snapshot.ParentHitId,
                 ["nesting_depth"] = snapshot.Depth,
             };
-            Bridge?.Emit("damage_resolution", aggregate: true, hookPath, fields);
+            Bridge?.Emit(
+                "damage_resolution",
+                aggregate: ShouldAggregateDamage(direction),
+                hookPath,
+                fields);
         }
         catch
         {
@@ -260,6 +391,7 @@ public sealed class Plugin : BasePlugin
             OperationId = operationId,
             ParentOperationId = stack.Count > 0 ? stack.Peek() : null,
             Depth = stack.Count,
+            InsideDamageResolution = HpStack is not null && HpStack.Count > 0,
         };
         stack.Push(operationId);
         return state;
@@ -310,7 +442,36 @@ public sealed class Plugin : BasePlugin
             }
             var requested = Finite(requestedDelta);
             var effective = Finite(after.Value - state.Before);
-            if (requested <= 0 || effective < 0)
+            if (effective < -0.0001)
+            {
+                if (state.InsideDamageResolution)
+                {
+                    return;
+                }
+                Bridge?.Emit(
+                    "resource_change",
+                    aggregate: true,
+                    hookPath,
+                    new Dictionary<string, object>
+                    {
+                        ["resource"] = "hp",
+                        ["resource_operation"] = "loss",
+                        ["requested_delta"] = requested,
+                        ["effective_delta"] = effective,
+                        ["value_before"] = Finite(state.Before),
+                        ["value_after"] = Finite(after.Value),
+                        ["max_before"] = Finite(state.MaxBefore),
+                        ["max_after"] = Finite(maxAfter.Value),
+                        ["blocked"] = false,
+                        ["overflow"] = 0.0,
+                        ["source_token"] = NullableToken(sourceToken)
+                            ?? "resource.self_damage",
+                        ["parent_operation_id"] = state.ParentOperationId,
+                        ["nesting_depth"] = state.Depth,
+                    });
+                return;
+            }
+            if (requested <= 0)
             {
                 return;
             }
@@ -389,7 +550,8 @@ public sealed class Plugin : BasePlugin
 
     internal static void EndPlayerMpObservation(
         float requestedDelta,
-        PlayerMpChangeState state)
+        PlayerMpChangeState state,
+        string hookPath)
     {
         if (state is null)
         {
@@ -402,8 +564,19 @@ public sealed class Plugin : BasePlugin
             {
                 return;
             }
+            _lastObservedPlayerMp = after.Value;
             var requested = Finite(requestedDelta);
             var effective = Finite(after.Value - state.Before);
+            var officialCovered = state.Depth == 0
+                ? TakeOfficialManaRecoveryCoverage(state.OperationId)
+                : 0.0;
+            var fallbackGain = state.Depth == 0
+                && effective > 0.0001
+                && _inActiveMap
+                && _manaRecoveryArmed
+                ? Math.Max(0.0, effective - officialCovered)
+                : 0.0;
+            var aggregateFallback = fallbackGain > 0.0001;
             if (Math.Abs(requested) <= 0.0001 && Math.Abs(effective) <= 0.0001)
             {
                 return;
@@ -421,16 +594,28 @@ public sealed class Plugin : BasePlugin
             var overflow = requested > 0 && atCapacity
                 ? Math.Max(0.0, requested - Math.Max(0.0, effective))
                 : 0.0;
+            if (aggregateFallback)
+            {
+                _diagnosticManaGained += fallbackGain;
+                _diagnosticManaGainEvents += 1;
+                RuntimeLog?.LogInfo(
+                    $"[LC2CB-MP] kind=runtime_gain hook={hookPath} " +
+                    $"before_raw={DiagnosticNumber(state.Before)} " +
+                    $"after_raw={DiagnosticNumber(after)} effective_raw={DiagnosticNumber(effective)} " +
+                    $"official_covered={DiagnosticNumber(officialCovered)} " +
+                    $"fallback_raw={DiagnosticNumber(fallbackGain)} " +
+                    $"armed={_manaRecoveryArmed} in_map={_inActiveMap}");
+            }
             Bridge?.Emit(
                 "resource_change",
-                aggregate: state.Depth == 0 && effective > 0.0001,
-                "runtime.creature_mp_change",
+                aggregate: aggregateFallback,
+                hookPath,
                 new Dictionary<string, object>
                 {
                     ["resource"] = "mp",
                     ["resource_operation"] = operation,
-                    ["requested_delta"] = requested,
-                    ["effective_delta"] = effective,
+                    ["requested_delta"] = aggregateFallback ? fallbackGain : requested,
+                    ["effective_delta"] = aggregateFallback ? fallbackGain : effective,
                     ["value_before"] = Finite(state.Before),
                     ["value_after"] = Finite(after.Value),
                     ["max_before"] = Finite(state.MaxBefore),
@@ -452,6 +637,7 @@ public sealed class Plugin : BasePlugin
             if (stack is null || stack.Count == 0 || stack.Peek() != state.OperationId)
             {
                 stack?.Clear();
+                ResetOfficialManaRecoveryCoverage();
                 Bridge?.FailSession("mp_resource_stack_mismatch");
             }
             else
@@ -465,17 +651,29 @@ public sealed class Plugin : BasePlugin
     {
         try
         {
+            EnsureRecoverManaCallback();
             var entity = EntityMgr.Instance?.GetEntity(arg.creatureID);
             var creature = TryCreature(entity);
             if (!IsPlayerRootCreature(creature))
             {
                 return;
             }
-            var spent = Positive(arg.useMana);
-            if (spent <= 0.0001)
+            var spentRaw = Positive(arg.useMana);
+            var spentDisplay = DisplayMpAmount(arg.useMana);
+            if (spentRaw <= 0.0001 || !EnsureActiveMapSession())
             {
                 return;
             }
+            _manaRecoveryArmed = true;
+            _diagnosticManaSpent += spentRaw;
+            _diagnosticManaSpendEvents += 1;
+            var (currentRaw, maxRaw) = ReadMp(creature);
+            RuntimeLog?.LogInfo(
+                $"[LC2CB-MP] kind=spend raw={DiagnosticNumber(arg.useMana)} " +
+                $"display={DiagnosticNumber(spentDisplay)} current_raw={DiagnosticNumber(currentRaw)} " +
+                $"current_display={DiagnosticDisplayMp(currentRaw)} max_raw={DiagnosticNumber(maxRaw)} " +
+                $"last_observed_raw={DiagnosticNumber(_lastObservedPlayerMp)} " +
+                $"events={_diagnosticManaSpendEvents} total={DiagnosticNumber(_diagnosticManaSpent)}");
             Bridge?.Emit(
                 "resource_change",
                 aggregate: true,
@@ -484,8 +682,8 @@ public sealed class Plugin : BasePlugin
                 {
                     ["resource"] = "mp",
                     ["resource_operation"] = "spend",
-                    ["requested_delta"] = -spent,
-                    ["effective_delta"] = -spent,
+                    ["requested_delta"] = -spentRaw,
+                    ["effective_delta"] = -spentRaw,
                     ["value_before"] = null,
                     ["value_after"] = null,
                     ["max_before"] = null,
@@ -502,6 +700,83 @@ public sealed class Plugin : BasePlugin
         catch
         {
             Bridge?.FailSession("mp_spend_conversion_failed");
+        }
+    }
+
+    internal static void EmitOfficialManaRecovery(CreatureEvent.OnRecoverMana arg)
+    {
+        try
+        {
+            var entity = EntityMgr.Instance?.GetEntity(arg.creatureID);
+            var creature = TryCreature(entity);
+            if (!IsPlayerRootCreature(creature))
+            {
+                return;
+            }
+            var (afterRaw, maxAfterRaw) = ReadMp(creature);
+            var beforeRaw = _lastObservedPlayerMp;
+            if (afterRaw is null || maxAfterRaw is null)
+            {
+                return;
+            }
+            _lastObservedPlayerMp = afterRaw.Value;
+            var beforeDisplay = beforeRaw is null
+                ? (double?)null
+                : DisplayMpValue(beforeRaw.Value);
+            var afterDisplay = DisplayMpValue(afterRaw.Value);
+            var maxAfterDisplay = DisplayMpValue(maxAfterRaw.Value);
+            var effectiveDisplay = beforeDisplay is null
+                ? 0.0
+                : Math.Max(0.0, afterDisplay - beforeDisplay.Value);
+            var effectiveRaw = beforeRaw is null
+                ? 0.0
+                : Math.Max(0.0, Finite(afterRaw.Value - beforeRaw.Value));
+            RuntimeLog?.LogInfo(
+                $"[LC2CB-MP] kind=recovery before_raw={DiagnosticNumber(beforeRaw)} " +
+                $"after_raw={DiagnosticNumber(afterRaw)} before_display={DiagnosticNumber(beforeDisplay)} " +
+                $"after_display={DiagnosticNumber(afterDisplay)} " +
+                $"effective_raw={DiagnosticNumber(effectiveRaw)} " +
+                $"effective_display={DiagnosticNumber(effectiveDisplay)} " +
+                $"armed={_manaRecoveryArmed} in_map={_inActiveMap}");
+            if (beforeRaw is null || !_inActiveMap || !_manaRecoveryArmed)
+            {
+                return;
+            }
+            // OnRecoverMana reports the post-recovery target, not the delta.
+            // Accumulate the raw before/after difference and round only at the UI
+            // boundary; rounding every callback can bias a long run.
+            if (effectiveRaw <= 0.0001)
+            {
+                return;
+            }
+            _diagnosticManaGained += effectiveRaw;
+            _diagnosticManaGainEvents += 1;
+            TrackOfficialManaRecovery(effectiveRaw);
+            Bridge?.Emit(
+                "resource_change",
+                aggregate: true,
+                "player.official_mana_recovery",
+                new Dictionary<string, object>
+                {
+                    ["resource"] = "mp",
+                    ["resource_operation"] = "gain",
+                    ["requested_delta"] = effectiveRaw,
+                    ["effective_delta"] = effectiveRaw,
+                    ["value_before"] = Finite(beforeRaw.Value),
+                    ["value_after"] = Finite(afterRaw.Value),
+                    ["max_before"] = Finite(maxAfterRaw.Value),
+                    ["max_after"] = Finite(maxAfterRaw.Value),
+                    ["blocked"] = false,
+                    ["overflow"] = 0.0,
+                    ["source_token"] = "resource.mana_recovery",
+                    ["actor_entity_id"] = EntityToken(creature),
+                    ["parent_operation_id"] = null,
+                    ["nesting_depth"] = 0,
+                });
+        }
+        catch
+        {
+            Bridge?.FailSession("mp_recovery_conversion_failed");
         }
     }
 
@@ -539,6 +814,90 @@ public sealed class Plugin : BasePlugin
 
     private static bool ValidRoomIndex(int value) =>
         value is >= 0 and <= 10 or 99 or 100 or 101;
+
+    private static void ResetDiagnosticManaTotals()
+    {
+        _diagnosticManaSpent = 0.0;
+        _diagnosticManaGained = 0.0;
+        _diagnosticManaSpendEvents = 0;
+        _diagnosticManaGainEvents = 0;
+    }
+
+    private static void TrackOfficialManaRecovery(double effectiveRaw)
+    {
+        var stack = PlayerMpObservationStack;
+        if (stack is null || stack.Count == 0)
+        {
+            return;
+        }
+        var rootOperationId = stack.Last();
+        if (OfficialManaRecoveryRootOperationId != rootOperationId)
+        {
+            OfficialManaRecoveryRootOperationId = rootOperationId;
+            OfficialManaRecoveryCovered = 0.0;
+        }
+        OfficialManaRecoveryCovered += effectiveRaw;
+    }
+
+    private static double TakeOfficialManaRecoveryCoverage(long rootOperationId)
+    {
+        var covered = OfficialManaRecoveryRootOperationId == rootOperationId
+            ? OfficialManaRecoveryCovered
+            : 0.0;
+        ResetOfficialManaRecoveryCoverage();
+        return covered;
+    }
+
+    private static void ResetOfficialManaRecoveryCoverage()
+    {
+        OfficialManaRecoveryRootOperationId = null;
+        OfficialManaRecoveryCovered = 0.0;
+    }
+
+    private static void LogManaSummary(string point) =>
+        RuntimeLog?.LogInfo(
+            $"[LC2CB-MP] kind=summary point={point} " +
+            $"spend_events={_diagnosticManaSpendEvents} spent={DiagnosticNumber(_diagnosticManaSpent)} " +
+            $"gain_events={_diagnosticManaGainEvents} gained={DiagnosticNumber(_diagnosticManaGained)} " +
+            $"net={DiagnosticNumber(_diagnosticManaGained - _diagnosticManaSpent)} " +
+            $"last_observed_raw={DiagnosticNumber(_lastObservedPlayerMp)}");
+
+    private static void LogRoomDiagnostic(string callback, RoomLocation room = null)
+    {
+        try
+        {
+            var stage = StageMgr.Instance;
+            RuntimeLog?.LogInfo(
+                $"[LC2CB-ROOM] callback={callback} valid={room is not null} " +
+                $"is_camp={stage?.IsInCamp} non_battle={stage?.IsNonBattleRoom()} " +
+                $"stage={(stage is null ? "null" : ((int)stage.CurStageLevel).ToString(CultureInfo.InvariantCulture))} " +
+                $"scenario={CombatPipeServer.Bound(stage?.CurScenario.ToString(), 128)} " +
+                $"room_index={(stage is null ? "null" : stage.CurRoomIndex.ToString(CultureInfo.InvariantCulture))} " +
+                $"map={CombatPipeServer.Bound(stage?.CurRoomInfo?.mapFileName, 256)}");
+        }
+        catch (Exception exception)
+        {
+            RuntimeLog?.LogWarning(
+                $"[LC2CB-ROOM] callback={callback} diagnostic_failed={exception.GetType().Name}");
+        }
+    }
+
+    private static string DiagnosticDisplayMp(float? raw) =>
+        raw is null ? "null" : DiagnosticNumber(DisplayMpValue(raw.Value));
+
+    private static string DiagnosticNumber(float? value) =>
+        value is null ? "null" : DiagnosticNumber((double)value.Value);
+
+    private static string DiagnosticNumber(float value) =>
+        DiagnosticNumber((double)value);
+
+    private static string DiagnosticNumber(double? value) =>
+        value is null ? "null" : DiagnosticNumber(value.Value);
+
+    private static string DiagnosticNumber(double value) =>
+        double.IsFinite(value)
+            ? value.ToString("R", CultureInfo.InvariantCulture)
+            : "non_finite";
 
     private static void CaptureHp(Creature instance, DisposeHitInfo hit, bool before)
     {
@@ -639,6 +998,26 @@ public sealed class Plugin : BasePlugin
         return runtime is null ? null : runtime.IsBoss;
     }
 
+    private static bool ShouldAggregateDamage(string direction)
+    {
+        if (!string.Equals(direction, "dealt", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        // Non-battle rooms can contain target dummies that participate in the
+        // official attacker callback and report IsBoss=true, while the game's
+        // end-of-run settlement excludes them. Use the game's own room semantic
+        // instead of guessing from map filenames or room indices.
+        try
+        {
+            return StageMgr.Instance?.IsNonBattleRoom() is not true;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
     private static string EntityToken(Entity entity) =>
         entity is null ? null : $"entity:{entity.EntityID.ToString(CultureInfo.InvariantCulture)}";
 
@@ -717,6 +1096,42 @@ public sealed class Plugin : BasePlugin
         return (runtime.CurMP.GetDecrypted(), runtime.MaxMP.GetDecrypted());
     }
 
+    private static void SyncPlayerMpObservation()
+    {
+        try
+        {
+            var creature = PlayerManager.Instance?.LocalPlayer?.OwnerCreature;
+            var (current, _) = ReadMp(creature);
+            _lastObservedPlayerMp = current is not null && float.IsFinite(current.Value)
+                ? current.Value
+                : null;
+        }
+        catch
+        {
+            _lastObservedPlayerMp = null;
+        }
+    }
+
+    private static double DisplayMpValue(float rawValue)
+    {
+        if (!float.IsFinite(rawValue) || rawValue < 0f)
+        {
+            return 0.0;
+        }
+        return Math.Max(0, CreatureRuntimeData.ToCurMPInt(rawValue));
+    }
+
+    private static double DisplayMpAmount(float rawValue)
+    {
+        if (!float.IsFinite(rawValue) || rawValue <= 0f)
+        {
+            return 0.0;
+        }
+        // OnUseMana/OnRecoverMana use the internal float unit. Match the game's
+        // own CurMP_Int conversion so the HUD reports the same visible amount.
+        return Math.Max(0, CreatureRuntimeData.ToCurMPInt(rawValue));
+    }
+
     private static double Finite(float value) =>
         float.IsFinite(value) ? value : 0.0;
 
@@ -755,7 +1170,10 @@ internal static class PlayerMpChangePatch
     private static void Postfix(
         float deltaValue,
         Plugin.PlayerMpChangeState __state) =>
-        Plugin.EndPlayerMpObservation(deltaValue, __state);
+        Plugin.EndPlayerMpObservation(
+            deltaValue,
+            __state,
+            "runtime.creature_mp_change");
 }
 
 [HarmonyPatch(typeof(CreatureRuntimeData), nameof(CreatureRuntimeData.UpdateMp))]
@@ -769,7 +1187,7 @@ internal static class PlayerMpRecoveryPatch
 
     [HarmonyPostfix]
     private static void Postfix(Plugin.PlayerMpChangeState __state) =>
-        Plugin.EndPlayerMpObservation(0f, __state);
+        Plugin.EndPlayerMpObservation(0f, __state, "runtime.update_mp");
 }
 
 [HarmonyPatch(typeof(HeroRuntimeData), nameof(HeroRuntimeData.ChangeCurrentHp))]
@@ -853,8 +1271,8 @@ internal static class RoundEndPatch
     private static void Postfix() => Plugin.EndRound();
 }
 
-[HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.OnChangeRoomStart))]
-internal static class RoomStartPatch
+[HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.OnChangeRoomEnd))]
+internal static class RoomEndLocationPatch
 {
     [HarmonyPostfix]
     private static void Postfix() => Plugin.BeginRoom();

@@ -29,6 +29,41 @@
         ],
         "redistribution_status": "author_approved_for_free_bundle_via_maintainer_2026-08-27"
       }
+    },
+    {
+      "id": "gold-editor-f5",
+      "display": {
+        "name": "金币编辑器",
+        "version": "1.0",
+        "author": "刺心",
+        "summary": "在游戏内读取、修改并保存金币"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2GoldFree.dll",
+        "bundled": false,
+        "archive_source": {
+          "expected_filename": "F5金币编辑器.7z",
+          "member": "LC2GoldFree.dll",
+          "sha256": "7DFB39A521C1135584D9D88FC6138CFA0F8AF017F952924C141F189EDA7A294B",
+          "size_bytes": 4136
+        }
+      },
+      "integrity_policy": {
+        "version_note": "程序集与内嵌标题 1.0；以 SHA-256 识别",
+        "author_source": "DLL 内嵌窗口标题与加载日志",
+        "author_channel": "程序集元数据",
+        "sha256": "BB6FF96AA4AF9BB3521ED93C3A5582E48D5D9CB8C7BAAF5291FA4C3E57647B56",
+        "size_bytes": 9216,
+        "signature_status": "unsigned",
+        "risk_level": "medium",
+        "capabilities": [
+          "BepInEx IL2CPP 插件",
+          "金币读取与写入",
+          "游戏存档保存"
+        ],
+        "redistribution_status": "local_user_supplied_only"
+      }
     }
   ]
 }

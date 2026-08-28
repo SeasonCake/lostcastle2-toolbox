@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from pathlib import Path
 
 from toolbox.app_shell import (
+    DEFAULT_TOOLBOX_WINDOW_PRESET,
     TOOLBOX_WINDOW_PRESETS,
     TOOLBOX_UI_SCALES,
+    TOOLBOX_REPOSITORY_URL,
+    TAKEN_DAMAGE_LABEL,
     ToolboxShell,
     boss_damage_share,
     clamp_main_window_size,
     combat_state_label,
     combat_hud_size,
+    combat_table_source_width,
     combat_table_numeric_width,
     format_location_label,
     format_metric,
@@ -26,6 +31,7 @@ from toolbox.app_shell import (
     main_window_min_size,
     ordered_keyboard_keys,
     seed_demo_combat,
+    toolbox_author_label,
 )
 from toolbox.combat_aggregator import CombatAggregator, ScenarioRegistry, SourceRegistry
 from toolbox.macro_config import default_profile_data
@@ -33,6 +39,16 @@ from toolbox.macro_model import parse_macro_profile
 
 
 class AppShellModelTests(unittest.TestCase):
+    def test_public_taken_damage_label_uses_player_facing_language(self) -> None:
+        self.assertEqual(TAKEN_DAMAGE_LABEL, "受击承伤")
+
+    def test_toolbox_attribution_and_repository_action_are_stable(self) -> None:
+        self.assertEqual(toolbox_author_label(), "作者：加菲_barista")
+        shell = SimpleNamespace(root=None)
+        with patch("toolbox.app_shell.webbrowser.open", return_value=True) as opener:
+            ToolboxShell._open_repository(shell)
+        opener.assert_called_once_with(TOOLBOX_REPOSITORY_URL, new=2)
+
     def test_demo_combat_state_is_deterministic_and_complete_for_ui_qa(self) -> None:
         root = Path(__file__).resolve().parents[1]
         aggregator = CombatAggregator(
@@ -137,17 +153,43 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(hud_panel_height(112, 2.0), 118)
         self.assertEqual(hud_panel_height(88, 2.0, high_dpi_gain=24), 100)
 
+    def test_hud_location_reserves_a_column_and_never_invents_an_ellipsis(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "toolbox" / "app_shell.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            "row.grid_columnconfigure(1, weight=0, minsize=self._px(150))",
+            source,
+        )
+        self.assertIn("label.configure(text=text, font=", source)
+        self.assertNotIn('rendered_text = "…"', source)
+
     def test_main_combat_layout_reserves_high_dpi_subtitles_and_numbers(self) -> None:
-        self.assertEqual(main_window_min_size(1.5), (780, 560))
-        self.assertEqual(main_window_min_size(2.0), (840, 650))
+        self.assertEqual(main_window_min_size(1.5), (780, 610))
+        self.assertEqual(main_window_min_size(2.0), (840, 700))
         self.assertEqual(main_metric_card_height(1.5), 133)
         self.assertEqual(main_metric_card_height(2.0), 151)
         self.assertEqual(combat_table_numeric_width(1.5), 90)
         self.assertEqual(combat_table_numeric_width(2.0), 105)
+        self.assertEqual(combat_table_numeric_width(1.5, 1.15), 103)
+        self.assertEqual(combat_table_numeric_width(2.0, 1.15), 121)
+        self.assertEqual(combat_table_source_width(1.25), 110)
+        self.assertEqual(combat_table_source_width(1.75), 125)
+        self.assertEqual(combat_table_source_width(2.0), 132)
+        self.assertLessEqual(
+            combat_table_source_width(1.25)
+            + 4 * combat_table_numeric_width(1.25, 1.15),
+            525,
+        )
 
     def test_main_window_presets_respect_minimum_and_screen_bounds(self) -> None:
         ordered = [TOOLBOX_WINDOW_PRESETS[name] for name in ("compact", "standard", "spacious")]
         scales = [TOOLBOX_UI_SCALES[name] for name in ("compact", "standard", "spacious")]
+        self.assertEqual(DEFAULT_TOOLBOX_WINDOW_PRESET, "spacious")
+        self.assertEqual(TOOLBOX_WINDOW_PRESETS["spacious"], (1280, 900))
+        self.assertEqual(TOOLBOX_UI_SCALES["spacious"], 1.15)
         self.assertTrue(all(left[0] < right[0] for left, right in zip(ordered, ordered[1:])))
         self.assertTrue(all(left[1] < right[1] for left, right in zip(ordered, ordered[1:])))
         self.assertTrue(all(left < right for left, right in zip(scales, scales[1:])))
@@ -169,7 +211,7 @@ class AppShellModelTests(unittest.TestCase):
                 screen_height=1080,
                 tk_scaling=2.0,
             ),
-            (840, 650),
+            (840, 700),
         )
         self.assertEqual(
             clamp_main_window_size(

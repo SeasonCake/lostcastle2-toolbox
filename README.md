@@ -22,9 +22,9 @@ The application now starts in a calculator-style main toolbox window. It manages
 | Foreground-only macros | Available, disabled by default |
 | Damage and HP semantics | Runtime-validated on the recorded game build |
 | Combat event v2 and replay aggregation | Implemented and tested |
-| Mana and shield observation bridge | Contract-ready; runtime hooks pending |
-| Main toolbox and external combat HUD | Local transport and bridge candidate implemented; game runtime test pending |
-| MOD management | One attributed external trainer registered; user-supplied exact file required |
+| Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
+| Main toolbox and external combat HUD | Local transport and Bridge 0.4.1 runtime-validated on the recorded game build |
+| MOD management | Two attributed third-party tools registered; user-supplied exact files required |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
@@ -48,7 +48,7 @@ Code-driven UI review can open a page or overlay without moving the mouse:
 
 ```powershell
 py -3 keyview.py --demo --show-page combat --show-combat-hud
-py -3 keyview.py --demo-large-values --show-page combat --window-size 780x560 --tk-scaling 1.5
+py -3 keyview.py --demo-large-values --show-page combat --window-size 1000x720 --tk-scaling 1.5
 py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo-scenario CastleBridge --demo-room-index 100
 ```
 
@@ -60,14 +60,14 @@ Build the Windows package:
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, with configure, launch, and local-copy removal controls. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见** and Gold Editor 1.0 by **刺心**. The trainer supports managed local-copy configuration and launch. The gold editor is installed only from a matching user-supplied DLL or original archive into its own BepInEx plugin directory; its binary is not distributed with the toolbox. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Safety and scope
 
 - The overlay reads Windows key state and does not inject into the game.
 - Macros send only user-configured input while `LostCastle2.exe` is foreground, and stop on focus loss or `Ctrl + Shift + F12`.
 - The research probe observes resolved combat state. It does not modify damage, drops, saves, or network state.
-- Third-party tools do not inherit that read-only guarantee; the toolbox only verifies, copies, and explicitly launches the pinned file.
+- Third-party tools do not inherit that read-only guarantee; the toolbox verifies pinned files and performs only the registered managed copy, install, uninstall, or explicit launch action.
 - Game binaries, generated interop assemblies, logs, screenshots, local configuration, and packaged builds are intentionally excluded from Git.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), and [`SECURITY.md`](SECURITY.md).

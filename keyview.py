@@ -16,7 +16,13 @@ import tkinter.font as tkfont
 from typing import Any
 import winreg
 
-from toolbox.app_shell import ToolboxShell, seed_demo_combat
+from toolbox.app_shell import (
+    DEFAULT_TOOLBOX_WINDOW_PRESET,
+    TOOLBOX_UI_SCALES,
+    TOOLBOX_WINDOW_PRESETS,
+    ToolboxShell,
+    seed_demo_combat,
+)
 from toolbox.combat_aggregator import CombatAggregator, ScenarioRegistry, SourceRegistry
 from toolbox.combat_transport import (
     CombatBridgeClient,
@@ -29,7 +35,7 @@ from toolbox.mod_manager import ModCatalog, ModManager
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.3"
+APP_VERSION = "1.5.6"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
     os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
@@ -53,6 +59,14 @@ LEGACY_CONFIG_FILE = (
     Path(os.environ.get("LOCALAPPDATA", Path.home()))
     / "LostCastle2KeyView"
     / "settings.json"
+)
+DEFAULT_TOOLBOX_WIDTH, DEFAULT_TOOLBOX_HEIGHT = TOOLBOX_WINDOW_PRESETS[
+    DEFAULT_TOOLBOX_WINDOW_PRESET
+]
+DEFAULT_TOOLBOX_UI_SCALE = TOOLBOX_UI_SCALES[DEFAULT_TOOLBOX_WINDOW_PRESET]
+LEGACY_TOOLBOX_DEFAULT_PROFILES = (
+    (900, 650, 1.0),
+    (1160, 840, 1.15),
 )
 
 DEFAULT_KEY_LAYOUT = {
@@ -662,25 +676,44 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
         "input_display_mode": "keyboard",
         "color_preset": DEFAULT_COLOR_PRESET,
         "ui_scale": 1.0,
-        "toolbox_width": 900,
-        "toolbox_height": 650,
-        "toolbox_ui_scale": 1.0,
+        "toolbox_width": DEFAULT_TOOLBOX_WIDTH,
+        "toolbox_height": DEFAULT_TOOLBOX_HEIGHT,
+        "toolbox_ui_scale": DEFAULT_TOOLBOX_UI_SCALE,
         "hud_ui_scale": 1.0,
         "always_on_top": True,
         "game_path": str(DEFAULT_GAME_EXE),
     }
     source_path = path
+    loaded_data: dict[str, Any] = {}
     if path == CONFIG_FILE and not path.exists() and LEGACY_CONFIG_FILE.exists():
         source_path = LEGACY_CONFIG_FILE
     try:
         data = json.loads(source_path.read_text(encoding="utf-8"))
         if isinstance(data, dict):
+            loaded_data = data
             defaults.update(data)
             if "background_opacity" not in data and "opacity" in data:
                 defaults["background_opacity"] = data["opacity"]
     except (OSError, ValueError, TypeError):
         pass
     defaults.pop("opacity", None)
+
+    try:
+        loaded_toolbox_profile = (
+            int(loaded_data.get("toolbox_width", 900)),
+            int(loaded_data.get("toolbox_height", 650)),
+            float(loaded_data.get("toolbox_ui_scale", 1.0)),
+        )
+    except (TypeError, ValueError):
+        loaded_toolbox_profile = None
+    if loaded_toolbox_profile is not None and any(
+        loaded_toolbox_profile[:2] == legacy[:2]
+        and abs(loaded_toolbox_profile[2] - legacy[2]) < 0.001
+        for legacy in LEGACY_TOOLBOX_DEFAULT_PROFILES
+    ):
+        defaults["toolbox_width"] = DEFAULT_TOOLBOX_WIDTH
+        defaults["toolbox_height"] = DEFAULT_TOOLBOX_HEIGHT
+        defaults["toolbox_ui_scale"] = DEFAULT_TOOLBOX_UI_SCALE
 
     def bounded_float(key: str, default: float, minimum: float, maximum: float) -> float:
         try:
@@ -708,14 +741,14 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
     )
     defaults["ui_scale"] = bounded_float("ui_scale", 1.0, 0.6, 1.8)
     try:
-        toolbox_width = int(defaults.get("toolbox_width", 900))
-        toolbox_height = int(defaults.get("toolbox_height", 650))
+        toolbox_width = int(defaults.get("toolbox_width", DEFAULT_TOOLBOX_WIDTH))
+        toolbox_height = int(defaults.get("toolbox_height", DEFAULT_TOOLBOX_HEIGHT))
     except (TypeError, ValueError):
-        toolbox_width, toolbox_height = 900, 650
+        toolbox_width, toolbox_height = DEFAULT_TOOLBOX_WIDTH, DEFAULT_TOOLBOX_HEIGHT
     defaults["toolbox_width"] = min(1400, max(780, toolbox_width))
     defaults["toolbox_height"] = min(1000, max(560, toolbox_height))
     defaults["toolbox_ui_scale"] = bounded_float(
-        "toolbox_ui_scale", 1.0, 0.9, 1.15
+        "toolbox_ui_scale", DEFAULT_TOOLBOX_UI_SCALE, 0.9, 1.15
     )
     defaults["hud_ui_scale"] = bounded_float("hud_ui_scale", 1.0, 0.85, 1.25)
     defaults["show_background"] = bool(defaults.get("show_background", True))
@@ -2410,10 +2443,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default="home",
         help="开发验证：主窗口直接打开指定页面",
     )
-    parser.add_argument(
+    hud_startup = parser.add_mutually_exclusive_group()
+    hud_startup.add_argument(
         "--show-combat-hud",
+        dest="show_combat_hud",
         action="store_true",
-        help="开发验证：启动后直接打开战斗 HUD",
+        default=True,
+        help="启动后直接打开战斗 HUD（默认）",
+    )
+    hud_startup.add_argument(
+        "--hide-combat-hud-on-start",
+        dest="show_combat_hud",
+        action="store_false",
+        help="启动时不自动打开战斗 HUD",
     )
     parser.add_argument(
         "--demo-large-values",
@@ -2497,11 +2539,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.tk_scaling is not None:
         root.tk.call("tk", "scaling", max(0.75, min(2.5, args.tk_scaling)))
     macro_feature = MacroFeature(root, CONFIG_DIR)
-    mod_manager = ModManager(
-        ModCatalog.from_file(RESOURCE_DIR / "assets" / "mod_catalog.json"),
-        CONFIG_DIR / "managed_mods",
-        RESOURCE_DIR / "third_party",
-    )
     keyboard_root = tk.Toplevel(root)
     keyboard_app: KeyViewApp
     keyboard_app = KeyViewApp(
@@ -2513,6 +2550,14 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     keyboard_app.toggle_visible()
+    mod_manager = ModManager(
+        ModCatalog.from_file(RESOURCE_DIR / "assets" / "mod_catalog.json"),
+        CONFIG_DIR / "managed_mods",
+        RESOURCE_DIR / "third_party",
+        game_exe_provider=lambda: resolve_game_exe(
+            keyboard_app.settings.get("game_path")
+        ),
+    )
     registry = SourceRegistry.from_file(
         RESOURCE_DIR / "assets" / "combat_sources.json"
     )

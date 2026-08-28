@@ -10,7 +10,7 @@ from typing import Any, Callable, Mapping
 
 SCHEMA_VERSION = 2
 DEFAULT_DPS_WINDOW_MS = 10_000
-DEFAULT_ENDED_RETENTION_MS = 30_000
+DEFAULT_ENDED_RETENTION_MS: int | None = None
 VALID_ROOM_INDICES = frozenset((*range(0, 11), 99, 100, 101))
 VALID_TRANSPORT_STATES = frozenset({"connecting", "disconnected", "stale", "error"})
 
@@ -238,7 +238,7 @@ class CombatAggregator:
     registry: SourceRegistry = field(default_factory=SourceRegistry)
     scenario_registry: ScenarioRegistry = field(default_factory=ScenarioRegistry)
     dps_window_ms: int = DEFAULT_DPS_WINDOW_MS
-    ended_retention_ms: int = DEFAULT_ENDED_RETENTION_MS
+    ended_retention_ms: int | None = DEFAULT_ENDED_RETENTION_MS
     clock_ms: Callable[[], int] = field(
         default=monotonic_milliseconds,
         repr=False,
@@ -248,7 +248,7 @@ class CombatAggregator:
     def __post_init__(self) -> None:
         if self.dps_window_ms <= 0:
             raise ValueError("dps_window_ms must be positive")
-        if self.ended_retention_ms < 0:
+        if self.ended_retention_ms is not None and self.ended_retention_ms < 0:
             raise ValueError("ended_retention_ms must not be negative")
         self.reset()
 
@@ -557,7 +557,8 @@ class CombatAggregator:
 
     def _expire_ended_metrics(self) -> None:
         if (
-            self.connection_state != "ended"
+            self.ended_retention_ms is None
+            or self.connection_state != "ended"
             or self._ended_at_clock_ms is None
             or self._ended_metrics_cleared
         ):

@@ -24,9 +24,9 @@
 | 前台限定宏 | 可用，默认全部停用 |
 | 造成伤害、承伤与生命恢复口径 | 已在记录的游戏版本完成运行时验证 |
 | 战斗事件 v2 与回放聚合 | 已实现并有行为测试 |
-| 法力与护盾观察桥 | 合同已预留；运行时 Hook 待验证 |
-| 综合主窗口与外部战斗 HUD | 本地管道与桥接候选已实现；待游戏实测 |
-| MOD 管理 | 已登记 1 个第三方独立修改器；用户提供原文件并校验后配置 |
+| 法力与护盾观察桥 | 法力消耗/恢复已完成运行时验证；护盾仍待独立样本 |
+| 综合主窗口与外部战斗 HUD | 本地管道与 Bridge 0.4.1 已在记录的游戏构建完成聚焦实测 |
+| MOD 管理 | 已登记 2 个第三方工具；用户提供原文件并校验后配置或安装 |
 
 研究结论只适用于计划文档记录的游戏构建。游戏更新后，Hook 兼容性与数据口径都需要重新验证。
 
@@ -37,6 +37,7 @@
 - `F8` 显示/隐藏，`F9` 开关鼠标穿透，`F11` 开关纯净模式。
 - 点击“启动游戏”会优先从 Steam 安装信息定位游戏；找不到时可手动选择 `LostCastle2.exe`。
 - “设置”页可调整主窗口尺寸与字体档位，并分别调整按键悬浮窗和战斗 HUD 缩放。
+- 主窗口首次启动默认使用宽敞档 `1280×900、115%`，战斗 HUD 默认同时打开；已保存的标准、紧凑或自定义尺寸保持不变。
 - 设置保存在程序目录的 `config/settings.json`；该目录不会提交到 Git。
 
 ## 按键宏
@@ -48,10 +49,13 @@
 
 ## MOD 管理
 
-- 当前收录“灵魂石修改器 1.2”，作者：恨你不见。
-- 支持配置、启动和删除本地副本。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+- 当前收录“灵魂石修改器 1.2”（作者：恨你不见）与“金币编辑器 1.0”（作者：刺心）。
+- 灵魂石修改器支持配置、启动和删除盒子副本；金币编辑器由用户选择登记版本的 DLL 或原始压缩包后安装到独占 BepInEx 插件目录，并只卸载自身文件。
+- 金币编辑器二进制不随工具箱分发。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
 ## 开发与测试
+
+战斗参数、游戏字段、转换公式、协议/聚合/UI 映射、实测数值基线和已知 Bug 统一维护在 [`docs/LC2_RUNTIME_PARAMETER_DEBUG_INDEX.zh-CN.md`](docs/LC2_RUNTIME_PARAMETER_DEBUG_INDEX.zh-CN.md)。
 
 需要 Windows、Python 3.13，以及 `requirements-dev.txt` 中的依赖：
 
@@ -71,7 +75,7 @@ py -3 keyview.py
 
 ```powershell
 py -3 keyview.py --demo --show-page combat --show-combat-hud
-py -3 keyview.py --demo-large-values --show-page combat --window-size 780x560 --tk-scaling 1.5
+py -3 keyview.py --demo-large-values --show-page combat --window-size 1000x720 --tk-scaling 1.5
 py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo-scenario CastleBridge --demo-room-index 100
 ```
 
@@ -81,14 +85,14 @@ py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo
 .\build.ps1
 ```
 
-实时桥接候选见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。桥接候选尚未部署或完成游戏运行时验证。
+实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.1 已在索引记录的游戏构建完成位置与官方法力恢复分支实测；官方回调缺失时的底层恢复兜底仍等待自然样本。
 
 ## 数据与安全边界
 
 - 按键悬浮窗只查询 Windows 按键状态，不向游戏注入代码。
 - 宏只发送用户显式配置的输入，不应包含无人值守玩法或规避游戏限制的功能。
 - 研究探针只观察已经结算的战斗状态，不修改伤害、掉落、存档或网络状态。
-- 第三方工具不继承上述只读保证；盒子只做固定哈希校验、受管复制和显式启动。
+- 第三方工具不继承上述只读保证；盒子只对登记版本做固定哈希校验，并执行对应的受管复制、安装、卸载或显式启动。
 - 仓库不会提交游戏 DLL、生成的 interop、日志、截图、本机配置或打包产物。
 
 架构见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)，协作规则见 [`CONTRIBUTING.md`](CONTRIBUTING.md)，安全问题见 [`SECURITY.md`](SECURITY.md)。

@@ -59,6 +59,13 @@ class KeyViewTests(unittest.TestCase):
         with self.assertRaises(argparse.ArgumentTypeError):
             keyview.parse_window_size("500x300")
 
+    def test_combat_hud_opens_by_default_with_an_explicit_startup_opt_out(self) -> None:
+        self.assertTrue(keyview.parse_args([]).show_combat_hud)
+        self.assertTrue(keyview.parse_args(["--show-combat-hud"]).show_combat_hud)
+        self.assertFalse(
+            keyview.parse_args(["--hide-combat-hud-on-start"]).show_combat_hud
+        )
+
     def test_z_order_helper_detects_only_candidate_above_reference(self) -> None:
         previous = {40: 30, 30: 20, 20: 10, 10: 0}
         getter = lambda hwnd: previous.get(hwnd, 0)
@@ -287,9 +294,12 @@ class KeyViewTests(unittest.TestCase):
             self.assertEqual(loaded["selected_keys"], ["W", "A"])
             self.assertEqual(loaded["color_preset"], keyview.DEFAULT_COLOR_PRESET)
             self.assertEqual(loaded["ui_scale"], 1.0)
-            self.assertEqual((loaded["toolbox_width"], loaded["toolbox_height"]), (900, 650))
+            self.assertEqual(
+                (loaded["toolbox_width"], loaded["toolbox_height"]),
+                (1280, 900),
+            )
             self.assertEqual(loaded["input_display_mode"], "keyboard")
-            self.assertEqual(loaded["toolbox_ui_scale"], 1.0)
+            self.assertEqual(loaded["toolbox_ui_scale"], 1.15)
             self.assertEqual(loaded["hud_ui_scale"], 1.0)
             json.loads(path.read_text(encoding="utf-8"))
 
@@ -318,6 +328,61 @@ class KeyViewTests(unittest.TestCase):
             )
             loaded = keyview.load_settings(path)
             self.assertEqual((loaded["toolbox_width"], loaded["toolbox_height"]), (1400, 560))
+
+    def test_fresh_settings_default_to_the_spacious_toolbox_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            loaded = keyview.load_settings(Path(temp_dir) / "missing-settings.json")
+        self.assertEqual(
+            (loaded["toolbox_width"], loaded["toolbox_height"]),
+            (1280, 900),
+        )
+        self.assertEqual(loaded["toolbox_ui_scale"], 1.15)
+
+    def test_legacy_default_and_spacious_profiles_migrate_to_the_new_default(self) -> None:
+        profiles = ((900, 650, 1.0), (1160, 840, 1.15))
+        for width, height, scale in profiles:
+            with self.subTest(profile=(width, height, scale)):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    path = Path(temp_dir) / "settings.json"
+                    path.write_text(
+                        json.dumps(
+                            {
+                                "toolbox_width": width,
+                                "toolbox_height": height,
+                                "toolbox_ui_scale": scale,
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    loaded = keyview.load_settings(path)
+                self.assertEqual(
+                    (loaded["toolbox_width"], loaded["toolbox_height"]),
+                    (1280, 900),
+                )
+                self.assertEqual(loaded["toolbox_ui_scale"], 1.15)
+
+    def test_standard_and_custom_toolbox_profiles_are_not_migrated(self) -> None:
+        profiles = ((1000, 720, 1.0), (1080, 760, 1.0))
+        for width, height, scale in profiles:
+            with self.subTest(profile=(width, height, scale)):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    path = Path(temp_dir) / "settings.json"
+                    path.write_text(
+                        json.dumps(
+                            {
+                                "toolbox_width": width,
+                                "toolbox_height": height,
+                                "toolbox_ui_scale": scale,
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    loaded = keyview.load_settings(path)
+                self.assertEqual(
+                    (loaded["toolbox_width"], loaded["toolbox_height"]),
+                    (width, height),
+                )
+                self.assertEqual(loaded["toolbox_ui_scale"], scale)
 
     def test_toolbox_window_size_setter_updates_persisted_state(self) -> None:
         app = object.__new__(keyview.KeyViewApp)

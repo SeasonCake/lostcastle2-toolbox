@@ -131,6 +131,52 @@ class CombatTransportContractTests(unittest.TestCase):
         event.pop("status")
         self.validator.validate(event)
 
+    def test_schema_accepts_official_mana_recovery_without_snapshot_values(self) -> None:
+        event = status_event(
+            1,
+            event_type="resource_change",
+            aggregate=True,
+            hook_path="player.official_mana_recovery",
+            resource="mp",
+            resource_operation="gain",
+            requested_delta=24,
+            effective_delta=24,
+            value_before=None,
+            value_after=None,
+            max_before=None,
+            max_after=None,
+            blocked=False,
+            overflow=0,
+            source_token="resource.mana_recovery",
+            parent_operation_id=None,
+            nesting_depth=0,
+        )
+        event.pop("status")
+        self.validator.validate(event)
+
+    def test_schema_accepts_low_level_mana_recovery_fallback(self) -> None:
+        event = status_event(
+            1,
+            event_type="resource_change",
+            aggregate=True,
+            hook_path="runtime.update_mp",
+            resource="mp",
+            resource_operation="gain",
+            requested_delta=29.75,
+            effective_delta=29.75,
+            value_before=100.25,
+            value_after=130,
+            max_before=130,
+            max_after=130,
+            blocked=False,
+            overflow=0,
+            source_token="resource.mana_recovery",
+            parent_operation_id=None,
+            nesting_depth=0,
+        )
+        event.pop("status")
+        self.validator.validate(event)
+
     def test_schema_error_reports_only_path_and_keyword(self) -> None:
         event = status_event(session_id="private-account-token" * 20)
         with self.assertRaises(CombatSchemaError) as caught:

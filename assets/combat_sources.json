@@ -62,6 +62,12 @@
       "resource": "hp",
       "effect_kind": "none"
     },
+    "set_cur_hp": {
+      "label": "直接生命变化",
+      "category": "resource.direct_hp_change",
+      "resource": "hp",
+      "effect_kind": "none"
+    },
     "resource.skill_cost": {
       "label": "技能法力消耗",
       "category": "resource.skill_cost",

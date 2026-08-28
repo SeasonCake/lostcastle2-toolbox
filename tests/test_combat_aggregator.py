@@ -234,7 +234,30 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.mp_spent, 0)
         self.assertEqual(snapshot.mp_gained, 0)
 
-    def test_ended_round_keeps_totals_for_thirty_seconds_then_clears(self) -> None:
+    def test_fractional_mana_events_accumulate_before_ui_rounding(self) -> None:
+        for sequence, delta in enumerate((-2.4, -2.4, -2.4, 0.987358, 9.2565), start=1):
+            self.aggregator.ingest(
+                common_event(
+                    "resource_change",
+                    sequence,
+                    resource="mp",
+                    effective_delta=delta,
+                    blocked=False,
+                    overflow=0,
+                    source_token=(
+                        "resource.skill_cost"
+                        if delta < 0
+                        else "resource.mana_recovery"
+                    ),
+                )
+            )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertAlmostEqual(snapshot.mp_spent, 7.2)
+        self.assertAlmostEqual(snapshot.mp_gained, 10.243858)
+        self.assertAlmostEqual(snapshot.mp_net, 3.043858)
+
+    def test_ended_round_keeps_totals_until_the_next_session(self) -> None:
         now = [1_000]
         self.aggregator.clock_ms = lambda: now[0]
         self.aggregator.ingest(
@@ -252,16 +275,23 @@ class CombatAggregatorTests(unittest.TestCase):
             common_event("status", 2, status="session_ended")
         )
 
-        now[0] += 29_999
+        now[0] += 300_000
         snapshot = self.aggregator.snapshot()
         self.assertEqual(snapshot.connection_state, "ended")
         self.assertEqual(snapshot.mp_spent, 24)
 
-        now[0] += 1
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                0,
+                event_id="session-b:0",
+                session_id="session-b",
+                monotonic_ms=0,
+                status="session_started",
+            )
+        )
         snapshot = self.aggregator.snapshot()
-        self.assertEqual(snapshot.connection_state, "ended")
         self.assertEqual(snapshot.mp_spent, 0)
-        self.assertIsNone(snapshot.current_room_id)
 
     def test_trigger_sources_do_not_need_aggregator_code_changes(self) -> None:
         self.aggregator.ingest(
@@ -307,7 +337,7 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.total_damage, 0)
         self.assertEqual(snapshot.connection_state, "live")
 
-    def test_recent_dps_expires_outside_window(self) -> None:
+    def test_recent_dps_is_a_ten_second_average_and_expires_outside_window(self) -> None:
         self.aggregator.ingest(
             common_event(
                 "damage_resolution",

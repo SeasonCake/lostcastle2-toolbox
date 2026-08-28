@@ -9,6 +9,7 @@ import unittest
 
 from toolbox.mod_manager import (
     ModCatalog,
+    ModGamePathRequired,
     ModIntegrityError,
     ModManager,
     ModManagerError,
@@ -52,6 +53,24 @@ def catalog_payload(content: bytes) -> dict[str, object]:
     }
 
 
+def plugin_catalog_payload(content: bytes, archive_content: bytes = b"archive") -> dict[str, object]:
+    payload = catalog_payload(content)
+    entry = payload["entries"][0]  # type: ignore[index]
+    entry["id"] = "fixture-plugin"
+    entry["operation"] = {
+        "kind": "bepinex_plugin",
+        "expected_filename": "fixture.dll",
+        "bundled": False,
+        "archive_source": {
+            "expected_filename": "fixture.7z",
+            "member": "fixture.dll",
+            "sha256": hashlib.sha256(archive_content).hexdigest().upper(),
+            "size_bytes": len(archive_content),
+        },
+    }
+    return payload
+
+
 class ModManagerTests(unittest.TestCase):
     def make_manager(self, root: Path, content: bytes) -> ModManager:
         catalog_path = root / "catalog.json"
@@ -79,6 +98,12 @@ class ModManagerTests(unittest.TestCase):
         self.assertNotIn("sha-256", display_json)
         self.assertNotIn("授权", display_json)
         self.assertNotIn("C:\\", json.dumps(asdict(entry), ensure_ascii=False))
+        gold = catalog.get("gold-editor-f5")
+        self.assertEqual(gold.display.author, "刺心")
+        self.assertEqual(gold.operation.kind, "bepinex_plugin")
+        self.assertFalse(gold.operation.bundled)
+        self.assertFalse(gold.operation.launchable)
+        self.assertEqual(gold.operation.archive_source.member, "LC2GoldFree.dll")
 
     def test_catalog_rejects_internal_details_in_display_copy(self) -> None:
         payload = catalog_payload(b"x")
@@ -169,6 +194,101 @@ class ModManagerTests(unittest.TestCase):
             path.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaises(ModManagerError):
                 ModCatalog.from_file(path)
+
+    def test_catalog_rejects_archive_member_path_traversal(self) -> None:
+        payload = plugin_catalog_payload(b"plugin")
+        payload["entries"][0]["operation"]["archive_source"]["member"] = "../fixture.dll"  # type: ignore[index]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "catalog.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaises(ModManagerError):
+                ModCatalog.from_file(path)
+
+    def test_bepinex_plugin_installs_and_uninstalls_only_owned_leaf(self) -> None:
+        content = b"fixture plugin bytes"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            game_root = root / "game"
+            game_exe = game_root / "LostCastle2.exe"
+            plugins_root = game_root / "BepInEx" / "plugins"
+            plugins_root.mkdir(parents=True)
+            game_exe.write_bytes(b"game")
+            sibling = plugins_root / "another-mod" / "keep.dll"
+            sibling.parent.mkdir()
+            sibling.write_bytes(b"keep")
+            source = root / "fixture.dll"
+            source.write_bytes(content)
+            catalog_path = root / "catalog.json"
+            catalog_path.write_text(
+                json.dumps(plugin_catalog_payload(content)), encoding="utf-8"
+            )
+            manager = ModManager(
+                ModCatalog.from_file(catalog_path),
+                root / "managed",
+                root / "bundled",
+                game_exe_provider=lambda: game_exe,
+            )
+
+            target = manager.install("fixture-plugin", source)
+            self.assertEqual(
+                target,
+                plugins_root / "fixture-plugin" / "fixture.dll",
+            )
+            self.assertTrue(manager.status("fixture-plugin").installed)
+            with self.assertRaises(ModManagerError):
+                manager.launch("fixture-plugin")
+            self.assertTrue(manager.uninstall("fixture-plugin"))
+            self.assertTrue(sibling.is_file())
+
+    def test_bepinex_plugin_requires_game_and_bepinex(self) -> None:
+        content = b"fixture plugin bytes"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            catalog_path = root / "catalog.json"
+            catalog_path.write_text(
+                json.dumps(plugin_catalog_payload(content)), encoding="utf-8"
+            )
+            manager = ModManager(
+                ModCatalog.from_file(catalog_path),
+                root / "managed",
+                root / "bundled",
+            )
+            self.assertEqual(
+                manager.status("fixture-plugin").state,
+                "game_not_configured",
+            )
+            with self.assertRaises(ModGamePathRequired):
+                manager.install("fixture-plugin", root / "fixture.dll")
+
+    def test_verified_archive_materializes_exact_plugin_dll(self) -> None:
+        content = b"fixture plugin bytes"
+        archive_content = b"known archive bytes"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            game_root = root / "game"
+            game_exe = game_root / "LostCastle2.exe"
+            (game_root / "BepInEx" / "plugins").mkdir(parents=True)
+            game_exe.write_bytes(b"game")
+            archive = root / "renamed.7z"
+            archive.write_bytes(archive_content)
+            catalog_path = root / "catalog.json"
+            catalog_path.write_text(
+                json.dumps(plugin_catalog_payload(content, archive_content)),
+                encoding="utf-8",
+            )
+            manager = ModManager(
+                ModCatalog.from_file(catalog_path),
+                root / "managed",
+                root / "bundled",
+                game_exe_provider=lambda: game_exe,
+            )
+            manager._extract_archive_member = lambda _path, _member: content  # type: ignore[method-assign]
+            target = manager.install("fixture-plugin", archive)
+            self.assertEqual(target.read_bytes(), content)
+
+            archive.write_bytes(b"wrong archive")
+            with self.assertRaises(ModIntegrityError):
+                manager.install("fixture-plugin", archive)
 
 
 if __name__ == "__main__":

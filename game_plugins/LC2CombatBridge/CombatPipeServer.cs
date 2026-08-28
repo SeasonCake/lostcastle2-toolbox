@@ -43,6 +43,7 @@ internal sealed class CombatPipeServer : IDisposable
     private bool _connected;
     private bool _failed;
     private bool _sessionActive;
+    private bool _roundActive = true;
     private string _sessionId = Guid.NewGuid().ToString("N");
     private long _sequence;
     private RoomLocation _room;
@@ -64,6 +65,7 @@ internal sealed class CombatPipeServer : IDisposable
         lock (_stateLock)
         {
             _room = null;
+            _roundActive = true;
             if (!_connected)
             {
                 return;
@@ -77,6 +79,7 @@ internal sealed class CombatPipeServer : IDisposable
     {
         lock (_stateLock)
         {
+            _roundActive = false;
             if (!_connected || !_sessionActive || _failed)
             {
                 return;
@@ -280,10 +283,22 @@ internal sealed class CombatPipeServer : IDisposable
             ClearOutboundLocked();
             _connected = true;
             _failed = false;
-            StartSessionLocked();
-            if (_room is not null)
+            if (_roundActive)
             {
-                EnqueueRoomStartedLocked(_room);
+                StartSessionLocked();
+                if (_room is not null)
+                {
+                    EnqueueRoomStartedLocked(_room);
+                }
+            }
+            else
+            {
+                _sessionActive = false;
+                EnqueueLocked(CreateEventLocked(
+                    "status",
+                    aggregate: false,
+                    "bridge.reconnect_after_round_end",
+                    new Dictionary<string, object> { ["status"] = "session_ended" }));
             }
         }
         _log.LogInfo("Combat bridge client connected; local stream active");

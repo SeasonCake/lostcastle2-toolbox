@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-from typing import Any
+from typing import Any, Callable
 
 
 SHA256_PATTERN = re.compile(r"^[0-9A-F]{64}$")
@@ -40,6 +40,10 @@ class ModIntegrityError(ModManagerError):
     """Raised when a selected or installed file differs from the catalog."""
 
 
+class ModGamePathRequired(ModManagerError):
+    """Raised when an in-game plugin has no usable Lost Castle 2 location."""
+
+
 @dataclass(frozen=True)
 class ModDisplay:
     name: str
@@ -49,10 +53,23 @@ class ModDisplay:
 
 
 @dataclass(frozen=True)
+class ModArchiveSource:
+    expected_filename: str
+    member: str
+    sha256: str
+    size_bytes: int
+
+
+@dataclass(frozen=True)
 class ModOperation:
     kind: str
     expected_filename: str
     bundled: bool
+    archive_source: ModArchiveSource | None = None
+
+    @property
+    def launchable(self) -> bool:
+        return self.kind == "external_trainer"
 
 
 @dataclass(frozen=True)
@@ -134,10 +151,17 @@ class ModCatalog:
             operation_raw, "expected_filename", "operation"
         )
         bundled = operation_raw.get("bundled")
+        operation_kind = ModCatalog._required_string(operation_raw, "kind", "operation")
+        if operation_kind not in {"external_trainer", "bepinex_plugin"}:
+            raise ModManagerError("Unsupported MOD operation kind.")
+        archive_source = ModCatalog._parse_archive_source(
+            operation_raw.get("archive_source")
+        )
         operation = ModOperation(
-            kind=ModCatalog._required_string(operation_raw, "kind", "operation"),
+            kind=operation_kind,
             expected_filename=expected_filename,
             bundled=bundled if type(bundled) is bool else False,
+            archive_source=archive_source,
         )
 
         size_bytes = policy_raw.get("size_bytes")
@@ -192,6 +216,35 @@ class ModCatalog:
         )
 
     @staticmethod
+    def _parse_archive_source(raw: Any) -> ModArchiveSource | None:
+        if raw is None:
+            return None
+        if not isinstance(raw, dict):
+            raise ModManagerError("MOD archive_source must be an object.")
+        expected_filename = ModCatalog._required_string(
+            raw, "expected_filename", "archive_source"
+        )
+        member = ModCatalog._required_string(raw, "member", "archive_source")
+        sha256 = ModCatalog._required_string(
+            raw, "sha256", "archive_source"
+        ).upper()
+        size_bytes = raw.get("size_bytes")
+        if Path(expected_filename).name != expected_filename:
+            raise ModManagerError("MOD archive filename must not contain a path.")
+        if Path(member).name != member:
+            raise ModManagerError("MOD archive member must be a single filename.")
+        if not SHA256_PATTERN.fullmatch(sha256):
+            raise ModManagerError("Invalid MOD archive SHA-256.")
+        if type(size_bytes) is not int or size_bytes <= 0:
+            raise ModManagerError("Invalid MOD archive size.")
+        return ModArchiveSource(
+            expected_filename=expected_filename,
+            member=member,
+            sha256=sha256,
+            size_bytes=size_bytes,
+        )
+
+    @staticmethod
     def _required_string(raw: dict[str, Any], key: str, section: str) -> str:
         value = raw.get(key)
         if not isinstance(value, str) or not value.strip():
@@ -219,17 +272,19 @@ class ModCatalog:
 
 
 class ModManager:
-    """Manage exact, catalog-owned copies without touching user originals or game files."""
+    """Manage exact catalog-owned copies and reversible BepInEx plugin installs."""
 
     def __init__(
         self,
         catalog: ModCatalog,
         managed_root: Path,
         bundled_root: Path,
+        game_exe_provider: Callable[[], Path | None] | None = None,
     ) -> None:
         self.catalog = catalog
         self.managed_root = managed_root.resolve()
         self.bundled_root = bundled_root.resolve()
+        self.game_exe_provider = game_exe_provider
         self._hash_cache: dict[Path, tuple[int, int, str]] = {}
 
     def descriptor(self, mod_id: str) -> ModDescriptor:
@@ -247,16 +302,34 @@ class ModManager:
 
     def installed_path(self, mod_id: str) -> Path:
         descriptor = self.descriptor(mod_id)
-        directory = (self.managed_root / descriptor.mod_id).resolve()
-        self._ensure_contained(directory, self.managed_root)
+        if descriptor.operation.kind == "bepinex_plugin":
+            game_exe = self.game_exe_provider() if self.game_exe_provider else None
+            if game_exe is None:
+                raise ModGamePathRequired("Lost Castle 2 executable is not configured.")
+            game_exe = game_exe.resolve()
+            if not game_exe.is_file():
+                raise ModGamePathRequired("Lost Castle 2 executable does not exist.")
+            plugins_root = (game_exe.parent / "BepInEx" / "plugins").resolve()
+            bepinex_root = (game_exe.parent / "BepInEx").resolve()
+            if not bepinex_root.is_dir():
+                raise ModGamePathRequired("BepInEx is not installed for the configured game.")
+            self._ensure_contained(plugins_root, game_exe.parent.resolve())
+            directory = (plugins_root / descriptor.mod_id).resolve()
+            self._ensure_contained(directory, plugins_root)
+        else:
+            directory = (self.managed_root / descriptor.mod_id).resolve()
+            self._ensure_contained(directory, self.managed_root)
         target = (directory / descriptor.operation.expected_filename).resolve()
         self._ensure_contained(target, directory)
         return target
 
     def status(self, mod_id: str) -> ModStatus:
         descriptor = self.descriptor(mod_id)
-        target = self.installed_path(mod_id)
         source_bundled = self.bundled_source(mod_id) is not None
+        try:
+            target = self.installed_path(mod_id)
+        except ModGamePathRequired:
+            return ModStatus("game_not_configured", source_bundled, False)
         if not target.exists():
             return ModStatus("not_installed", source_bundled, False)
         policy = descriptor.integrity_policy
@@ -274,14 +347,22 @@ class ModManager:
         source = source_path.resolve() if source_path is not None else self.bundled_source(mod_id)
         if source is None:
             raise ModSourceRequired("A matching user-supplied source file is required.")
-        self._validate_file(source, descriptor)
         target = self.installed_path(mod_id)
         if source == target:
+            self._validate_file(source, descriptor)
             return target
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + ".installing")
         try:
-            shutil.copyfile(source, temporary)
+            if self._is_archive_source(source, descriptor):
+                self._validate_archive(source, descriptor.operation.archive_source)
+                content = self._extract_archive_member(
+                    source, descriptor.operation.archive_source.member
+                )
+                temporary.write_bytes(content)
+            else:
+                self._validate_file(source, descriptor)
+                shutil.copyfile(source, temporary)
             self._hash_cache.pop(temporary, None)
             self._validate_file(temporary, descriptor)
             os.replace(temporary, target)
@@ -308,11 +389,46 @@ class ModManager:
         return True
 
     def launch(self, mod_id: str) -> subprocess.Popen[bytes]:
+        descriptor = self.descriptor(mod_id)
+        if not descriptor.operation.launchable:
+            raise ModManagerError("This MOD is loaded by the game and cannot be launched.")
         status = self.status(mod_id)
         if not status.installed:
             raise ModIntegrityError("Managed MOD copy is missing or does not match the catalog.")
         target = self.installed_path(mod_id)
         return subprocess.Popen([str(target)], cwd=str(target.parent), close_fds=True)
+
+    @staticmethod
+    def _is_archive_source(path: Path, descriptor: ModDescriptor) -> bool:
+        archive = descriptor.operation.archive_source
+        return archive is not None and path.suffix.casefold() in {".7z", ".zip", ".rar"}
+
+    def _validate_archive(
+        self, path: Path, archive: ModArchiveSource | None
+    ) -> None:
+        if archive is None or not path.is_file():
+            raise ModIntegrityError("Selected MOD archive is not a file.")
+        if path.stat().st_size != archive.size_bytes:
+            raise ModIntegrityError("Selected MOD archive has an unexpected size.")
+        if self._sha256(path, use_cache=False) != archive.sha256:
+            raise ModIntegrityError("Selected MOD archive failed SHA-256 verification.")
+
+    @staticmethod
+    def _extract_archive_member(path: Path, member: str) -> bytes:
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            result = subprocess.run(
+                ["tar", "-xOf", str(path), member],
+                check=True,
+                capture_output=True,
+                timeout=15,
+                creationflags=creationflags,
+            )
+        except (OSError, subprocess.SubprocessError) as exception:
+            raise ModIntegrityError("Unable to read the selected MOD archive.") from exception
+        if not result.stdout:
+            raise ModIntegrityError("The selected MOD archive did not contain the expected file.")
+        return result.stdout
 
     def _validate_file(self, path: Path, descriptor: ModDescriptor) -> None:
         policy = descriptor.integrity_policy
@@ -320,12 +436,12 @@ class ModManager:
             raise ModIntegrityError("Selected MOD source is not a file.")
         if path.stat().st_size != policy.size_bytes:
             raise ModIntegrityError("Selected MOD source has an unexpected size.")
-        if self._sha256(path) != policy.sha256:
+        if self._sha256(path, use_cache=False) != policy.sha256:
             raise ModIntegrityError("Selected MOD source failed SHA-256 verification.")
 
-    def _sha256(self, path: Path) -> str:
+    def _sha256(self, path: Path, *, use_cache: bool = True) -> str:
         stat = path.stat()
-        cached = self._hash_cache.get(path)
+        cached = self._hash_cache.get(path) if use_cache else None
         identity = (stat.st_mtime_ns, stat.st_size)
         if cached is not None and cached[:2] == identity:
             return cached[2]
@@ -334,7 +450,8 @@ class ModManager:
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(chunk)
         value = digest.hexdigest().upper()
-        self._hash_cache[path] = (identity[0], identity[1], value)
+        if use_cache:
+            self._hash_cache[path] = (identity[0], identity[1], value)
         return value
 
     @staticmethod
