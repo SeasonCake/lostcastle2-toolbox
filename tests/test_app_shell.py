@@ -49,6 +49,21 @@ class AppShellModelTests(unittest.TestCase):
             ToolboxShell._open_repository(shell)
         opener.assert_called_once_with(TOOLBOX_REPOSITORY_URL, new=2)
 
+    def test_game_loaded_mod_launch_reuses_existing_game_launcher(self) -> None:
+        actions: list[str] = []
+        shell = SimpleNamespace(
+            mod_manager=SimpleNamespace(
+                status=lambda _mod_id: SimpleNamespace(installed=True)
+            ),
+            launch_game=lambda: actions.append("launch_game"),
+        )
+        ToolboxShell._launch_game_for_mod(shell, "gold-editor-f5")
+        self.assertEqual(actions, ["launch_game"])
+
+        shell.mod_manager.status = lambda _mod_id: SimpleNamespace(installed=False)
+        ToolboxShell._launch_game_for_mod(shell, "gold-editor-f5")
+        self.assertEqual(actions, ["launch_game"])
+
     def test_demo_combat_state_is_deterministic_and_complete_for_ui_qa(self) -> None:
         root = Path(__file__).resolve().parents[1]
         aggregator = CombatAggregator(

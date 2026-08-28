@@ -24,7 +24,7 @@ The application now starts in a calculator-style main toolbox window. It manages
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
 | Main toolbox and external combat HUD | Local transport and Bridge 0.4.1 runtime-validated on the recorded game build |
-| MOD management | Two attributed third-party tools registered; user-supplied exact files required |
+| MOD management | Two existing tools plus 46 latest usable community MODs bundled; local auto-import supported |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
@@ -58,9 +58,11 @@ Build the Windows package:
 .\build.ps1
 ```
 
+The pinned 7-Zip runtime and its license are included so source-mode archive inspection works after cloning. Other third-party executables, DLLs, archives, and the generated `third_party/community_mods` payload are intentionally excluded from Git. Before packaging, provision the exact local files recorded in `THIRD_PARTY_NOTICES.md` and `assets/community_mod_catalog.json`; `build.ps1` verifies their counts, sizes, and SHA-256 identities and stops if an input is missing or different.
+
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见** and Gold Editor 1.0 by **刺心**. The trainer supports managed local-copy configuration and launch. The gold editor is installed only from a matching user-supplied DLL or original archive into its own BepInEx plugin directory; its binary is not distributed with the toolbox. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 46 deduplicated latest-usable community MOD entries. Each entry carries an author label, purpose, usage guidance, hash-bound payload, one-click installation, game launch, and exact uninstall. Files or folders placed in the package's `用户MOD` inbox can be statically inspected and added through an editable preview; the package includes a Chinese `lc2-mod.json` format guide and AI prompt. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Safety and scope
 

@@ -26,7 +26,7 @@
 | 战斗事件 v2 与回放聚合 | 已实现并有行为测试 |
 | 法力与护盾观察桥 | 法力消耗/恢复已完成运行时验证；护盾仍待独立样本 |
 | 综合主窗口与外部战斗 HUD | 本地管道与 Bridge 0.4.1 已在记录的游戏构建完成聚焦实测 |
-| MOD 管理 | 已登记 2 个第三方工具；用户提供原文件并校验后配置或安装 |
+| MOD 管理 | 2 个原有工具与 46 个最新可用社区 MOD 随包；支持本地自动识别与添加 |
 
 研究结论只适用于计划文档记录的游戏构建。游戏更新后，Hook 兼容性与数据口径都需要重新验证。
 
@@ -49,9 +49,12 @@
 
 ## MOD 管理
 
-- 当前收录“灵魂石修改器 1.2”（作者：恨你不见）与“金币编辑器 1.0”（作者：刺心）。
-- 灵魂石修改器支持配置、启动和删除盒子副本；金币编辑器由用户选择登记版本的 DLL 或原始压缩包后安装到独占 BepInEx 插件目录，并只卸载自身文件。
-- 金币编辑器二进制不随工具箱分发。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+- 当前收录“灵魂石修改器 1.2”（作者：恨你不见）、“金币编辑器 1.0”（作者：刺心）与 46 个按功能族去重的最新可用社区 MOD。
+- 灵魂石修改器支持配置、启动和删除盒子副本；金币编辑器随包提供登记 DLL，可一键安装到独占 BepInEx 插件目录，并只卸载自身文件。
+- 金币编辑器安装完成后可从 MOD 卡片直接启动游戏；进入游戏按 `F5` 打开窗口，输入数量并保存，返回主菜单再进入游戏生效。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+- 社区目录剔除了旧版重复、测试、未完成、半成品和明确有 bug 的来源；每个条目显示作者、功能和使用方法，作者证据不足时明确标为“社区未署名”。
+- 用户可把 DLL、ZIP、7Z、RAR 或文件夹放入工具箱旁的“用户MOD”，点击“添加 MOD”静态识别并编辑预览；完整清单与 AI 提示词见包内 `MOD自动添加说明.txt`。
+- 普通插件安装到各自独占目录；卸载只移除登记文件，同名 DLL 冲突会阻止重复安装。BepInEx 前置整包和游戏文件覆盖不会按普通 MOD 自动添加。
 
 ## 开发与测试
 
@@ -84,6 +87,8 @@ py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo
 ```powershell
 .\build.ps1
 ```
+
+仓库包含固定版本的 7-Zip 运行组件及其许可证，clone 后可直接使用源码模式的压缩包识别。其他第三方 EXE、DLL、压缩包及生成的 `third_party/community_mods` 载荷不会提交到 Git。打包前需在本机准备 `THIRD_PARTY_NOTICES.md` 和 `assets/community_mod_catalog.json` 登记的精确输入；`build.ps1` 会核对数量、大小和 SHA-256，缺失或不一致时直接停止。
 
 实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.1 已在索引记录的游戏构建完成位置与官方法力恢复分支实测；官方回调缺失时的底层恢复兜底仍等待自然样本。
 

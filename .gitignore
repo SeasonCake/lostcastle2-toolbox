@@ -36,6 +36,13 @@ third_party/**/*.exe
 third_party/**/*.zip
 third_party/**/*.7z
 third_party/**/*.rar
+third_party/community_mods/
+
+# The pinned 7-Zip runtime is redistributable under its bundled License.txt and
+# is required for source-mode archive inspection.
+!third_party/7zip/7z.exe
+!third_party/7zip/7z.dll
+!third_party/7zip/License.txt
 
 # Local QA captures. Keep only the small written evidence summaries.
 artifacts/**

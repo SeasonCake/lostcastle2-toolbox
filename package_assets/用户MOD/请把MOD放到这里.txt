@@ -1,0 +1,3 @@
+把要添加的 DLL、ZIP、7Z、RAR 或 MOD 文件夹放在这里，然后打开工具箱 → MOD 管理 → 添加 MOD。
+
+完整格式、AI 提示词和 lc2-mod.json 示例见上一级“MOD自动添加说明.txt”。

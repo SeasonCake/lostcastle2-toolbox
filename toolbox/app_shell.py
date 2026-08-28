@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import queue
 import threading
@@ -14,11 +15,14 @@ from .combat_aggregator import CombatAggregator, CombatSnapshot
 from .combat_transport import CombatEventPump
 from .macro_model import MacroProfile
 from .mod_manager import (
+    ModConflictError,
     ModGamePathRequired,
     ModIntegrityError,
     ModManager,
     ModManagerError,
 )
+from .mod_inspector import ModDraft, ModInspectionError, ModPackageInspector
+from .user_mod_registry import UserModRegistry, UserModRegistryError, draft_fingerprint
 
 
 BG = "#F3EEE3"
@@ -1045,6 +1049,9 @@ class ToolboxShell:
         keyboard: KeyboardModule,
         macro_feature: MacroModule,
         mod_manager: ModManager,
+        mod_inspector: ModPackageInspector,
+        user_mod_registry: UserModRegistry,
+        mod_inbox: Path,
         combat_aggregator: CombatAggregator,
         combat_event_pump: CombatEventPump | None,
         keyboard_preview_provider: Callable[
@@ -1060,6 +1067,10 @@ class ToolboxShell:
         self.keyboard = keyboard
         self.macro_feature = macro_feature
         self.mod_manager = mod_manager
+        self.mod_inspector = mod_inspector
+        self.user_mod_registry = user_mod_registry
+        self.mod_inbox = mod_inbox.resolve()
+        self.mod_help_file = self.mod_inbox.parent / "MOD自动添加说明.txt"
         self.combat_aggregator = combat_aggregator
         self.combat_event_pump = combat_event_pump
         self.keyboard_preview_provider = keyboard_preview_provider
@@ -1079,9 +1090,17 @@ class ToolboxShell:
         self.labels: dict[str, tk.Label] = {}
         self._macro_row_descriptions: list[str] = []
         self.mod_buttons: dict[str, dict[str, tk.Button]] = {}
+        self.mod_tree: ttk.Treeview | None = None
+        self.mod_search_var = tk.StringVar(value="")
+        self.mod_selected_id: str | None = None
+        self.mod_detail_labels: dict[str, tk.Label] = {}
+        self.mod_action_buttons: dict[str, tk.Button] = {}
         self.input_mode_buttons: dict[str, tk.Button] = {}
         self._mod_busy = False
         self._mod_results: queue.Queue[tuple[bool, Exception | None]] = queue.Queue()
+        self._mod_import_results: queue.Queue[
+            tuple[list[ModDraft], list[tuple[str, str]]]
+        ] = queue.Queue()
         self._after_id: str | None = None
         self._closed = False
         self._main_roots: list[tk.Misc] = []
@@ -1770,81 +1789,564 @@ class ToolboxShell:
         page = self._new_page("mods")
         self._page_heading(page, "MOD 管理", "")
 
-        for index, descriptor in enumerate(self.mod_manager.catalog.entries):
-            panel = RoundedPanel(
-                page,
-                height=None,
-                content_padx=14,
-                content_pady=12,
-            )
-            panel.pack(fill="x", pady=(0, 9 if index < len(self.mod_manager.catalog.entries) - 1 else 0))
-            card = panel.content
-            top = tk.Frame(card, bg=SURFACE)
-            top.pack(fill="x")
-            title = tk.Frame(top, bg=SURFACE)
-            title.pack(side="left", fill="x", expand=True)
-            tk.Label(
-                title,
-                text=f"{descriptor.display.name}  v{descriptor.display.version}",
-                bg=SURFACE,
-                fg=TEXT,
-                anchor="w",
-                font=("Microsoft YaHei UI", 12, "bold"),
-            ).pack(fill="x")
-            tk.Label(
-                title,
-                text=f"作者：{descriptor.display.author}",
-                bg=SURFACE,
-                fg=MUTED,
-                anchor="w",
-                font=("Microsoft YaHei UI", 8),
-            ).pack(fill="x", pady=(3, 0))
-            status_key = f"mod_status:{descriptor.mod_id}"
-            self.labels[status_key] = tk.Label(
-                top,
-                text="● 正在检查",
-                bg=SURFACE,
-                fg=MUTED,
-                font=("Microsoft YaHei UI", 8, "bold"),
-            )
-            self.labels[status_key].pack(side="right", padx=(12, 0))
+        toolbar = tk.Frame(page, bg=BG)
+        toolbar.pack(fill="x", pady=(0, 8))
+        tk.Label(
+            toolbar,
+            text="搜索",
+            bg=BG,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 8),
+        ).pack(side="left")
+        search = tk.Entry(
+            toolbar,
+            textvariable=self.mod_search_var,
+            relief="solid",
+            bd=1,
+            bg=SURFACE,
+            fg=TEXT,
+            insertbackground=TEXT,
+            font=("Microsoft YaHei UI", 9),
+        )
+        search.pack(side="left", fill="x", expand=True, padx=(6, 10), ipady=4)
+        self._button(toolbar, "打开目录", self._open_mod_inbox, width=9).pack(
+            side="right", padx=(6, 0)
+        )
+        self._button(toolbar, "格式说明", self._open_mod_help, width=9).pack(
+            side="right", padx=(6, 0)
+        )
+        self._button(toolbar, "添加 MOD", self._add_user_mod, accent=True, width=10).pack(
+            side="right"
+        )
 
-            tk.Label(
-                card,
-                text=descriptor.display.summary,
-                bg=SURFACE,
-                fg=TEXT,
-                anchor="w",
-                font=("Microsoft YaHei UI", 8),
-            ).pack(fill="x", pady=(10, 0))
+        mod_content = tk.Frame(page, bg=BG)
+        mod_content.pack(fill="both", expand=True)
+        mod_content.columnconfigure(0, weight=1)
+        mod_content.rowconfigure(0, weight=1)
+        mod_content.rowconfigure(1, weight=0)
+        list_panel = RoundedPanel(mod_content, height=160, content_padx=8, content_pady=8)
+        list_panel.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+        list_frame = list_panel.content
+        tree = ttk.Treeview(
+            list_frame,
+            columns=("name", "version", "author", "status"),
+            show="headings",
+            height=5,
+            style="Toolbox.Treeview",
+            selectmode="browse",
+        )
+        tree.heading("name", text="MOD")
+        tree.heading("version", text="版本")
+        tree.heading("author", text="作者")
+        tree.heading("status", text="状态")
+        tree.column("name", width=190, minwidth=110, stretch=True, anchor="w")
+        tree.column("version", width=58, minwidth=48, stretch=False, anchor="center")
+        tree.column("author", width=105, minwidth=70, stretch=True, anchor="w")
+        tree.column("status", width=78, minwidth=68, stretch=False, anchor="center")
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        tree.bind("<<TreeviewSelect>>", self._on_mod_selected)
+        self.mod_tree = tree
 
-            actions = tk.Frame(card, bg=SURFACE)
-            actions.pack(side="bottom", fill="x")
-            buttons: dict[str, tk.Button] = {}
-            buttons["remove"] = self._button(
-                actions,
-                "卸载" if descriptor.operation.kind == "bepinex_plugin" else "删除副本",
-                lambda current_id=descriptor.mod_id: self._remove_mod(current_id),
-                width=10,
-            )
-            buttons["remove"].pack(side="right")
-            if descriptor.operation.launchable:
-                buttons["launch"] = self._button(
-                    actions,
-                    "启动",
-                    lambda current_id=descriptor.mod_id: self._launch_mod(current_id),
-                    width=8,
+        detail_panel = RoundedPanel(mod_content, height=178, content_padx=14, content_pady=10)
+        detail_panel.grid(row=1, column=0, sticky="ew")
+        detail = detail_panel.content
+        top = tk.Frame(detail, bg=SURFACE)
+        top.pack(fill="x")
+        self.mod_detail_labels["title"] = tk.Label(
+            top,
+            text="请选择一个 MOD",
+            bg=SURFACE,
+            fg=TEXT,
+            anchor="w",
+            font=("Microsoft YaHei UI", 11, "bold"),
+        )
+        self.mod_detail_labels["title"].pack(side="left", fill="x", expand=True)
+        self.mod_detail_labels["status"] = tk.Label(
+            top,
+            text="",
+            bg=SURFACE,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 8, "bold"),
+        )
+        self.mod_detail_labels["status"].pack(side="right", padx=(12, 0))
+        self.mod_detail_labels["author"] = tk.Label(
+            detail,
+            text="",
+            bg=SURFACE,
+            fg=MUTED,
+            anchor="w",
+            font=("Microsoft YaHei UI", 8),
+        )
+        self.mod_detail_labels["author"].pack(fill="x", pady=(2, 0))
+        self.mod_detail_labels["summary"] = tk.Label(
+            detail,
+            text="",
+            bg=SURFACE,
+            fg=TEXT,
+            anchor="w",
+            justify="left",
+            font=("Microsoft YaHei UI", 8),
+        )
+        self.mod_detail_labels["summary"].pack(fill="x", pady=(7, 0))
+        self.mod_detail_labels["usage"] = tk.Label(
+            detail,
+            text="",
+            bg=SURFACE,
+            fg=MUTED,
+            anchor="w",
+            justify="left",
+            font=("Microsoft YaHei UI", 8),
+        )
+        self.mod_detail_labels["usage"].pack(fill="x", pady=(3, 8))
+        actions = tk.Frame(detail, bg=SURFACE)
+        actions.pack(fill="x")
+        self.mod_action_buttons["remove"] = self._button(
+            actions,
+            "卸载",
+            lambda: self.mod_selected_id and self._remove_mod(self.mod_selected_id),
+            width=10,
+        )
+        self.mod_action_buttons["remove"].pack(side="right")
+        self.mod_action_buttons["launch"] = self._button(
+            actions,
+            "启动游戏",
+            lambda: self.mod_selected_id
+            and self._launch_selected_mod(self.mod_selected_id),
+            width=10,
+        )
+        self.mod_action_buttons["launch"].pack(side="right", padx=(0, 6))
+        self.mod_action_buttons["configure"] = self._button(
+            actions,
+            "一键安装",
+            lambda: self.mod_selected_id
+            and self._configure_mod(self.mod_selected_id),
+            accent=True,
+            width=10,
+        )
+        self.mod_action_buttons["configure"].pack(side="right", padx=(0, 6))
+
+        def wrap_detail(_event: tk.Event[Any]) -> None:
+            width = max(180, detail.winfo_width() - 24)
+            self.mod_detail_labels["summary"].configure(wraplength=width)
+            self.mod_detail_labels["usage"].configure(wraplength=width)
+
+        detail.bind("<Configure>", wrap_detail)
+        self.mod_search_var.trace_add("write", lambda *_args: self._populate_mod_tree())
+        self._populate_mod_tree()
+
+    def _populate_mod_tree(self) -> None:
+        tree = self.mod_tree
+        if tree is None:
+            return
+        selected = self.mod_selected_id
+        query = self.mod_search_var.get().strip().casefold()
+        for item in tree.get_children(""):
+            tree.delete(item)
+        visible_ids: list[str] = []
+        for descriptor in self.mod_manager.catalog.entries:
+            haystack = "\n".join(
+                (
+                    descriptor.display.name,
+                    descriptor.display.author,
+                    descriptor.display.summary,
+                    descriptor.display.usage_hint,
                 )
-                buttons["launch"].pack(side="right", padx=(0, 6))
-            buttons["configure"] = self._button(
-                actions,
-                "一键安装" if descriptor.operation.kind == "bepinex_plugin" else "一键配置",
-                lambda current_id=descriptor.mod_id: self._configure_mod(current_id),
-                accent=True,
-                width=10,
+            ).casefold()
+            if query and query not in haystack:
+                continue
+            status = self.mod_manager.status(descriptor.mod_id)
+            label, _color = self._mod_status_text(descriptor, status.state)
+            tree.insert(
+                "",
+                "end",
+                iid=descriptor.mod_id,
+                values=(
+                    descriptor.display.name,
+                    descriptor.display.version,
+                    descriptor.display.author,
+                    label.replace("● ", ""),
+                ),
             )
-            buttons["configure"].pack(side="right", padx=(0, 6))
-            self.mod_buttons[descriptor.mod_id] = buttons
+            visible_ids.append(descriptor.mod_id)
+        if selected not in visible_ids:
+            selected = visible_ids[0] if visible_ids else None
+        self.mod_selected_id = selected
+        if selected is not None:
+            tree.selection_set(selected)
+            tree.focus(selected)
+            tree.see(selected)
+        self._update_mod_detail()
+
+    def _on_mod_selected(self, _event: tk.Event[Any] | None = None) -> None:
+        if self.mod_tree is None:
+            return
+        selected = self.mod_tree.selection()
+        self.mod_selected_id = selected[0] if selected else None
+        self._update_mod_detail()
+
+    @staticmethod
+    def _mod_status_text(descriptor: Any, state: str) -> tuple[str, str]:
+        is_plugin = descriptor.operation.is_game_plugin
+        if state == "installed":
+            return ("● 已安装" if is_plugin else "● 已配置"), GREEN
+        if state == "integrity_error":
+            return "● 文件校验失败", RED
+        if state == "game_not_configured":
+            return "● 未定位游戏", MUTED
+        return ("● 未安装" if is_plugin else "● 未配置"), MUTED
+
+    def _update_mod_detail(self) -> None:
+        if not self.mod_detail_labels:
+            return
+        if self.mod_selected_id is None:
+            self.mod_detail_labels["title"].configure(text="没有匹配的 MOD")
+            for key in ("status", "author", "summary", "usage"):
+                self.mod_detail_labels[key].configure(text="")
+            for button in self.mod_action_buttons.values():
+                button.configure(state="disabled")
+            return
+        descriptor = self.mod_manager.descriptor(self.mod_selected_id)
+        status = self.mod_manager.status(descriptor.mod_id)
+        label, color = self._mod_status_text(descriptor, status.state)
+        if self._mod_busy:
+            label, color = "● 操作中", GOLD
+        self.mod_detail_labels["title"].configure(
+            text=f"{descriptor.display.name}  v{descriptor.display.version}"
+        )
+        self.mod_detail_labels["status"].configure(text=label, fg=color)
+        self.mod_detail_labels["author"].configure(
+            text=f"作者：{descriptor.display.author}"
+        )
+        self.mod_detail_labels["summary"].configure(text=descriptor.display.summary)
+        self.mod_detail_labels["usage"].configure(
+            text=descriptor.display.usage_hint
+        )
+        any_copy = status.state in {"installed", "integrity_error"}
+        is_plugin = descriptor.operation.is_game_plugin
+        self.mod_action_buttons["configure"].configure(
+            text=("重新安装" if is_plugin else "重新配置")
+            if any_copy
+            else ("一键安装" if is_plugin else "一键配置"),
+            state="disabled" if self._mod_busy else "normal",
+        )
+        self.mod_action_buttons["launch"].configure(
+            text="启动" if descriptor.operation.launchable else "启动游戏",
+            state="normal" if status.installed and not self._mod_busy else "disabled",
+        )
+        self.mod_action_buttons["remove"].configure(
+            text="卸载" if is_plugin else "删除副本",
+            state="normal" if any_copy and not self._mod_busy else "disabled",
+        )
+
+    def _launch_selected_mod(self, mod_id: str) -> None:
+        descriptor = self.mod_manager.descriptor(mod_id)
+        if descriptor.operation.launchable:
+            self._launch_mod(mod_id)
+        else:
+            self._launch_game_for_mod(mod_id)
+
+    def _open_mod_inbox(self) -> None:
+        try:
+            self.mod_inbox.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(self.mod_inbox))
+        except OSError as exception:
+            messagebox.showerror(
+                "无法打开目录", f"无法打开用户 MOD 目录：\n{exception}", parent=self.root
+            )
+
+    def _open_mod_help(self) -> None:
+        help_file = self.mod_help_file
+        if not help_file.is_file():
+            fallback = (
+                Path(__file__).resolve().parents[1]
+                / "package_assets"
+                / "MOD自动添加说明.txt"
+            )
+            help_file = fallback if fallback.is_file() else help_file
+        try:
+            os.startfile(str(help_file))
+        except OSError as exception:
+            messagebox.showerror(
+                "无法打开说明", f"无法打开 MOD 格式说明：\n{exception}", parent=self.root
+            )
+
+    def _add_user_mod(self) -> None:
+        if self._mod_busy:
+            return
+        self.mod_inbox.mkdir(parents=True, exist_ok=True)
+        candidates = [
+            item
+            for item in sorted(self.mod_inbox.iterdir(), key=lambda path: path.name.casefold())
+            if item.is_dir()
+            or item.suffix.casefold() in {".dll", ".zip", ".7z", ".rar"}
+        ]
+        if not candidates:
+            messagebox.showinfo(
+                "没有待添加 MOD",
+                "请先把 DLL、ZIP、7Z、RAR 或 MOD 文件夹放入“用户MOD”目录。",
+                parent=self.root,
+            )
+            return
+        registered = self.user_mod_registry.registered_fingerprints()
+        self._mod_busy = True
+        self._update_mod_detail()
+
+        def inspect_candidates() -> None:
+            drafts: list[ModDraft] = []
+            errors: list[tuple[str, str]] = []
+            for source in candidates:
+                try:
+                    draft = self.mod_inspector.inspect(source)
+                    if draft_fingerprint(draft) in registered:
+                        continue
+                    drafts.append(draft)
+                except (ModInspectionError, OSError) as exception:
+                    errors.append((source.name, str(exception)))
+            self._mod_import_results.put((drafts, errors))
+
+        threading.Thread(
+            target=inspect_candidates, name="LC2ModInspect", daemon=True
+        ).start()
+
+    def _drain_mod_import_results(self) -> None:
+        try:
+            drafts, errors = self._mod_import_results.get_nowait()
+        except queue.Empty:
+            return
+        self._mod_busy = False
+        self._update_mod_detail()
+        if drafts:
+            self._open_mod_import_dialog(drafts, errors)
+            return
+        if errors:
+            details = "\n".join(f"• {name}：{error}" for name, error in errors[:6])
+            if len(errors) > 6:
+                details += f"\n• 另有 {len(errors) - 6} 项未通过识别"
+            messagebox.showerror("没有可添加的 MOD", details, parent=self.root)
+        else:
+            messagebox.showinfo(
+                "没有新的 MOD",
+                "投放目录中的可识别内容都已经添加。",
+                parent=self.root,
+            )
+
+    def _open_mod_import_dialog(
+        self, drafts: list[ModDraft], errors: list[tuple[str, str]]
+    ) -> None:
+        pending = list(drafts)
+        dialog = tk.Toplevel(self.root)
+        dialog.title("添加用户 MOD")
+        dialog.configure(bg=BG)
+        dialog.geometry("760x520")
+        dialog.minsize(640, 460)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        body = tk.Frame(dialog, bg=BG, padx=16, pady=14)
+        body.pack(fill="both", expand=True)
+        tk.Label(
+            body,
+            text="检查识别结果",
+            bg=BG,
+            fg=TEXT,
+            anchor="w",
+            font=("Microsoft YaHei UI", 14, "bold"),
+        ).pack(fill="x")
+        tk.Label(
+            body,
+            text="确认作者与操作方式；证据不足时保留“社区未署名”。识别阶段不会启动 MOD。",
+            bg=BG,
+            fg=MUTED,
+            anchor="w",
+            font=("Microsoft YaHei UI", 8),
+        ).pack(fill="x", pady=(3, 10))
+
+        source_var = tk.StringVar()
+        selector = ttk.Combobox(body, textvariable=source_var, state="readonly")
+        selector.pack(fill="x", pady=(0, 10))
+
+        form = tk.Frame(body, bg=BG)
+        form.pack(fill="both", expand=True)
+        form.columnconfigure(1, weight=1)
+        name_var = tk.StringVar()
+        version_var = tk.StringVar()
+        author_var = tk.StringVar()
+
+        def add_entry(row: int, label: str, variable: tk.StringVar) -> None:
+            tk.Label(
+                form,
+                text=label,
+                bg=BG,
+                fg=TEXT,
+                anchor="w",
+                font=("Microsoft YaHei UI", 9, "bold"),
+            ).grid(row=row, column=0, sticky="nw", padx=(0, 10), pady=4)
+            tk.Entry(
+                form,
+                textvariable=variable,
+                relief="solid",
+                bd=1,
+                bg=SURFACE,
+                fg=TEXT,
+                insertbackground=TEXT,
+                font=("Microsoft YaHei UI", 9),
+            ).grid(row=row, column=1, sticky="ew", pady=4, ipady=4)
+
+        add_entry(0, "名称", name_var)
+        add_entry(1, "版本", version_var)
+        add_entry(2, "作者", author_var)
+        tk.Label(
+            form,
+            text="功能",
+            bg=BG,
+            fg=TEXT,
+            anchor="w",
+            font=("Microsoft YaHei UI", 9, "bold"),
+        ).grid(row=3, column=0, sticky="nw", padx=(0, 10), pady=4)
+        summary_text = tk.Text(
+            form,
+            height=3,
+            wrap="word",
+            relief="solid",
+            bd=1,
+            bg=SURFACE,
+            fg=TEXT,
+            insertbackground=TEXT,
+            font=("Microsoft YaHei UI", 9),
+        )
+        summary_text.grid(row=3, column=1, sticky="nsew", pady=4)
+        tk.Label(
+            form,
+            text="使用方法",
+            bg=BG,
+            fg=TEXT,
+            anchor="w",
+            font=("Microsoft YaHei UI", 9, "bold"),
+        ).grid(row=4, column=0, sticky="nw", padx=(0, 10), pady=4)
+        usage_text = tk.Text(
+            form,
+            height=4,
+            wrap="word",
+            relief="solid",
+            bd=1,
+            bg=SURFACE,
+            fg=TEXT,
+            insertbackground=TEXT,
+            font=("Microsoft YaHei UI", 9),
+        )
+        usage_text.grid(row=4, column=1, sticky="nsew", pady=4)
+        form.rowconfigure(3, weight=1)
+        form.rowconfigure(4, weight=1)
+        evidence_label = tk.Label(
+            body,
+            text="",
+            bg=BG,
+            fg=MUTED,
+            anchor="w",
+            justify="left",
+            font=("Microsoft YaHei UI", 8),
+        )
+        evidence_label.pack(fill="x", pady=(6, 4))
+        result_label = tk.Label(
+            body,
+            text=(f"另有 {len(errors)} 项未通过自动识别。" if errors else ""),
+            bg=BG,
+            fg=RED if errors else GREEN,
+            anchor="w",
+            font=("Microsoft YaHei UI", 8),
+        )
+        result_label.pack(fill="x")
+
+        def current_draft() -> ModDraft:
+            index = max(0, selector.current())
+            return pending[index]
+
+        def load_selection(_event: tk.Event[Any] | None = None) -> None:
+            if not pending:
+                return
+            draft = current_draft()
+            source_var.set(draft.source.name)
+            name_var.set(draft.name)
+            version_var.set(draft.version)
+            author_var.set(draft.author)
+            summary_text.delete("1.0", "end")
+            summary_text.insert("1.0", draft.summary)
+            usage_text.delete("1.0", "end")
+            usage_text.insert("1.0", draft.usage_hint)
+            notes = [
+                f"识别依据：{'、'.join(draft.evidence)}",
+                f"载荷：{len(draft.payload)} 个文件 / {sum(item.size_bytes for item in draft.payload):,} 字节",
+            ]
+            if draft.warnings:
+                notes.append("注意：" + "；".join(draft.warnings))
+            evidence_label.configure(text="  ·  ".join(notes))
+
+        selector.bind("<<ComboboxSelected>>", load_selection)
+
+        actions = tk.Frame(body, bg=BG)
+        actions.pack(fill="x", pady=(10, 0))
+
+        def close_dialog() -> None:
+            try:
+                dialog.grab_release()
+            except tk.TclError:
+                pass
+            dialog.destroy()
+
+        def register_current() -> None:
+            draft = current_draft()
+            display = {
+                "name": name_var.get(),
+                "version": version_var.get(),
+                "author": author_var.get(),
+                "summary": summary_text.get("1.0", "end").strip(),
+                "usage_hint": usage_text.get("1.0", "end").strip(),
+            }
+            try:
+                registered = self.user_mod_registry.register(
+                    draft,
+                    display,
+                    reserved_ids={
+                        entry.mod_id for entry in self.mod_manager.catalog.entries
+                    },
+                )
+                self.mod_manager.add_descriptor(
+                    registered.descriptor, registered.payload_root
+                )
+            except (ModManagerError, OSError) as exception:
+                messagebox.showerror(
+                    "添加失败", str(exception), parent=dialog
+                )
+                return
+            self.mod_selected_id = registered.descriptor.mod_id
+            pending.remove(draft)
+            self._populate_mod_tree()
+            if not pending:
+                close_dialog()
+                messagebox.showinfo(
+                    "添加完成",
+                    "MOD 已加入本地列表，可返回 MOD 管理执行一键安装。",
+                    parent=self.root,
+                )
+                return
+            selector.configure(values=[item.source.name for item in pending])
+            selector.current(0)
+            result_label.configure(
+                text=f"已添加“{registered.descriptor.display.name}”；还有 {len(pending)} 项待确认。",
+                fg=GREEN,
+            )
+            load_selection()
+
+        self._button(actions, "取消", close_dialog, width=10).pack(side="right")
+        self._button(
+            actions, "确认添加", register_current, accent=True, width=12
+        ).pack(side="right", padx=(0, 8))
+        selector.configure(values=[item.source.name for item in pending])
+        selector.current(0)
+        load_selection()
 
     def _configure_mod(self, mod_id: str) -> None:
         if self._mod_busy:
@@ -1903,6 +2405,9 @@ class ToolboxShell:
 
     @staticmethod
     def _mod_error_text(error: Exception | None) -> str:
+        if isinstance(error, ModConflictError):
+            names = "、".join(error.conflicts)
+            return f"检测到提供同名插件的已安装 MOD：{names}。请先卸载冲突项。"
         if isinstance(error, ModIntegrityError):
             return "所选文件与登记版本不一致；请重新选择对应版本。"
         if isinstance(error, ModGamePathRequired):
@@ -1927,6 +2432,11 @@ class ToolboxShell:
             self.mod_manager.launch(mod_id)
         except Exception as exception:
             messagebox.showerror("启动失败", self._mod_error_text(exception), parent=self.root)
+
+    def _launch_game_for_mod(self, mod_id: str) -> None:
+        if not self.mod_manager.status(mod_id).installed:
+            return
+        self.launch_game()
 
     def _remove_mod(self, mod_id: str) -> None:
         if self._mod_busy:
@@ -1953,35 +2463,37 @@ class ToolboxShell:
             )
 
     def _refresh_mod_page(self) -> None:
-        for descriptor in self.mod_manager.catalog.entries:
-            status = self.mod_manager.status(descriptor.mod_id)
-            is_plugin = descriptor.operation.kind == "bepinex_plugin"
-            if self._mod_busy:
-                label, color = "● 操作中", GOLD
-            elif status.state == "installed":
-                label, color = ("● 已安装" if is_plugin else "● 已配置"), GREEN
-            elif status.state == "integrity_error":
-                label, color = "● 文件校验失败", RED
-            elif status.state == "game_not_configured":
-                label, color = "● 未定位游戏", MUTED
-            else:
-                label, color = ("● 未安装" if is_plugin else "● 未配置"), MUTED
-            self.labels[f"mod_status:{descriptor.mod_id}"].configure(text=label, fg=color)
-            any_copy = status.state in {"installed", "integrity_error"}
-            buttons = self.mod_buttons[descriptor.mod_id]
-            configure_label = "重新安装" if is_plugin else "重新配置"
-            default_label = "一键安装" if is_plugin else "一键配置"
-            buttons["configure"].configure(
-                text=configure_label if any_copy else default_label,
-                state="disabled" if self._mod_busy else "normal",
-            )
-            if "launch" in buttons:
-                buttons["launch"].configure(
-                    state="normal" if status.installed and not self._mod_busy else "disabled"
+        tree = self.mod_tree
+        if tree is None:
+            return
+        visible = set(tree.get_children(""))
+        query = self.mod_search_var.get().strip().casefold()
+        expected = {
+            descriptor.mod_id
+            for descriptor in self.mod_manager.catalog.entries
+            if not query
+            or query
+            in "\n".join(
+                (
+                    descriptor.display.name,
+                    descriptor.display.author,
+                    descriptor.display.summary,
+                    descriptor.display.usage_hint,
                 )
-            buttons["remove"].configure(
-                state="normal" if any_copy and not self._mod_busy else "disabled"
-            )
+            ).casefold()
+        }
+        if visible != expected:
+            self._populate_mod_tree()
+            return
+        for mod_id in visible:
+            descriptor = self.mod_manager.descriptor(mod_id)
+            status = self.mod_manager.status(mod_id)
+            label, _color = self._mod_status_text(descriptor, status.state)
+            values = list(tree.item(mod_id, "values"))
+            if len(values) == 4 and values[3] != label.replace("● ", ""):
+                values[3] = label.replace("● ", "")
+                tree.item(mod_id, values=values)
+        self._update_mod_detail()
 
     def _build_settings_page(self) -> None:
         page = self._new_page("settings")
@@ -2502,6 +3014,7 @@ class ToolboxShell:
         if self.combat_event_pump is not None:
             self.combat_event_pump.drain()
         self._drain_mod_results()
+        self._drain_mod_import_results()
         self.refresh()
         self._after_id = self.root.after(500, self._tick)
 

@@ -9,6 +9,7 @@ import unittest
 
 from toolbox.mod_manager import (
     ModCatalog,
+    ModConflictError,
     ModGamePathRequired,
     ModIntegrityError,
     ModManager,
@@ -100,9 +101,11 @@ class ModManagerTests(unittest.TestCase):
         self.assertNotIn("C:\\", json.dumps(asdict(entry), ensure_ascii=False))
         gold = catalog.get("gold-editor-f5")
         self.assertEqual(gold.display.author, "刺心")
+        self.assertIn("按 F5", gold.display.usage_hint)
         self.assertEqual(gold.operation.kind, "bepinex_plugin")
-        self.assertFalse(gold.operation.bundled)
+        self.assertTrue(gold.operation.bundled)
         self.assertFalse(gold.operation.launchable)
+        self.assertTrue(gold.operation.requires_game_launch)
         self.assertEqual(gold.operation.archive_source.member, "LC2GoldFree.dll")
 
     def test_catalog_rejects_internal_details_in_display_copy(self) -> None:
@@ -113,6 +116,25 @@ class ModManagerTests(unittest.TestCase):
             path.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaises(ModManagerError):
                 ModCatalog.from_file(path)
+
+    def test_catalog_rejects_internal_details_in_usage_hint(self) -> None:
+        payload = catalog_payload(b"x")
+        payload["entries"][0]["display"]["usage_hint"] = "Uses Frida injection"  # type: ignore[index]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "catalog.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaises(ModManagerError):
+                ModCatalog.from_file(path)
+
+    def test_bundled_gold_editor_build_contract_matches_catalog(self) -> None:
+        catalog = ModCatalog.from_file(PROJECT_ROOT / "assets" / "mod_catalog.json")
+        gold = catalog.get("gold-editor-f5")
+        build_source = (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8")
+
+        self.assertTrue(gold.operation.bundled)
+        self.assertIn("third_party\\LC2GoldFree.dll", build_source)
+        self.assertIn(gold.integrity_policy.sha256, build_source)
+        self.assertIn('$goldEditorPath;third_party', build_source)
 
     def test_regular_ui_copy_does_not_expose_internal_mod_metadata(self) -> None:
         visible_sources = (
@@ -289,6 +311,139 @@ class ModManagerTests(unittest.TestCase):
             archive.write_bytes(b"wrong archive")
             with self.assertRaises(ModIntegrityError):
                 manager.install("fixture-plugin", archive)
+
+    def test_community_catalog_payloads_are_complete_and_hash_bound(self) -> None:
+        catalog = ModCatalog.from_file(
+            PROJECT_ROOT / "assets" / "community_mod_catalog.json"
+        )
+        self.assertEqual(len(catalog.entries), 46)
+        bundled_root = PROJECT_ROOT / "third_party"
+        for descriptor in catalog.entries:
+            self.assertTrue(descriptor.operation.files)
+            source_root = bundled_root / str(descriptor.operation.bundle_dir)
+            for spec in descriptor.operation.files:
+                payload = source_root.joinpath(*Path(spec.path).parts)
+                self.assertTrue(payload.is_file(), payload)
+                self.assertEqual(payload.stat().st_size, spec.size_bytes)
+                self.assertEqual(
+                    hashlib.sha256(payload.read_bytes()).hexdigest().upper(),
+                    spec.sha256,
+                )
+
+    def test_all_community_mods_install_and_uninstall_in_isolated_game(self) -> None:
+        catalog = ModCatalog.from_file(
+            PROJECT_ROOT / "assets" / "community_mod_catalog.json"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            game = root / "game"
+            plugins = game / "BepInEx" / "plugins"
+            plugins.mkdir(parents=True)
+            game_exe = game / "LostCastle2.exe"
+            game_exe.write_bytes(b"game")
+            sibling = plugins / "unrelated" / "keep.dll"
+            sibling.parent.mkdir()
+            sibling.write_bytes(b"keep")
+            manager = ModManager(
+                catalog,
+                root / "managed",
+                PROJECT_ROOT / "third_party",
+                game_exe_provider=lambda: game_exe,
+            )
+            for descriptor in catalog.entries:
+                manager.install(descriptor.mod_id)
+                self.assertTrue(manager.status(descriptor.mod_id).installed)
+                self.assertTrue(manager.uninstall(descriptor.mod_id))
+                self.assertEqual(
+                    manager.status(descriptor.mod_id).state, "not_installed"
+                )
+                self.assertTrue(sibling.is_file())
+
+    def test_multi_file_package_install_status_and_uninstall_preserve_unknown_leaf(self) -> None:
+        first = b"first dll"
+        second = b"dependency dll"
+        payload = plugin_catalog_payload(first)
+        entry = payload["entries"][0]  # type: ignore[index]
+        entry["operation"] = {
+            "kind": "bepinex_plugin",
+            "expected_filename": "fixture.dll",
+            "bundled": True,
+            "bundle_dir": "community_mods/fixture-plugin",
+            "files": [
+                {
+                    "path": "fixture.dll",
+                    "sha256": hashlib.sha256(first).hexdigest().upper(),
+                    "size_bytes": len(first),
+                },
+                {
+                    "path": "libs/dependency.dll",
+                    "sha256": hashlib.sha256(second).hexdigest().upper(),
+                    "size_bytes": len(second),
+                },
+            ],
+            "provides": ["fixture.dll", "dependency.dll"],
+            "hotkeys": [],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            bundled = root / "bundled" / "community_mods" / "fixture-plugin"
+            (bundled / "libs").mkdir(parents=True)
+            (bundled / "fixture.dll").write_bytes(first)
+            (bundled / "libs" / "dependency.dll").write_bytes(second)
+            game = root / "game"
+            (game / "BepInEx" / "plugins").mkdir(parents=True)
+            game_exe = game / "LostCastle2.exe"
+            game_exe.write_bytes(b"game")
+            manager = ModManager(
+                ModCatalog.from_payload(payload),
+                root / "managed",
+                root / "bundled",
+                game_exe_provider=lambda: game_exe,
+            )
+            manager.install("fixture-plugin")
+            target_dir = game / "BepInEx" / "plugins" / "fixture-plugin"
+            unknown = target_dir / "keep.user"
+            unknown.write_bytes(b"keep")
+            self.assertTrue(manager.status("fixture-plugin").installed)
+            self.assertTrue(manager.uninstall("fixture-plugin"))
+            self.assertTrue(unknown.is_file())
+            self.assertFalse((target_dir / "fixture.dll").exists())
+            self.assertFalse((target_dir / "libs" / "dependency.dll").exists())
+
+    def test_same_provided_dll_blocks_second_installed_mod(self) -> None:
+        first = b"first"
+        second = b"second"
+        payload = plugin_catalog_payload(first)
+        first_entry = payload["entries"][0]  # type: ignore[index]
+        first_entry["operation"]["provides"] = ["shared.dll"]  # type: ignore[index]
+        second_entry = json.loads(json.dumps(first_entry))
+        second_entry["id"] = "second-plugin"
+        second_entry["display"]["name"] = "Second Plugin"
+        second_entry["operation"]["expected_filename"] = "second.dll"
+        second_entry["operation"]["provides"] = ["shared.dll"]
+        second_entry["integrity_policy"]["sha256"] = hashlib.sha256(second).hexdigest().upper()
+        second_entry["integrity_policy"]["size_bytes"] = len(second)
+        payload["entries"].append(second_entry)  # type: ignore[index]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            game = root / "game"
+            (game / "BepInEx" / "plugins").mkdir(parents=True)
+            game_exe = game / "LostCastle2.exe"
+            game_exe.write_bytes(b"game")
+            first_source = root / "first.dll"
+            second_source = root / "second.dll"
+            first_source.write_bytes(first)
+            second_source.write_bytes(second)
+            manager = ModManager(
+                ModCatalog.from_payload(payload),
+                root / "managed",
+                root / "bundled",
+                game_exe_provider=lambda: game_exe,
+            )
+            manager.install("fixture-plugin", first_source)
+            with self.assertRaises(ModConflictError) as context:
+                manager.install("second-plugin", second_source)
+            self.assertEqual(context.exception.conflicts, ("Fixture Tool",))
 
 
 if __name__ == "__main__":

@@ -31,11 +31,13 @@ from toolbox.combat_transport import (
     CombatInbox,
 )
 from toolbox.macro_ui import MacroFeature
+from toolbox.mod_inspector import ModPackageInspector
 from toolbox.mod_manager import ModCatalog, ModManager
+from toolbox.user_mod_registry import UserModRegistry
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.6"
+APP_VERSION = "1.5.8"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
     os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
@@ -2487,6 +2489,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--start-hidden", action="store_true", help="兼容旧版；按键悬浮窗默认隐藏")
     parser.add_argument("--exit-after", type=float, default=0.0, help="若干秒后自动退出")
+    parser.add_argument(
+        "--qa-open-mod-import", action="store_true", help=argparse.SUPPRESS
+    )
     parser.add_argument("--self-test", action="store_true", help="运行无界面结构检查")
     return parser.parse_args(argv)
 
@@ -2550,13 +2555,28 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     keyboard_app.toggle_visible()
+    builtin_mod_catalog = ModCatalog.from_file(
+        RESOURCE_DIR / "assets" / "mod_catalog.json"
+    )
+    community_mod_catalog = ModCatalog.from_file(
+        RESOURCE_DIR / "assets" / "community_mod_catalog.json"
+    )
+    mod_inspector = ModPackageInspector(
+        RESOURCE_DIR / "third_party" / "7zip" / "7z.exe"
+    )
+    user_mod_registry = UserModRegistry(CONFIG_DIR / "user_mods", mod_inspector)
+    user_mod_catalog, user_mod_sources = user_mod_registry.load()
+    mod_entries = builtin_mod_catalog.entries + community_mod_catalog.entries
+    if user_mod_catalog is not None:
+        mod_entries += user_mod_catalog.entries
     mod_manager = ModManager(
-        ModCatalog.from_file(RESOURCE_DIR / "assets" / "mod_catalog.json"),
+        ModCatalog(mod_entries),
         CONFIG_DIR / "managed_mods",
         RESOURCE_DIR / "third_party",
         game_exe_provider=lambda: resolve_game_exe(
             keyboard_app.settings.get("game_path")
         ),
+        source_overrides=user_mod_sources,
     )
     registry = SourceRegistry.from_file(
         RESOURCE_DIR / "assets" / "combat_sources.json"
@@ -2617,6 +2637,11 @@ def main(argv: list[str] | None = None) -> int:
         keyboard=keyboard_app,
         macro_feature=macro_feature,
         mod_manager=mod_manager,
+        mod_inspector=mod_inspector,
+        user_mod_registry=user_mod_registry,
+        mod_inbox=Path(
+            os.environ.get("KEYVIEW_MOD_INBOX_DIR", APP_DIR / "用户MOD")
+        ),
         combat_aggregator=combat_aggregator,
         combat_event_pump=combat_pump,
         keyboard_preview_provider=keyboard_preview,
@@ -2632,6 +2657,8 @@ def main(argv: list[str] | None = None) -> int:
         root.geometry(f"{args.window_size[0]}x{args.window_size[1]}")
     root.deiconify()
     shell.show_page(args.show_page)
+    if args.qa_open_mod_import:
+        root.after(300, shell._add_user_mod)
     if args.show_settings:
         root.after(250, lambda: (shell.show_page("keyboard"), keyboard_app.open_settings()))
     if args.show_macros:

@@ -21,6 +21,23 @@ The packaged binary is pinned to the exact size and SHA-256 above. The toolbox c
 - Registered DLL: `LC2GoldFree.dll`, 9,216 bytes, SHA-256 `BB6FF96AA4AF9BB3521ED93C3A5582E48D5D9CB8C7BAAF5291FA4C3E57647B56`.
 - Registered original archive: `F5金币编辑器.7z`, 4,136 bytes, SHA-256 `7DFB39A521C1135584D9D88FC6138CFA0F8AF017F952924C141F189EDA7A294B`.
 - Observed form: unsigned BepInEx IL2CPP plugin that reads, changes, and saves in-game gold.
-- Redistribution status: local user-supplied only. Neither the DLL nor its archive is included in the toolbox package.
+- Packaging status: the maintainer selected the exact registered DLL for inclusion in the local toolbox package on 2026-08-28. This does not claim separate public redistribution permission.
 
-The toolbox accepts only the registered DLL or original archive, verifies the extracted DLL, installs it into a dedicated BepInEx plugin directory, and removes only that catalog-owned file during uninstall.
+The toolbox verifies the bundled DLL, installs it into a dedicated BepInEx plugin directory, and removes only that catalog-owned file during uninstall. The source archive remains outside the package.
+
+## Curated community MOD bundle
+
+- The local package contains 46 deduplicated, latest-usable community MOD entries selected by the maintainer on 2026-08-28.
+- Exact payload paths, sizes, SHA-256 values, displayed authors, versions, purposes, and usage guidance are recorded in `assets/community_mod_catalog.json`; source-package selection and attribution evidence are maintained in `assets/community_mod_sources.json`.
+- Entries with no reliable author evidence display `社区未署名` instead of an inferred identity. Older duplicates, test builds, unfinished or half-finished sources, and sources explicitly marked as having a bug are not in the default bundle.
+- These MODs are not covered by this repository's MIT License. Local inclusion does not claim separate public redistribution permission; publication remains a separate maintainer decision.
+
+The toolbox installs every entry into an independent BepInEx plugin directory, verifies all registered payload files, prevents simultaneous installation of entries that provide the same DLL name, and removes only registered files during uninstall.
+
+## 7-Zip command-line components
+
+- 7-Zip Copyright (C) 1999-2025 Igor Pavlov.
+- Bundled files: `7z.exe` (575,488 bytes, SHA-256 `4CD7D776C686427226A151789D2D61F0B2ED2C392148CC4E69C0238362FAFECF`) and `7z.dll` (1,906,176 bytes, SHA-256 `5BD20FB38499D95C39594F41D4781B6181B3304B7F1F4D06B0182F514E7EAA74`).
+- The complete upstream `License.txt` is included beside those files in the package and governs their use and redistribution.
+
+The toolbox uses these components only to list and read user-selected ZIP, 7Z, and RAR packages during static MOD identification.

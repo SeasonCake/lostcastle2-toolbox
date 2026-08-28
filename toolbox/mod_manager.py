@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
@@ -44,12 +44,21 @@ class ModGamePathRequired(ModManagerError):
     """Raised when an in-game plugin has no usable Lost Castle 2 location."""
 
 
+class ModConflictError(ModManagerError):
+    """Raised when another installed MOD provides the same plugin payload."""
+
+    def __init__(self, conflicts: tuple[str, ...]) -> None:
+        super().__init__("Conflicting MODs are already installed.")
+        self.conflicts = conflicts
+
+
 @dataclass(frozen=True)
 class ModDisplay:
     name: str
     version: str
     author: str
     summary: str
+    usage_hint: str = ""
 
 
 @dataclass(frozen=True)
@@ -61,15 +70,34 @@ class ModArchiveSource:
 
 
 @dataclass(frozen=True)
+class ModFileSpec:
+    path: str
+    sha256: str
+    size_bytes: int
+
+
+@dataclass(frozen=True)
 class ModOperation:
     kind: str
     expected_filename: str
     bundled: bool
     archive_source: ModArchiveSource | None = None
+    bundle_dir: str | None = None
+    files: tuple[ModFileSpec, ...] = ()
+    provides: tuple[str, ...] = ()
+    hotkeys: tuple[str, ...] = ()
 
     @property
     def launchable(self) -> bool:
         return self.kind == "external_trainer"
+
+    @property
+    def requires_game_launch(self) -> bool:
+        return self.kind == "bepinex_plugin"
+
+    @property
+    def is_game_plugin(self) -> bool:
+        return self.kind == "bepinex_plugin"
 
 
 @dataclass(frozen=True)
@@ -117,6 +145,10 @@ class ModCatalog:
     @classmethod
     def from_file(cls, path: Path) -> ModCatalog:
         payload = json.loads(path.read_text(encoding="utf-8"))
+        return cls.from_payload(payload)
+
+    @classmethod
+    def from_payload(cls, payload: Any) -> ModCatalog:
         if not isinstance(payload, dict) or payload.get("schema_version") != 2:
             raise ModManagerError("Unsupported MOD catalog version.")
         raw_entries = payload.get("entries")
@@ -139,11 +171,15 @@ class ModCatalog:
             raise ModManagerError("MOD catalog integrity_policy must be an object.")
 
         mod_id = ModCatalog._required_string(raw, "id", "entry")
+        usage_hint = display_raw.get("usage_hint", "")
+        if not isinstance(usage_hint, str):
+            raise ModManagerError("MOD catalog display usage_hint must be a string.")
         display = ModDisplay(
             name=ModCatalog._required_string(display_raw, "name", "display"),
             version=ModCatalog._required_string(display_raw, "version", "display"),
             author=ModCatalog._required_string(display_raw, "author", "display"),
             summary=ModCatalog._required_string(display_raw, "summary", "display"),
+            usage_hint=usage_hint.strip(),
         )
         ModCatalog._validate_visible_copy(display)
 
@@ -157,11 +193,25 @@ class ModCatalog:
         archive_source = ModCatalog._parse_archive_source(
             operation_raw.get("archive_source")
         )
+        bundle_dir = ModCatalog._optional_relative_path(
+            operation_raw.get("bundle_dir"), "operation.bundle_dir"
+        )
+        files = ModCatalog._parse_file_specs(operation_raw.get("files"))
+        provides = ModCatalog._parse_string_list(
+            operation_raw.get("provides", []), "operation.provides"
+        )
+        hotkeys = ModCatalog._parse_string_list(
+            operation_raw.get("hotkeys", []), "operation.hotkeys"
+        )
         operation = ModOperation(
             kind=operation_kind,
             expected_filename=expected_filename,
             bundled=bundled if type(bundled) is bool else False,
             archive_source=archive_source,
+            bundle_dir=bundle_dir,
+            files=files,
+            provides=provides,
+            hotkeys=hotkeys,
         )
 
         size_bytes = policy_raw.get("size_bytes")
@@ -185,6 +235,26 @@ class ModCatalog:
             raise ModManagerError("MOD capabilities must be a non-empty string list.")
         if type(bundled) is not bool:
             raise ModManagerError("MOD bundled flag must be boolean.")
+        if files:
+            if operation_kind != "bepinex_plugin":
+                raise ModManagerError("Multi-file MODs must be BepInEx plugins.")
+            matching_primary = [
+                spec
+                for spec in files
+                if PurePosixPath(spec.path).name.casefold()
+                == expected_filename.casefold()
+            ]
+            if len(matching_primary) != 1:
+                raise ModManagerError(
+                    "Multi-file MOD expected_filename must identify one payload file."
+                )
+            primary = matching_primary[0]
+            if primary.sha256 != sha256 or primary.size_bytes != size_bytes:
+                raise ModManagerError(
+                    "Multi-file MOD primary integrity must match integrity_policy."
+                )
+            if bundled and bundle_dir is None:
+                raise ModManagerError("Bundled multi-file MODs require bundle_dir.")
         integrity_policy = ModIntegrityPolicy(
             version_note=ModCatalog._required_string(
                 policy_raw, "version_note", "integrity_policy"
@@ -245,6 +315,61 @@ class ModCatalog:
         )
 
     @staticmethod
+    def _parse_file_specs(raw: Any) -> tuple[ModFileSpec, ...]:
+        if raw is None:
+            return ()
+        if not isinstance(raw, list) or not raw:
+            raise ModManagerError("MOD operation.files must be a non-empty array.")
+        specs: list[ModFileSpec] = []
+        paths: set[str] = set()
+        for item in raw:
+            if not isinstance(item, dict):
+                raise ModManagerError("MOD operation.files entries must be objects.")
+            path = ModCatalog._required_string(item, "path", "operation.files")
+            path = ModCatalog._validate_relative_path(path, "operation.files.path")
+            sha256 = ModCatalog._required_string(
+                item, "sha256", "operation.files"
+            ).upper()
+            size_bytes = item.get("size_bytes")
+            if not SHA256_PATTERN.fullmatch(sha256):
+                raise ModManagerError("Invalid MOD payload SHA-256.")
+            if type(size_bytes) is not int or size_bytes <= 0:
+                raise ModManagerError("Invalid MOD payload size.")
+            if path.casefold() in paths:
+                raise ModManagerError("Duplicate MOD payload path.")
+            paths.add(path.casefold())
+            specs.append(ModFileSpec(path, sha256, size_bytes))
+        return tuple(specs)
+
+    @staticmethod
+    def _parse_string_list(raw: Any, section: str) -> tuple[str, ...]:
+        if not isinstance(raw, list) or not all(
+            isinstance(item, str) and item.strip() for item in raw
+        ):
+            raise ModManagerError(f"MOD catalog {section} must be a string array.")
+        return tuple(dict.fromkeys(item.strip() for item in raw))
+
+    @staticmethod
+    def _optional_relative_path(raw: Any, section: str) -> str | None:
+        if raw is None:
+            return None
+        if not isinstance(raw, str) or not raw.strip():
+            raise ModManagerError(f"MOD catalog {section} must be a relative path.")
+        return ModCatalog._validate_relative_path(raw.strip(), section)
+
+    @staticmethod
+    def _validate_relative_path(value: str, section: str) -> str:
+        normalized = value.replace("\\", "/").strip("/")
+        path = PurePosixPath(normalized)
+        if (
+            not normalized
+            or path.is_absolute()
+            or any(part in {"", ".", ".."} or ":" in part for part in path.parts)
+        ):
+            raise ModManagerError(f"MOD catalog {section} contains an unsafe path.")
+        return path.as_posix()
+
+    @staticmethod
     def _required_string(raw: dict[str, Any], key: str, section: str) -> str:
         value = raw.get(key)
         if not isinstance(value, str) or not value.strip():
@@ -255,7 +380,15 @@ class ModCatalog:
 
     @staticmethod
     def _validate_visible_copy(display: ModDisplay) -> None:
-        visible = "\n".join((display.name, display.version, display.author, display.summary))
+        visible = "\n".join(
+            (
+                display.name,
+                display.version,
+                display.author,
+                display.summary,
+                display.usage_hint,
+            )
+        )
         folded = visible.casefold()
         matches = [term for term in VISIBLE_COPY_FORBIDDEN_TERMS if term in folded]
         if matches:
@@ -280,46 +413,59 @@ class ModManager:
         managed_root: Path,
         bundled_root: Path,
         game_exe_provider: Callable[[], Path | None] | None = None,
+        source_overrides: dict[str, Path] | None = None,
     ) -> None:
         self.catalog = catalog
         self.managed_root = managed_root.resolve()
         self.bundled_root = bundled_root.resolve()
         self.game_exe_provider = game_exe_provider
+        self._source_overrides = {
+            mod_id: path.resolve()
+            for mod_id, path in (source_overrides or {}).items()
+        }
         self._hash_cache: dict[Path, tuple[int, int, str]] = {}
 
     def descriptor(self, mod_id: str) -> ModDescriptor:
         return self.catalog.get(mod_id)
 
+    def add_descriptor(self, descriptor: ModDescriptor, source: Path) -> None:
+        if any(entry.mod_id == descriptor.mod_id for entry in self.catalog.entries):
+            raise ModManagerError("MOD id already exists.")
+        source = source.resolve()
+        if descriptor.operation.files and not source.is_dir():
+            raise ModManagerError("Registered MOD payload directory is missing.")
+        if not descriptor.operation.files and not source.is_file():
+            raise ModManagerError("Registered MOD payload file is missing.")
+        self.catalog = ModCatalog(self.catalog.entries + (descriptor,))
+        self._source_overrides[descriptor.mod_id] = source
+
     def bundled_source(self, mod_id: str) -> Path | None:
         descriptor = self.descriptor(mod_id)
         if not descriptor.operation.bundled:
             return None
-        candidate = (
-            self.bundled_root / descriptor.operation.expected_filename
-        ).resolve()
+        override = self._source_overrides.get(mod_id)
+        if override is not None:
+            expected_type = override.is_dir() if descriptor.operation.files else override.is_file()
+            return override if expected_type else None
+        if descriptor.operation.files:
+            if descriptor.operation.bundle_dir is None:
+                return None
+            candidate = self._join_relative(
+                self.bundled_root, descriptor.operation.bundle_dir
+            ).resolve()
+        else:
+            candidate = (
+                self.bundled_root / descriptor.operation.expected_filename
+            ).resolve()
         self._ensure_contained(candidate, self.bundled_root)
-        return candidate if candidate.is_file() else None
+        expected_type = candidate.is_dir() if descriptor.operation.files else candidate.is_file()
+        return candidate if expected_type else None
 
     def installed_path(self, mod_id: str) -> Path:
         descriptor = self.descriptor(mod_id)
-        if descriptor.operation.kind == "bepinex_plugin":
-            game_exe = self.game_exe_provider() if self.game_exe_provider else None
-            if game_exe is None:
-                raise ModGamePathRequired("Lost Castle 2 executable is not configured.")
-            game_exe = game_exe.resolve()
-            if not game_exe.is_file():
-                raise ModGamePathRequired("Lost Castle 2 executable does not exist.")
-            plugins_root = (game_exe.parent / "BepInEx" / "plugins").resolve()
-            bepinex_root = (game_exe.parent / "BepInEx").resolve()
-            if not bepinex_root.is_dir():
-                raise ModGamePathRequired("BepInEx is not installed for the configured game.")
-            self._ensure_contained(plugins_root, game_exe.parent.resolve())
-            directory = (plugins_root / descriptor.mod_id).resolve()
-            self._ensure_contained(directory, plugins_root)
-        else:
-            directory = (self.managed_root / descriptor.mod_id).resolve()
-            self._ensure_contained(directory, self.managed_root)
-        target = (directory / descriptor.operation.expected_filename).resolve()
+        directory = self._installed_directory(descriptor)
+        primary_spec = self._primary_spec(descriptor)
+        target = self._join_relative(directory, primary_spec.path).resolve()
         self._ensure_contained(target, directory)
         return target
 
@@ -327,15 +473,20 @@ class ModManager:
         descriptor = self.descriptor(mod_id)
         source_bundled = self.bundled_source(mod_id) is not None
         try:
-            target = self.installed_path(mod_id)
+            directory = self._installed_directory(descriptor)
         except ModGamePathRequired:
             return ModStatus("game_not_configured", source_bundled, False)
-        if not target.exists():
+        specs = self._file_specs(descriptor)
+        targets = [self._join_relative(directory, spec.path) for spec in specs]
+        existing = [target.exists() for target in targets]
+        if not any(existing):
             return ModStatus("not_installed", source_bundled, False)
-        policy = descriptor.integrity_policy
-        if not target.is_file() or target.stat().st_size != policy.size_bytes:
-            return ModStatus("integrity_error", source_bundled, False)
-        integrity_ok = self._sha256(target) == policy.sha256
+        integrity_ok = all(
+            target.is_file()
+            and target.stat().st_size == spec.size_bytes
+            and self._sha256(target) == spec.sha256
+            for target, spec in zip(targets, specs, strict=True)
+        )
         return ModStatus(
             "installed" if integrity_ok else "integrity_error",
             source_bundled,
@@ -344,9 +495,14 @@ class ModManager:
 
     def install(self, mod_id: str, source_path: Path | None = None) -> Path:
         descriptor = self.descriptor(mod_id)
+        conflicts = self.installed_conflicts(mod_id)
+        if conflicts:
+            raise ModConflictError(conflicts)
         source = source_path.resolve() if source_path is not None else self.bundled_source(mod_id)
         if source is None:
             raise ModSourceRequired("A matching user-supplied source file is required.")
+        if descriptor.operation.files:
+            return self._install_package(descriptor, source)
         target = self.installed_path(mod_id)
         if source == target:
             self._validate_file(source, descriptor)
@@ -373,20 +529,54 @@ class ModManager:
                 temporary.unlink()
         return target
 
+    def installed_conflicts(self, mod_id: str) -> tuple[str, ...]:
+        descriptor = self.descriptor(mod_id)
+        provided = {item.casefold() for item in descriptor.operation.provides}
+        if not provided:
+            return ()
+        conflicts: list[str] = []
+        for other in self.catalog.entries:
+            if other.mod_id == mod_id:
+                continue
+            other_provided = {item.casefold() for item in other.operation.provides}
+            if not provided.intersection(other_provided):
+                continue
+            if self.status(other.mod_id).installed:
+                conflicts.append(other.display.name)
+        return tuple(conflicts)
+
     def uninstall(self, mod_id: str) -> bool:
-        self.descriptor(mod_id)
-        target = self.installed_path(mod_id)
-        if not target.exists():
+        descriptor = self.descriptor(mod_id)
+        directory = self._installed_directory(descriptor)
+        specs = self._file_specs(descriptor)
+        targets = [self._join_relative(directory, spec.path) for spec in specs]
+        if not any(target.exists() for target in targets):
             return False
-        if not target.is_file():
-            raise ModManagerError("Managed MOD target is not a removable file.")
-        target.unlink()
-        self._hash_cache.pop(target, None)
-        try:
-            target.parent.rmdir()
-        except OSError:
-            pass
-        return True
+        removed = False
+        for target in targets:
+            if not target.exists():
+                continue
+            if not target.is_file():
+                raise ModManagerError("Managed MOD target is not a removable file.")
+            target.unlink()
+            removed = True
+            self._hash_cache.pop(target, None)
+        parents = sorted(
+            {target.parent for target in targets},
+            key=lambda path: len(path.parts),
+            reverse=True,
+        )
+        for parent in parents:
+            current = parent
+            while current != directory.parent:
+                try:
+                    current.rmdir()
+                except OSError:
+                    break
+                if current == directory:
+                    break
+                current = current.parent
+        return removed
 
     def launch(self, mod_id: str) -> subprocess.Popen[bytes]:
         descriptor = self.descriptor(mod_id)
@@ -397,6 +587,90 @@ class ModManager:
             raise ModIntegrityError("Managed MOD copy is missing or does not match the catalog.")
         target = self.installed_path(mod_id)
         return subprocess.Popen([str(target)], cwd=str(target.parent), close_fds=True)
+
+    def _install_package(self, descriptor: ModDescriptor, source: Path) -> Path:
+        if not source.is_dir():
+            raise ModIntegrityError("Bundled MOD payload directory is missing.")
+        directory = self._installed_directory(descriptor)
+        specs = self._file_specs(descriptor)
+        for spec in specs:
+            source_file = self._join_relative(source, spec.path).resolve()
+            self._ensure_contained(source_file, source)
+            self._validate_spec_file(source_file, spec)
+        for spec in specs:
+            source_file = self._join_relative(source, spec.path).resolve()
+            target = self._join_relative(directory, spec.path).resolve()
+            self._ensure_contained(target, directory)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_name(target.name + ".installing")
+            try:
+                shutil.copyfile(source_file, temporary)
+                self._hash_cache.pop(temporary, None)
+                self._validate_spec_file(temporary, spec)
+                os.replace(temporary, target)
+                self._hash_cache.pop(target, None)
+                self._validate_spec_file(target, spec)
+            finally:
+                if temporary.exists():
+                    temporary.unlink()
+        return self.installed_path(descriptor.mod_id)
+
+    def _installed_directory(self, descriptor: ModDescriptor) -> Path:
+        if descriptor.operation.is_game_plugin:
+            game_exe = self.game_exe_provider() if self.game_exe_provider else None
+            if game_exe is None:
+                raise ModGamePathRequired("Lost Castle 2 executable is not configured.")
+            game_exe = game_exe.resolve()
+            if not game_exe.is_file():
+                raise ModGamePathRequired("Lost Castle 2 executable does not exist.")
+            plugins_root = (game_exe.parent / "BepInEx" / "plugins").resolve()
+            bepinex_root = (game_exe.parent / "BepInEx").resolve()
+            if not bepinex_root.is_dir():
+                raise ModGamePathRequired("BepInEx is not installed for the configured game.")
+            self._ensure_contained(plugins_root, game_exe.parent.resolve())
+            directory = (plugins_root / descriptor.mod_id).resolve()
+            self._ensure_contained(directory, plugins_root)
+            return directory
+        directory = (self.managed_root / descriptor.mod_id).resolve()
+        self._ensure_contained(directory, self.managed_root)
+        return directory
+
+    @staticmethod
+    def _file_specs(descriptor: ModDescriptor) -> tuple[ModFileSpec, ...]:
+        if descriptor.operation.files:
+            return descriptor.operation.files
+        policy = descriptor.integrity_policy
+        return (
+            ModFileSpec(
+                descriptor.operation.expected_filename,
+                policy.sha256,
+                policy.size_bytes,
+            ),
+        )
+
+    @staticmethod
+    def _primary_spec(descriptor: ModDescriptor) -> ModFileSpec:
+        matches = [
+            spec
+            for spec in ModManager._file_specs(descriptor)
+            if PurePosixPath(spec.path).name.casefold()
+            == descriptor.operation.expected_filename.casefold()
+        ]
+        if len(matches) != 1:
+            raise ModManagerError("MOD primary payload is ambiguous.")
+        return matches[0]
+
+    @staticmethod
+    def _join_relative(root: Path, relative: str) -> Path:
+        return root.joinpath(*PurePosixPath(relative).parts)
+
+    def _validate_spec_file(self, path: Path, spec: ModFileSpec) -> None:
+        if not path.is_file():
+            raise ModIntegrityError("Bundled MOD payload file is missing.")
+        if path.stat().st_size != spec.size_bytes:
+            raise ModIntegrityError("Bundled MOD payload size mismatch.")
+        if self._sha256(path, use_cache=False) != spec.sha256:
+            raise ModIntegrityError("Bundled MOD payload SHA-256 mismatch.")
 
     @staticmethod
     def _is_archive_source(path: Path, descriptor: ModDescriptor) -> bool:

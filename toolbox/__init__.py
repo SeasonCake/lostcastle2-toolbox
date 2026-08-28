@@ -38,13 +38,17 @@ from .macro_engine import MacroController, MacroState
 from .macro_model import MacroProfile, MacroProfileError, parse_macro_profile
 from .mod_manager import (
     ModCatalog,
+    ModConflictError,
     ModDescriptor,
+    ModFileSpec,
     ModIntegrityError,
     ModManager,
     ModManagerError,
     ModSourceRequired,
     ModStatus,
 )
+from .mod_inspector import ModDraft, ModInspectionError, ModPackageInspector
+from .user_mod_registry import UserModRegistry, UserModRegistryError
 
 __all__ = [
     "CombatAggregator",
@@ -64,12 +68,19 @@ __all__ = [
     "MacroProfileError",
     "MacroState",
     "ModCatalog",
+    "ModConflictError",
     "ModDescriptor",
+    "ModDraft",
+    "ModFileSpec",
+    "ModInspectionError",
     "ModIntegrityError",
     "ModManager",
     "ModManagerError",
+    "ModPackageInspector",
     "ModSourceRequired",
     "ModStatus",
+    "UserModRegistry",
+    "UserModRegistryError",
     "ScenarioInfo",
     "ScenarioRegistry",
     "SequenceError",

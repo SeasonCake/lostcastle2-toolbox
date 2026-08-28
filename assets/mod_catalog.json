@@ -36,12 +36,15 @@
         "name": "金币编辑器",
         "version": "1.0",
         "author": "刺心",
-        "summary": "在游戏内读取、修改并保存金币"
+        "summary": "在游戏内读取、修改并保存金币",
+        "usage_hint": "安装后启动游戏，按 F5 打开窗口；输入数量并保存，返回主菜单再进入游戏生效。"
       },
       "operation": {
         "kind": "bepinex_plugin",
         "expected_filename": "LC2GoldFree.dll",
-        "bundled": false,
+        "bundled": true,
+        "provides": ["lc2goldfree.dll"],
+        "hotkeys": ["F5"],
         "archive_source": {
           "expected_filename": "F5金币编辑器.7z",
           "member": "LC2GoldFree.dll",
@@ -62,7 +65,7 @@
           "金币读取与写入",
           "游戏存档保存"
         ],
-        "redistribution_status": "local_user_supplied_only"
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
       }
     }
   ]
