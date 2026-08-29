@@ -27,6 +27,27 @@ class KeyViewTests(unittest.TestCase):
         )
         self.assertIn("assets\\keyview.ico;assets", build_source)
 
+        from PIL import Image
+
+        with Image.open(
+            Path(__file__).resolve().parents[1] / "assets" / "keyview.ico"
+        ) as icon:
+            sizes = icon.info.get("sizes", set())
+        self.assertTrue(
+            {
+                (16, 16),
+                (20, 20),
+                (24, 24),
+                (32, 32),
+                (40, 40),
+                (48, 48),
+                (64, 64),
+                (96, 96),
+                (128, 128),
+                (256, 256),
+            }.issubset(sizes)
+        )
+
     def test_windows_fixed_and_string_versions_match_the_app_version(self) -> None:
         version_source = (
             Path(__file__).resolve().parents[1] / "version_info.txt"
@@ -51,6 +72,34 @@ class KeyViewTests(unittest.TestCase):
             str(observed).casefold(),
             str(Path(sys.executable).resolve()).casefold(),
         )
+
+    def test_process_creation_time_uses_same_epoch_as_file_mtime(self) -> None:
+        created_ns = keyview._process_creation_time_ns(keyview.os.getpid())
+        self.assertIsNotNone(created_ns)
+        assert created_ns is not None
+        self.assertLess(created_ns, keyview.time.time_ns())
+
+    def test_mod_panel_hotkey_requires_exact_game_path_and_foreground(self) -> None:
+        app = keyview.KeyViewApp.__new__(keyview.KeyViewApp)
+        app.game_process_id = 42
+        app.settings = {"game_path": r"C:\Games\Lost Castle 2\LostCastle2.exe"}
+        expected = Path(app.settings["game_path"])
+        backend = object()
+        with mock.patch.object(keyview, "resolve_game_exe", return_value=expected), mock.patch.object(
+            keyview, "_process_executable_path", return_value=expected
+        ), mock.patch.object(keyview, "focus_process_window", return_value=True), mock.patch.object(
+            keyview, "WindowsSendInputBackend", return_value=backend
+        ), mock.patch.object(keyview, "send_hotkey") as sender, mock.patch.object(
+            keyview.time, "sleep"
+        ):
+            self.assertTrue(app.open_game_panel_hotkey("INS"))
+        sender.assert_called_once_with(backend, "INS")
+
+        with mock.patch.object(keyview, "resolve_game_exe", return_value=expected), mock.patch.object(
+            keyview, "_process_executable_path", return_value=Path(r"C:\Other\LostCastle2.exe")
+        ), mock.patch.object(keyview, "focus_process_window") as focus:
+            self.assertFalse(app.open_game_panel_hotkey("INS"))
+        focus.assert_not_called()
 
     def test_game_process_enumeration_failure_freezes_runtime_setup(self) -> None:
         with mock.patch.object(
@@ -136,6 +185,9 @@ class KeyViewTests(unittest.TestCase):
         )
         self.assertEqual(args.qa_ui_window, "hud")
         self.assertEqual(args.qa_ui_receipt, Path("receipt.json"))
+        self.assertIsNone(args.qa_select_mod)
+        selected = keyview.parse_args(["--qa-select-mod", "player-live-stats"])
+        self.assertEqual(selected.qa_select_mod, "player-live-stats")
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             keyview.parse_args(["--qa-ui-receipt", "receipt.json"])
 

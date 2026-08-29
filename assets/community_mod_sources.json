@@ -25,6 +25,7 @@
       "summary": "调整战利品自选、掉落与战斗手感",
       "usage_hint": "安装后启动游戏，按 F7 打开设置面板；与增强计划的掉落功能同时开启时请自行取舍。",
       "hotkeys": ["F7"],
+      "panel_hotkey": "F7",
       "author_source": "随包 MOD使用说明.txt 的作者团队署名；QQ 上传者 rlyons"
     },
     {
@@ -38,6 +39,7 @@
       "summary": "在游戏内更换角色服装外观",
       "usage_hint": "安装后启动游戏，按 F9 打开服装幻化界面。",
       "hotkeys": ["F9"],
+      "panel_hotkey": "F9",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
@@ -51,6 +53,7 @@
       "summary": "为武器选择并激活额外刻印与共鸣",
       "usage_hint": "进入营地读取数据；面板会自动出现，也可按 F5 打开或关闭，按原说明完成主刻印刷新。",
       "hotkeys": ["F5"],
+      "panel_hotkey": "F5",
       "author_source": "含源码版本 README 署名"
     },
     {
@@ -64,6 +67,7 @@
       "summary": "在游戏内管理刻印相关灵魂石",
       "usage_hint": "安装后启动游戏，按 F6 打开管理界面。",
       "hotkeys": ["F6"],
+      "panel_hotkey": "F6",
       "author_source": "随包说明署名"
     },
     {
@@ -77,6 +81,7 @@
       "summary": "按关卡序列自定义可替换房间类型",
       "usage_hint": "安装后启动游戏，按 F1 打开面板；输入房间类型编号序列并保存。",
       "hotkeys": ["F1"],
+      "panel_hotkey": "F1",
       "author_source": "v2.0 操作说明署名"
     },
     {
@@ -91,8 +96,9 @@
       "version": "4.8",
       "author": "茶橘柚、空容、刺心",
       "summary": "提供多项战斗、掉落与便利功能调节",
-      "usage_hint": "安装后启动游戏，按 INS 打开增强计划面板；首次启动会生成默认配置。",
+      "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，首次启动会生成默认配置。",
       "hotkeys": ["INS"],
+      "panel_hotkey": "INS",
       "author_source": "DLL 内嵌作者团队署名；QQ 上传者时间喝奶"
     },
     {
@@ -143,6 +149,7 @@
       "summary": "允许塑能法弹、法力护盾与以太飘浮同时激活",
       "usage_hint": "安装后启动游戏，按 F8 打开相关设置。",
       "hotkeys": ["F8"],
+      "panel_hotkey": "F8",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
@@ -182,6 +189,7 @@
       "summary": "按配置动态调整怪物与首领血量",
       "usage_hint": "安装后重启游戏生效；按 F3 打开配置界面。",
       "hotkeys": ["F3"],
+      "panel_hotkey": "F3",
       "author_source": "LC2DynamicHp.dll 内嵌 GUI 与版本日志署名；QQ 上传者墨河以轩"
     },
     {
@@ -371,6 +379,7 @@
       "summary": "调整宝箱宝藏数量与相关掉落效果",
       "usage_hint": "安装后启动游戏，按 F10 打开设置面板。",
       "hotkeys": ["F10"],
+      "panel_hotkey": "F10",
       "author_source": "程序内署名"
     },
     {
@@ -422,6 +431,7 @@
       "summary": "为联机房间提供可配置的欢迎语",
       "usage_hint": "安装后启动游戏，按 F11 打开相关设置。",
       "hotkeys": ["F11"],
+      "panel_hotkey": "F11",
       "author_source": "DLL 内嵌作者字符串；QQ 上传者茶橘柚"
     },
     {
@@ -472,6 +482,7 @@
       "summary": "在战斗房胜利后提供随机海克斯药水强化",
       "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。",
       "hotkeys": ["F1"],
+      "panel_hotkey": "F1",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
@@ -519,8 +530,9 @@
       "version": "1.1.2",
       "author": "Freenix",
       "summary": "禁用指定物品并为装备或藏品设置掉落概率",
-      "usage_hint": "安装后启动游戏，按 INS 打开界面，填写物品名称与概率并保存。",
+      "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，填写物品名称与概率并保存。",
       "hotkeys": ["INS"],
+      "panel_hotkey": "INS",
       "author_source": "随包说明署名"
     },
     {
@@ -533,6 +545,7 @@
       "summary": "调整爆裂弓效果与触发概率",
       "usage_hint": "安装后启动游戏，按 F11 打开控制面板。",
       "hotkeys": ["F11"],
+      "panel_hotkey": "F11",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
@@ -546,6 +559,7 @@
       "summary": "自定义联机房间标题前缀并保留违禁词系统",
       "usage_hint": "安装后启动游戏，按 Alt+1 打开面板；面板标题下方可控制开关。",
       "hotkeys": ["Alt+1"],
+      "panel_hotkey": "Alt+1",
       "author_source": "来源文件名与随包说明"
     },
     {
@@ -556,8 +570,8 @@
       "name": "诅咒硬币保底",
       "version": "1.5.0",
       "author": "刺心",
-      "summary": "为诅咒硬币相关掉落与机制增加保底逻辑",
-      "usage_hint": "安装后重启游戏自动生效。",
+      "summary": "每局首个诅咒房为每位玩家提供诅咒硬币保底",
+      "usage_hint": "安装后重启游戏自动生效；默认每位玩家仅首个诅咒房保底，可在生成的配置文件中改为每个诅咒房。",
       "hotkeys": [],
       "author_source": "整合包程序署名与功能说明"
     },
@@ -609,6 +623,7 @@
       "summary": "强化毒雾相关效果与上限",
       "usage_hint": "安装后启动游戏，按 F12 打开相关设置。",
       "hotkeys": ["F12"],
+      "panel_hotkey": "F12",
       "author_source": "随包说明署名"
     },
     {
@@ -626,16 +641,17 @@
     {
       "id": "player-live-stats",
       "sort_priority": 100,
-      "source": "实时显示数值及查看队友数值.rar",
-      "include": ["实时数据1.3.dll"],
-      "primary": "实时数据1.3.dll",
+      "source": "显示实时数值及查看其他玩家数值2.0.rar",
+      "include": ["实时数值v2.0.dll"],
+      "primary": "实时数值v2.0.dll",
       "name": "玩家实时属性与队友面板",
-      "version": "1.3",
+      "version": "2.0",
       "author": "懒虫桑",
-      "summary": "实时显示本地玩家属性、效果，并可查看队友数据",
-      "usage_hint": "安装后启动游戏，按 F6 打开控制面板；勾选要显示的数值，点击 2P–4P 查看对应队友数据。",
+      "summary": "实时显示本地与其他玩家属性、效果，修复房主数据偶尔缺失",
+      "usage_hint": "安装后启动游戏，按 F6 或在工具箱点击“打开 MOD 面板”；勾选要显示的数值，直接点击玩家名字查看对应数据。",
       "hotkeys": ["F6"],
-      "author_source": "随包更新说明与作者提供的 QQ 上传列表截图（2026-08-29）"
+      "panel_hotkey": "F6",
+      "author_source": "2.0 DLL 内嵌界面署名“作者：懒虫桑”；随包更新说明"
     }
   ]
 }

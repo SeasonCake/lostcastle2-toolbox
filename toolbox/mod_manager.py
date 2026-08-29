@@ -10,6 +10,8 @@ import shutil
 import subprocess
 from typing import Any, Callable
 
+from .windows_input import WindowsInputError, parse_hotkey_chord
+
 
 SHA256_PATTERN = re.compile(r"^[0-9A-F]{64}$")
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
@@ -86,6 +88,7 @@ class ModOperation:
     files: tuple[ModFileSpec, ...] = ()
     provides: tuple[str, ...] = ()
     hotkeys: tuple[str, ...] = ()
+    panel_hotkey: str | None = None
 
     @property
     def launchable(self) -> bool:
@@ -98,6 +101,10 @@ class ModOperation:
     @property
     def is_game_plugin(self) -> bool:
         return self.kind == "bepinex_plugin"
+
+    @property
+    def has_game_panel(self) -> bool:
+        return self.is_game_plugin and self.panel_hotkey is not None
 
 
 @dataclass(frozen=True)
@@ -203,6 +210,9 @@ class ModCatalog:
         hotkeys = ModCatalog._parse_string_list(
             operation_raw.get("hotkeys", []), "operation.hotkeys"
         )
+        panel_hotkey = ModCatalog._parse_panel_hotkey(
+            operation_raw.get("panel_hotkey"), hotkeys
+        )
         operation = ModOperation(
             kind=operation_kind,
             expected_filename=expected_filename,
@@ -212,6 +222,7 @@ class ModCatalog:
             files=files,
             provides=provides,
             hotkeys=hotkeys,
+            panel_hotkey=panel_hotkey,
         )
 
         size_bytes = policy_raw.get("size_bytes")
@@ -348,6 +359,28 @@ class ModCatalog:
         ):
             raise ModManagerError(f"MOD catalog {section} must be a string array.")
         return tuple(dict.fromkeys(item.strip() for item in raw))
+
+    @staticmethod
+    def _parse_panel_hotkey(
+        raw: Any, hotkeys: tuple[str, ...]
+    ) -> str | None:
+        if raw is None:
+            return None
+        if not isinstance(raw, str) or not raw.strip():
+            raise ModManagerError("MOD catalog operation.panel_hotkey must be a hotkey string.")
+        try:
+            normalized = "+".join(parse_hotkey_chord(raw))
+        except WindowsInputError as exception:
+            raise ModManagerError("Unsupported MOD panel hotkey.") from exception
+        normalized_hotkeys: set[str] = set()
+        for item in hotkeys:
+            try:
+                normalized_hotkeys.add("+".join(parse_hotkey_chord(item)))
+            except WindowsInputError:
+                continue
+        if normalized not in normalized_hotkeys:
+            raise ModManagerError("MOD panel_hotkey must also be listed in operation.hotkeys.")
+        return normalized
 
     @staticmethod
     def _optional_relative_path(raw: Any, section: str) -> str | None:
@@ -492,6 +525,22 @@ class ModManager:
             source_bundled,
             integrity_ok,
         )
+
+    def installed_mtime_ns(self, mod_id: str) -> int | None:
+        """Return the newest managed payload write time for load-order checks."""
+
+        descriptor = self.descriptor(mod_id)
+        try:
+            directory = self._installed_directory(descriptor)
+        except ModGamePathRequired:
+            return None
+        targets = [
+            self._join_relative(directory, spec.path)
+            for spec in self._file_specs(descriptor)
+        ]
+        if not targets or not all(target.is_file() for target in targets):
+            return None
+        return max(target.stat().st_mtime_ns for target in targets)
 
     def install(self, mod_id: str, source_path: Path | None = None) -> Path:
         descriptor = self.descriptor(mod_id)

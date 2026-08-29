@@ -2,28 +2,29 @@
 
 ## 角色、目标与阶段
 
-- 当前角色：LC2 工具箱 1.5.12 与 Bridge 0.4.3 锁血兼容候选、运行时和 UI 验收负责人。
-- 当前目标：以已通过真实 65% 生命锁定正控的 1.5.12 / 0.4.3 完成干净 ZIP、commit、push 和 GitHub 预发布更新；真实 2P–4P 继续作为后续自然实测。
-- 当前阶段：`1.5.12 HP-STATE HOTFIX / PACKAGE VERIFIED / REAL 65% HP LOCK PASS / REAL MULTIPLAYER NOT RUN`；1.5.11 预发布和旧桌面包保留为历史身份，不覆盖。
-- 当前授权边界：已授权本地实现、测试、构建、桌面/ZIP 候选、commit、push 和 GitHub Release；未自动执行任何第三方 MOD DLL。
+- 当前角色：LC2 工具箱 1.6.0、Bridge 0.4.5、MOD 面板一键打开与最终发布收口负责人。
+- 当前目标：以已通过普通太刀回蓝实测的 0.4.5 为战斗基线，升级玩家实时属性 MOD 到 2.0，保留最新诅咒硬币 1.5.0，闭合用户 MOD 格式、任务栏图标、全新包、独立审计与 Release。
+- 当前阶段：`1.6.0 POST-AUDIT FIX REBUILT / PACKAGE + UI VERIFIED / SAME-AUDITOR NARROW RECHECK PENDING / REAL MULTIPLAYER NOT RUN`；v1.5.12 预发布仍标注暂缓下载，旧 tag 不改写。
+- 当前授权边界：作者已明确授权 1.6 本地实现、测试、构建、审计、commit、push、ZIP 与 GitHub Release；第三方 MOD 只做静态检查、受管随包和隔离安装回归，未执行其游戏逻辑。
 
 ## 仓库与运行身份
 
 | 项目 | 当前值 |
 | --- | --- |
 | 仓库 | `C:\xiangmuyunxing\biancheng\2026\lostcastle2-keyview` |
-| 产品 source / remote | 基线 `24ee1e08602f685c986131f8edcd73011e97c56e` 与 `origin/main` 对齐；1.5.12/0.4.3 为未提交工作树候选 |
-| 工作树 | 只包含 1.5.12/0.4.3 锁血合同、本地玩家资源过滤、法力取整说明、版本/运行时清单、测试与本节记录；本地生成包/UI 回执按既有 ignore 合同保留 |
-| 游戏进程 | 真实正控采集时 exact `LostCastle2.exe` 正在运行，路径为本机 Steam 游戏目录；提交前状态另行回读 |
-| 工具箱 | 干净项目包冻结为 1,757 文件 / `166,217,064` B；桌面 `1.5.12-锁血兼容测试版` 已由作者启动实测，EXE `6,237,686` B / SHA-256 `4E48267FFDBB5868FFC0890FBC67E7B74CB2B2353EC38A5EB8404FABEB8DAD31` |
-| 游戏目录 Bridge | 已精确部署 `0.4.3`，等待作者真实生命锁定切换正控 |
-| 运行 DLL SHA-256 | `2837F6C485F691BB743CEAF3EB5EBE2BB5FA1D66A19E1FB2D4B87F029CF562A3` |
-| `Plugin.cs` SHA-256 | `BD66896DCB203A31808D193D3A69F6ECE537D2DF6A70814E390952E4FB5318F8` |
+| 产品 source / remote | `65ecfe2aee8a5058900474bed6ab7c10e071309c` 与 `origin/main` 对齐并标记 `v1.5.12`；1.6.0/0.4.5 为未提交工作树候选 |
+| 工作树 | 35 个 tracked 修改与 7 个 prospective untracked 文件均归属 0.4.5/1.6.0/MOD/UI/文档/测试；index 尚为空，本地日志、包、DLL 与 UI 回执按既有 ignore 合同保留 |
+| 游戏进程 | 作者完成 0.4.5 实测并关闭；2026-08-29 22:01 exact name + `ExecutablePath` 连续两次均为 0，未知字段为 0 |
+| 工具箱 | package/桌面均为 1,757 文件、`166,453,914` B、0 配置文件、逐文件零差异；EXE `6,463,370` B / SHA-256 `33D57E63945B7424124A11F2158E272BDAD54C40E6ED1E2DABFBEEEE39678F74` / 版本 1.6.0 |
+| 分享 ZIP | `C:\Users\shenc\Desktop\失落城堡2工具箱1.6.0-实时数值监测+一键MOD安装.zip`，`136,933,435` B / SHA-256 `3352565A2F9A7AA136DEE522F04D5CD466694DCCDC5399A11EF29238EB1290E0`；7-Zip 与 .NET UTF-8 顶层/唯一 EXE/config0 均 PASS |
+| 游戏目录 Bridge | 已精确部署并回读 `0.4.5`；0.4.4 exact rollback 已冻结 |
+| 运行 DLL SHA-256 | `A6484B75E3369B1B0AA774F4A7DCB53E0107CE381F104D33A9388FC5EF25A801` |
+| `Plugin.cs` SHA-256 | 提交前在最终源码冻结后回读 |
 | Harmony Patch 数 | `14`；0.3.4 的 `ResetDataBy` 探针已删除 |
 
 本文所有 `artifacts/runtime-deploy/...` 定位都指向本机被 `.gitignore` 排除的二进制/回滚证据，fresh clone 不包含，故只作本机恢复定位，不声称是仓库链接。
 
-0.4.3 的 0.4.2 exact rollback、候选和可提交摘要位于本机 `artifacts/runtime-deploy/2026-08-29-bridge-0.4.3/`。当前游戏目录已逐字节核验为 0.4.3。
+0.4.5 的 0.4.4 exact rollback、候选和可提交摘要位于本机 `artifacts/runtime-deploy/2026-08-29-bridge-0.4.5/`。当前游戏目录已逐字节核验为 0.4.5。
 
 0.3.6 候选、PDB、回滚和完整运行 receipt 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.6/`。
 
@@ -293,3 +294,22 @@
 - 真实 65% 锁血正控 `R-PASS`：游戏画面 `49/140`，即真实 max 仍为 140、可用 35% 精确为 49；HUD 保持绿色“实时”，结算保留总伤害 `63,952`、Boss `26,969`、受击承伤 `205`、回复 `191`、法力消耗/恢复 `162/162`。BepInEx 明确加载 0.4.3、pipe connected，Bridge error/resource conversion/stack mismatch 匹配均为 0。
 - 干净分享 ZIP：`C:\Users\shenc\Desktop\失落城堡2工具箱1.5.12-实时数值监测+一键MOD安装.zip`，`136,662,047` B / SHA-256 `103E8A1363343CF031FC32F4C39C4EC4C4AF3A83B31979340E262E9809EF947F`。7-Zip 完整性 PASS；.NET 回读唯一 UTF-8 顶层目录为 `失落城堡2工具箱 1.5.12`，1,757 个文件、唯一主 EXE、0 个 config 文件。
 - `NOT RUN`：20%/40% 档位逐档真实选择、洗掉生命锁定、冠军腰带/药剂的当前与最大生命变化、2P–4P 队友独立锁血；自动合同正控不能替代这些人口。
+
+## 2026-08-29 1.5.13 / Bridge 0.4.4 魔晶石回蓝候选
+
+- 新反例：作者新开一局取得“诅咒的魔晶石”（法力上限 +80%、消耗 +50%），两次技能后游戏已回到 `225/225`，HUD 却为消耗 `38`、恢复 `0`。
+- 冻结日志精确记录前两次官方消耗各 `19`，每次回调处为 `206/225`，下一次根操作前又是 `225`；期间没有官方恢复 callback 或现有 `runtime_gain`。根因是恢复在同一底层 `ChangeCurrentMp` 根操作内发生，入口/出口净变化为 0，旧 fallback 的 `effective>0` 条件把“先扣19、再回19”抵消掉。
+- 0.4.4 不增加 Hook；统一 fallback 为 `max(0, after-before+same_operation_spend-official_recovery_covered)`。编译 DLL 直接反射五臂：净零回满 19、纯消耗 0、部分返还 4、官方已覆盖 0、纯低层恢复 19，全部 PASS。
+- 0.4.4 为 `46,592` B / `CF223767...CE3966`；0.4.3 exact rollback 已冻结并在游戏进程连续两次为 0 时部署。源码/构建内均为 149/149 PASS。
+- 桌面 `C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.13-魔晶石回蓝测试版` 与项目包逐文件零差异；EXE 版本 1.5.13。100% 主战斗页和 200% 四人 HUD 均 `VERIFIED`。
+- GitHub `v1.5.12` 预发布在下载数仍为 0 时已将标题与首行改为“暂缓下载：魔晶石恢复漏记”；不删除、不移动 tag。1.5.13 真实复测通过后才进入新的 commit/push/Release。
+
+## 2026-08-29 Bridge 0.4.5 / 工具箱 1.6.0 收口
+
+- 0.4.4 的第二个真实反例来自普通太刀、无加蓝宝藏的新局：游戏为 `105/105`，HUD 消耗已到 `144`、恢复仍为 `0`。冻结日志显示第一次 `48` 消耗后当前 `57`，下一次消耗前连续观测已到 `95.513`；恢复发生在两次技能之间，根操作入口/出口仍为净负，故 0.4.4 的 root-local 公式不足。
+- 0.4.5 不增加 Hook：官方耗蓝回调把权威扣蓝后值写回连续基线；根操作结束时同时计算 rooted recovery 与 sequential recovery，并扣除官方已覆盖量。编译反射六臂包含太刀 `38.513`、`24.35785675`、魔晶石净零 `19`、纯消耗 `0`、官方已覆盖 `0`、纯 runtime gain `19`，全部 PASS。
+- 0.4.5 DLL 为 `47,104` B / `A6484B75...25A801`；部署前后游戏与工具箱 exact name + path 连续两次为 0。作者完成普通太刀实测，截图为总伤害 `69,634`、Boss `26,990`、承伤/回复 `155/200`、法力消耗/恢复 `762/763`，并说明伤害差异来自中途继续对局。关闭日志 `208,919` B / `76C3F50C...59F0E62` 明确包含 `84` 与 `43.3125` 等有效回蓝，判 `R-PASS`。
+- 1.6.0 将“玩家实时属性与队友面板”从 1.3 升到 2.0（作者懒虫桑，DLL `26,624` B / `ED2183DD...10194`），操作改为点击玩家名字并修复房主偶发缺失。新下载的诅咒银币独立包内仍声明 v1.5.0，且早于当前整合包同版本构建，按“同功能族只保留最新”继续使用现有 `16,896` B / `0ECEF204...72AAC`，文案明确每局首个诅咒房保底与配置开关，不新增重复条目。
+- 新增显式 `panel_hotkey`：只为打开设置/UI 的 MOD 提供“打开 MOD 面板”；未安装、游戏未运行、安装晚于当前游戏启动、正常已加载分别进入提示安装、启动游戏、提示重启、聚焦游戏并代按快捷键。直接丢钱等动作键不登记。用户 `lc2-mod.json` 可选 `interaction.panel_hotkey`，已有格式说明和导入→登记→隔离安装→卸载回归。
+- 任务栏图标新增原生 `20/40/96` 像素层，与既有 `16/24/32/48/64/128/256` 合并，避免 Windows DPI 临时缩放。最终 exact H2/H3/H4 五臂覆盖 MIN100、125%、150%、175%、200% 与四按钮状态，几何和像素均 `VERIFIED`。
+- 唯一 different-owner 初审曾判 `RELEASE HOLD`：重复 modifier 可登记但运行拒绝、manifest 绕过 64 文件/128 MiB 门、Bridge notice 旧版本、3 个 README EOF、fresh-clone 前置条件和 inventory 旧版本。现已共用运行时快捷键解析器、把载荷门移到共同出口、增加三类负控并修正文档；重建后全量 `164 PASS`，package runtime/MOD 与原始 2.0 RAR 导入 PASS。待同一审计席位做窄复核后再 stage/commit/push/Release。

@@ -42,10 +42,11 @@ from toolbox.runtime_setup import (
     RuntimeSetupManager,
 )
 from toolbox.user_mod_registry import UserModRegistry
+from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, send_hotkey
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.12"
+APP_VERSION = "1.6.0"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -617,6 +618,14 @@ kernel32.QueryFullProcessImageNameW.argtypes = (
     ctypes.POINTER(wintypes.DWORD),
 )
 kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+kernel32.GetProcessTimes.argtypes = (
+    wintypes.HANDLE,
+    ctypes.POINTER(wintypes.FILETIME),
+    ctypes.POINTER(wintypes.FILETIME),
+    ctypes.POINTER(wintypes.FILETIME),
+    ctypes.POINTER(wintypes.FILETIME),
+)
+kernel32.GetProcessTimes.restype = wintypes.BOOL
 kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
 kernel32.CloseHandle.restype = wintypes.BOOL
 kernel32.CreateMutexW.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
@@ -1041,6 +1050,30 @@ def _process_executable_path(process_id: int) -> Path | None:
         kernel32.CloseHandle(handle)
 
 
+def _process_creation_time_ns(process_id: int) -> int | None:
+    handle = kernel32.OpenProcess(0x1000, False, process_id)
+    if not handle:
+        return None
+    creation = wintypes.FILETIME()
+    exit_time = wintypes.FILETIME()
+    kernel_time = wintypes.FILETIME()
+    user_time = wintypes.FILETIME()
+    try:
+        if not kernel32.GetProcessTimes(
+            handle,
+            ctypes.byref(creation),
+            ctypes.byref(exit_time),
+            ctypes.byref(kernel_time),
+            ctypes.byref(user_time),
+        ):
+            return None
+        ticks = (int(creation.dwHighDateTime) << 32) | int(creation.dwLowDateTime)
+        unix_ticks = ticks - 116_444_736_000_000_000
+        return unix_ticks * 100 if unix_ticks >= 0 else None
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def is_exact_game_process_running(game_exe: Path) -> bool:
     expected = str(game_exe.resolve()).casefold()
     snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
@@ -1200,6 +1233,7 @@ class KeyViewApp:
         self.last_process_check = 0.0
         self.last_layer_order_check = 0.0
         self.game_process_id: int | None = None
+        self.game_process_started_ns: int | None = None
         self.settings_window: tk.Toplevel | None = None
         self.settings_vars: dict[str, tk.Variable] = {}
         self.key_toggle_buttons: dict[str, tk.Button] = {}
@@ -1875,7 +1909,14 @@ class KeyViewApp:
 
         if now - self.last_process_check >= 1.5:
             self.last_process_check = now
-            self.game_process_id = find_game_process_id()
+            observed_pid = find_game_process_id()
+            if observed_pid != self.game_process_id:
+                self.game_process_id = observed_pid
+                self.game_process_started_ns = (
+                    _process_creation_time_ns(observed_pid)
+                    if observed_pid is not None
+                    else None
+                )
             self._refresh_game_status()
         self.root.after(16, self._tick)
 
@@ -1916,6 +1957,23 @@ class KeyViewApp:
                 return
         if messagebox.askyesno(APP_NAME, "没有找到 LostCastle2.exe，是否现在手动定位？"):
             self.choose_game_path()
+
+    def open_game_panel_hotkey(self, hotkey: str) -> bool:
+        process_id = self.game_process_id or find_game_process_id()
+        game_exe = resolve_game_exe(self.settings.get("game_path"))
+        if process_id is None or game_exe is None:
+            return False
+        observed = _process_executable_path(process_id)
+        if observed is None or str(observed).casefold() != str(game_exe).casefold():
+            return False
+        if not focus_process_window(process_id):
+            return False
+        time.sleep(0.08)
+        try:
+            send_hotkey(WindowsSendInputBackend("LostCastle2.exe"), hotkey)
+        except WindowsInputError:
+            return False
+        return True
 
     def choose_game_path(self) -> None:
         path = filedialog.askopenfilename(
@@ -2744,6 +2802,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--qa-open-mod-import", action="store_true", help=argparse.SUPPRESS
     )
+    parser.add_argument("--qa-select-mod", help=argparse.SUPPRESS)
     parser.add_argument("--qa-ui-receipt", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--qa-ui-screenshot", type=Path, help=argparse.SUPPRESS)
     parser.add_argument(
@@ -3001,6 +3060,16 @@ def main(argv: list[str] | None = None) -> int:
         root.geometry(f"{args.window_size[0]}x{args.window_size[1]}")
     root.deiconify()
     shell.show_page(args.show_page)
+    if args.qa_select_mod:
+        def select_qa_mod() -> None:
+            try:
+                mod_id = shell.mod_manager.descriptor(args.qa_select_mod).mod_id
+            except ModManagerError:
+                return
+            shell.mod_selected_id = mod_id
+            shell._populate_mod_tree()
+
+        root.after(350, select_qa_mod)
     if args.qa_open_mod_import:
         root.after(300, shell._add_user_mod)
     if args.show_settings:
@@ -3035,6 +3104,18 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 window = root
                 labels = dict(shell.labels)
+                labels.update(
+                    {
+                        f"mod_{name}": widget
+                        for name, widget in shell.mod_detail_labels.items()
+                    }
+                )
+                labels.update(
+                    {
+                        f"mod_button_{name}": widget
+                        for name, widget in shell.mod_action_buttons.items()
+                    }
+                )
 
             screenshot = args.qa_ui_screenshot.resolve()
             try:

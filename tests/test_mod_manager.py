@@ -106,6 +106,8 @@ class ModManagerTests(unittest.TestCase):
         self.assertTrue(gold.operation.bundled)
         self.assertFalse(gold.operation.launchable)
         self.assertTrue(gold.operation.requires_game_launch)
+        self.assertTrue(gold.operation.has_game_panel)
+        self.assertEqual(gold.operation.panel_hotkey, "F5")
         self.assertEqual(gold.operation.archive_source.member, "LC2GoldFree.dll")
 
     def test_catalog_rejects_internal_details_in_display_copy(self) -> None:
@@ -125,6 +127,27 @@ class ModManagerTests(unittest.TestCase):
             path.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaises(ModManagerError):
                 ModCatalog.from_file(path)
+
+    def test_panel_hotkey_must_be_supported_and_declared_as_a_hotkey(self) -> None:
+        payload = plugin_catalog_payload(b"fixture")
+        operation = payload["entries"][0]["operation"]  # type: ignore[index]
+        operation["hotkeys"] = ["INS"]
+        operation["panel_hotkey"] = "Insert"
+        parsed = ModCatalog.from_payload(payload).entries[0]
+        self.assertEqual(parsed.operation.panel_hotkey, "INS")
+
+        operation["panel_hotkey"] = "F13"
+        with self.assertRaises(ModManagerError):
+            ModCatalog.from_payload(payload)
+
+        operation["panel_hotkey"] = "F6"
+        with self.assertRaises(ModManagerError):
+            ModCatalog.from_payload(payload)
+
+        operation["hotkeys"] = ["CTRL+CTRL+F5"]
+        operation["panel_hotkey"] = "CTRL+CTRL+F5"
+        with self.assertRaises(ModManagerError):
+            ModCatalog.from_payload(payload)
 
     def test_bundled_gold_editor_build_contract_matches_catalog(self) -> None:
         catalog = ModCatalog.from_file(PROJECT_ROOT / "assets" / "mod_catalog.json")
@@ -358,12 +381,22 @@ class ModManagerTests(unittest.TestCase):
         self.assertIn("自动生效", hide_fx.display.usage_hint)
 
         live_stats = catalog.get("player-live-stats")
-        self.assertEqual(live_stats.display.version, "1.3")
+        self.assertEqual(live_stats.display.version, "2.0")
         self.assertEqual(live_stats.display.author, "懒虫桑")
-        self.assertEqual(live_stats.operation.expected_filename, "实时数据1.3.dll")
+        self.assertEqual(live_stats.operation.expected_filename, "实时数值v2.0.dll")
         self.assertEqual(live_stats.operation.hotkeys, ("F6",))
-        self.assertIn("2P–4P", live_stats.display.usage_hint)
+        self.assertEqual(live_stats.operation.panel_hotkey, "F6")
+        self.assertIn("点击玩家名字", live_stats.display.usage_hint)
+        self.assertEqual(
+            live_stats.integrity_policy.sha256,
+            "ED2183DD3DF1A9C7ECB0320D32A766893642A46AE65167E1162A2EB602610194",
+        )
         self.assertEqual(len(live_stats.operation.files), 1)
+
+        curse_coin = catalog.get("curse-coin")
+        self.assertEqual(curse_coin.display.version, "1.5.0")
+        self.assertIn("首个诅咒房", curse_coin.display.summary)
+        self.assertIn("每个诅咒房", curse_coin.display.usage_hint)
 
         damage_meter = catalog.get("damage-meter")
         self.assertEqual(damage_meter.display.version, "1.6.4")

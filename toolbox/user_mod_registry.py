@@ -177,18 +177,21 @@ class UserModRegistry:
             for spec in specs
             if str(spec["path"]).casefold().endswith(".dll")
         ]
+        operation: dict[str, object] = {
+            "kind": "bepinex_plugin",
+            "expected_filename": primary_name,
+            "bundled": True,
+            "bundle_dir": "payload",
+            "files": specs,
+            "provides": list(dict.fromkeys(provides)),
+            "hotkeys": list(draft.hotkeys),
+        }
+        if draft.panel_hotkey is not None:
+            operation["panel_hotkey"] = draft.panel_hotkey
         return {
             "id": mod_id,
             "display": values,
-            "operation": {
-                "kind": "bepinex_plugin",
-                "expected_filename": primary_name,
-                "bundled": True,
-                "bundle_dir": "payload",
-                "files": specs,
-                "provides": list(dict.fromkeys(provides)),
-                "hotkeys": list(draft.hotkeys),
-            },
+            "operation": operation,
             "integrity_policy": {
                 "version_note": f"user imported {values['version']}",
                 "author_source": "lc2-mod.json or user-confirmed import preview",

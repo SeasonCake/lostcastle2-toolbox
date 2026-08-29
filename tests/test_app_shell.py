@@ -40,6 +40,7 @@ from toolbox.app_shell import (
     main_team_panel_height,
     main_window_min_size,
     mod_tree_column_widths,
+    mod_launch_action,
     ordered_keyboard_keys,
     seed_demo_combat,
     toolbox_author_label,
@@ -99,6 +100,70 @@ class AppShellModelTests(unittest.TestCase):
         shell.mod_manager.status = lambda _mod_id: SimpleNamespace(installed=False)
         ToolboxShell._launch_game_for_mod(shell, "gold-editor-f5")
         self.assertEqual(actions, ["launch_game"])
+
+    def test_ready_mod_panel_action_focuses_game_and_sends_declared_hotkey(self) -> None:
+        actions: list[str] = []
+        operation = SimpleNamespace(
+            launchable=False,
+            has_game_panel=True,
+            panel_hotkey="INS",
+        )
+        descriptor = SimpleNamespace(operation=operation)
+        manager = SimpleNamespace(
+            descriptor=lambda _mod_id: descriptor,
+            status=lambda _mod_id: SimpleNamespace(installed=True),
+            installed_mtime_ns=lambda _mod_id: 50,
+        )
+        keyboard = SimpleNamespace(
+            game_process_id=42,
+            game_process_started_ns=100,
+            open_game_panel_hotkey=lambda key: actions.append(key) or True,
+        )
+        shell = SimpleNamespace(
+            mod_manager=manager,
+            keyboard=keyboard,
+            _mod_busy=False,
+            root=None,
+        )
+        with patch("toolbox.app_shell.messagebox.showerror") as showerror:
+            ToolboxShell._launch_selected_mod(shell, "fixture")
+        self.assertEqual(actions, ["INS"])
+        showerror.assert_not_called()
+
+    def test_mod_panel_action_explains_install_and_restart_requirements(self) -> None:
+        operation = SimpleNamespace(
+            launchable=False,
+            has_game_panel=True,
+            panel_hotkey="INS",
+        )
+        descriptor = SimpleNamespace(operation=operation)
+        status = SimpleNamespace(installed=False)
+        manager = SimpleNamespace(
+            descriptor=lambda _mod_id: descriptor,
+            status=lambda _mod_id: status,
+            installed_mtime_ns=lambda _mod_id: 150,
+        )
+        keyboard = SimpleNamespace(
+            game_process_id=None,
+            game_process_started_ns=None,
+            open_game_panel_hotkey=lambda _key: False,
+        )
+        shell = SimpleNamespace(
+            mod_manager=manager,
+            keyboard=keyboard,
+            _mod_busy=False,
+            root=None,
+        )
+        with patch("toolbox.app_shell.messagebox.showinfo") as showinfo:
+            ToolboxShell._launch_selected_mod(shell, "fixture")
+        self.assertIn("先安装", showinfo.call_args.args[0])
+
+        status.installed = True
+        keyboard.game_process_id = 42
+        keyboard.game_process_started_ns = 100
+        with patch("toolbox.app_shell.messagebox.showinfo") as showinfo:
+            ToolboxShell._launch_selected_mod(shell, "fixture")
+        self.assertIn("重启游戏", showinfo.call_args.args[0])
 
     def test_demo_combat_state_is_deterministic_and_complete_for_ui_qa(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -257,6 +322,72 @@ class AppShellModelTests(unittest.TestCase):
         self.assertGreaterEqual(compact["author"], 136)
         self.assertGreater(spacious["name"], compact["name"])
         self.assertGreater(spacious["author"], compact["author"])
+
+    def test_mod_detail_panel_uses_content_driven_height(self) -> None:
+        source = (
+            Path(__file__).resolve().parents[1] / "toolbox" / "app_shell.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "detail_panel = RoundedPanel(\n            mod_content,\n            height=None,",
+            source,
+        )
+
+    def test_mod_panel_action_tracks_install_and_game_load_order(self) -> None:
+        operation = SimpleNamespace(launchable=False, has_game_panel=True)
+        install_required = mod_launch_action(
+            operation,
+            installed=False,
+            busy=False,
+            game_process_id=None,
+            game_started_ns=None,
+            installed_mtime_ns=None,
+        )
+        self.assertEqual(install_required.kind, "install_required")
+        self.assertEqual(install_required.label, "打开 MOD 面板")
+        self.assertTrue(install_required.enabled)
+
+        launch_game = mod_launch_action(
+            operation,
+            installed=True,
+            busy=False,
+            game_process_id=None,
+            game_started_ns=None,
+            installed_mtime_ns=50,
+        )
+        self.assertEqual(launch_game.kind, "launch_game")
+        self.assertEqual(launch_game.label, "启动游戏")
+
+        ready = mod_launch_action(
+            operation,
+            installed=True,
+            busy=False,
+            game_process_id=42,
+            game_started_ns=100,
+            installed_mtime_ns=50,
+        )
+        self.assertEqual(ready.kind, "open_panel")
+        self.assertEqual(ready.label, "打开 MOD 面板")
+
+        restart = mod_launch_action(
+            operation,
+            installed=True,
+            busy=False,
+            game_process_id=42,
+            game_started_ns=100,
+            installed_mtime_ns=150,
+        )
+        self.assertEqual(restart.kind, "restart_game")
+        self.assertEqual(restart.label, "需重启游戏")
+
+        busy = mod_launch_action(
+            operation,
+            installed=True,
+            busy=True,
+            game_process_id=42,
+            game_started_ns=100,
+            installed_mtime_ns=50,
+        )
+        self.assertFalse(busy.enabled)
 
     def test_hud_location_reserves_a_column_and_never_invents_an_ellipsis(self) -> None:
         root = Path(__file__).resolve().parents[1]

@@ -25,8 +25,8 @@
 | 造成伤害、承伤与生命恢复口径 | 已在记录的游戏版本完成运行时验证 |
 | 战斗事件 v2 与回放聚合 | 已实现并有行为测试 |
 | 法力与护盾观察桥 | 法力消耗/恢复已完成运行时验证；护盾仍待独立样本 |
-| 综合主窗口与外部战斗 HUD | Bridge 0.4.3 已完成单机法力与 65% 生命锁定实测；匿名多人归属仍待联机实测 |
-| MOD 管理 | 2 个原有工具与 49 个最新可用社区 MOD 随包；支持本地自动识别与添加 |
+| 综合主窗口与外部战斗 HUD | Bridge 0.4.5 已完成 65% 生命锁定与普通太刀连续回蓝实测；匿名多人归属仍待联机实测 |
+| MOD 管理 | 2 个原有工具与 49 个最新可用社区 MOD 随包；支持本地自动识别、面板一键打开与添加 |
 
 研究结论只适用于计划文档记录的游戏构建。游戏更新后，Hook 兼容性与数据口径都需要重新验证。
 
@@ -52,9 +52,10 @@
 
 - 当前收录“灵魂石修改器 1.2”（作者：恨你不见）、“金币编辑器 1.0”（作者：刺心）与 49 个按功能族去重的最新可用社区 MOD；实战/资源工具优先，外观类靠后。
 - 灵魂石修改器支持配置、启动和删除盒子副本；金币编辑器随包提供登记 DLL，可一键安装到独占 BepInEx 插件目录，并只卸载自身文件。
-- 金币编辑器安装完成后可从 MOD 卡片直接启动游戏；进入游戏按 `F5` 打开窗口，输入数量并保存，返回主菜单再进入游戏生效。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+- 金币编辑器安装完成后可从 MOD 卡片直接启动游戏；进入游戏后可点击“打开 MOD 面板”或按 `F5`，输入数量并保存，返回主菜单再进入游戏生效。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 - 社区目录剔除了旧版重复、测试、未完成、半成品和明确有 bug 的来源；每个条目显示作者、功能和使用方法，作者证据不足时明确标为“社区未署名”。
-- 用户可把 DLL、ZIP、7Z、RAR 或文件夹放入工具箱旁的“用户MOD”，点击“添加 MOD”静态识别并编辑预览；完整清单与 AI 提示词见包内 `MOD自动添加说明.txt`。
+- 明确带设置/操作界面的 MOD 会登记独立 `panel_hotkey`：未安装时提示先安装，游戏未运行时启动游戏，本次游戏启动后才安装时提示重启，已加载时切回游戏并代按面板键；丢钱等直接执行功能的快捷键不会被误判为面板。
+- 用户可把 DLL、ZIP、7Z、RAR 或文件夹放入工具箱旁的“用户MOD”，点击“添加 MOD”静态识别并编辑预览；完整清单、可选 `interaction.panel_hotkey` 与 AI 提示词见包内 `MOD自动添加说明.txt`。
 - 普通插件安装到各自独占目录；卸载只移除登记文件，同名 DLL 冲突会阻止重复安装。BepInEx 前置整包和游戏文件覆盖不会按普通 MOD 自动添加。
 - 首次安装 DLL MOD 时会复用同一初始化入口；若已有不同身份的 BepInEx 核心，盒子停止并保留原文件，不盲目覆盖。
 - 主窗口左下角依次提供 GitHub、[bilibili](https://space.bilibili.com/88048665?) 和“投喂”；“投喂”可悬停查看默认微信赞助码，点击打开微信、支付宝与完整说明。工具箱源于玩家对《失落城堡2》的热爱，想支持加菲或催催更新时可以自愿投喂猫罐头。
@@ -64,6 +65,8 @@
 战斗参数、游戏字段、转换公式、协议/聚合/UI 映射、实测数值基线和已知 Bug 统一维护在 [`docs/LC2_RUNTIME_PARAMETER_DEBUG_INDEX.zh-CN.md`](docs/LC2_RUNTIME_PARAMETER_DEBUG_INDEX.zh-CN.md)。
 
 需要 Windows、Python 3.13，以及 `requirements-dev.txt` 中的依赖：
+
+注意：fresh clone 包含源码、合同与固定 7-Zip 组件，但不包含被 Git 排除的社区 MOD 载荷和 LC2 运行时二进制。运行下面的全量 `unittest`、`keyview.py --self-test` 或打包前，必须先按 `THIRD_PARTY_NOTICES.md`、`assets/community_mod_sources.json` 和运行时清单准备精确本地输入；未准备时只能运行不依赖这些载荷的聚焦测试，不能把缺载荷失败解释为源码回归。
 
 ```powershell
 py -3 -m pip install -r requirements-dev.txt
@@ -93,7 +96,7 @@ py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo
 
 仓库包含固定版本的 7-Zip 运行组件及其许可证，clone 后可直接使用源码模式的压缩包识别。其他第三方 EXE、DLL、压缩包及生成的 `third_party/community_mods` 载荷不会提交到 Git。打包前需在本机准备 `THIRD_PARTY_NOTICES.md` 和 `assets/community_mod_catalog.json` 登记的精确输入；`build.ps1` 会核对数量、大小和 SHA-256，缺失或不一致时直接停止。
 
-实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.2 已用真实日志闭合法力小数累计与闪避同操作回蓝；0.4.3 补齐官方生命锁定产生的 `loss` 事件合同，并把本地承伤与 HP/MP 资源观察和队友匿名伤害归属分开。65% 锁血已完成 `49/140` 实机正控；2P–4P 仍需实机验证。
+实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.3 已完成 `49/140` 的 65% 锁血正控；0.4.5 在不增加 Hook 的前提下同时使用根操作和连续观测基线，已闭合普通太刀两次技能之间自然回蓝仍显示 0 的反例。作者实测结算为法力消耗/恢复 `762/763`，与底层浮点累计后界面取整一致；2P–4P 仍需真实联机实测。
 
 ## 数据与安全边界
 

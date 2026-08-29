@@ -18,7 +18,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.4.3";
+    public const string PluginVersion = "0.4.5";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
@@ -583,34 +583,51 @@ public sealed class Plugin : BasePlugin
             {
                 return;
             }
-            _lastObservedPlayerMp = after.Value;
+            var observedBeforeRaw = _lastObservedPlayerMp;
             var requested = Finite(requestedDelta);
             var effective = Finite(after.Value - state.Before);
             var officialCovered = state.Depth == 0
                 ? TakeOfficialManaRecoveryCoverage(state.OperationId)
                 : 0.0;
+            var sameOperationSpendRaw = state.Depth == 0
+                ? TakeOfficialManaSpendCoverage()
+                : 0.0;
             var fallbackGain = state.Depth == 0
-                && effective > 0.0001
                 && _inActiveMap
                 && _manaRecoveryArmed
-                ? Math.Max(0.0, effective - officialCovered)
+                ? ReconcileFallbackManaRecovery(
+                    state.Before,
+                    after.Value,
+                    sameOperationSpendRaw,
+                    officialCovered,
+                    observedBeforeRaw ?? state.Before)
                 : 0.0;
             var aggregateFallback = fallbackGain > 0.0001;
+            if (state.Depth == 0)
+            {
+                _lastObservedPlayerMp = after.Value;
+            }
             if (Math.Abs(requested) <= 0.0001 && Math.Abs(effective) <= 0.0001)
             {
                 return;
             }
-            var operation = effective < -0.0001
-                ? "spend"
-                : effective > 0.0001
-                    ? "gain"
-                    : "attempt";
-            var sourceToken = requested < 0 || effective < 0
-                ? "resource.skill_cost"
-                : "resource.mana_recovery";
+            var operation = aggregateFallback
+                ? "gain"
+                : effective < -0.0001
+                    ? "spend"
+                    : effective > 0.0001
+                        ? "gain"
+                        : "attempt";
+            var sourceToken = aggregateFallback
+                ? "resource.mana_recovery"
+                : requested < 0 || effective < 0
+                    ? "resource.skill_cost"
+                    : "resource.mana_recovery";
             var atCapacity = after.Value >= maxAfter.Value - 0.0001f;
-            var blocked = Math.Abs(effective) <= 0.0001 && Math.Abs(requested) > 0.0001;
-            var overflow = requested > 0 && atCapacity
+            var blocked = !aggregateFallback
+                && Math.Abs(effective) <= 0.0001
+                && Math.Abs(requested) > 0.0001;
+            var overflow = !aggregateFallback && requested > 0 && atCapacity
                 ? Math.Max(0.0, requested - Math.Max(0.0, effective))
                 : 0.0;
             if (aggregateFallback)
@@ -621,6 +638,8 @@ public sealed class Plugin : BasePlugin
                     $"[LC2CB-MP] kind=runtime_gain hook={hookPath} " +
                     $"before_raw={DiagnosticNumber(state.Before)} " +
                     $"after_raw={DiagnosticNumber(after)} effective_raw={DiagnosticNumber(effective)} " +
+                    $"observed_before_raw={DiagnosticNumber(observedBeforeRaw)} " +
+                    $"same_operation_spend_raw={DiagnosticNumber(sameOperationSpendRaw)} " +
                     $"official_covered={DiagnosticNumber(officialCovered)} " +
                     $"fallback_raw={DiagnosticNumber(fallbackGain)} " +
                     $"armed={_manaRecoveryArmed} in_map={_inActiveMap}");
@@ -699,6 +718,14 @@ public sealed class Plugin : BasePlugin
                 $"current_display={DiagnosticDisplayMp(currentRaw)} max_raw={DiagnosticNumber(maxRaw)} " +
                 $"last_observed_raw={DiagnosticNumber(_lastObservedPlayerMp)} " +
                 $"events={_diagnosticManaSpendEvents} total={DiagnosticNumber(_diagnosticManaSpent)}");
+            if (currentRaw is not null && float.IsFinite(currentRaw.Value))
+            {
+                // The official callback observes the authoritative post-spend
+                // value. Keep it as the sequential baseline so an enclosing
+                // runtime call can reveal a refund even when its own net delta
+                // remains zero or negative.
+                _lastObservedPlayerMp = currentRaw.Value;
+            }
             Bridge?.Emit(
                 "resource_change",
                 aggregate: true,
@@ -864,6 +891,27 @@ public sealed class Plugin : BasePlugin
             ? Math.Max(0.0, sameOperationSpendRaw)
             : 0.0;
         return Math.Max(0.0, afterRaw - beforeRaw + pairedSpend);
+    }
+
+    internal static double ReconcileFallbackManaRecovery(
+        double beforeRaw,
+        double afterRaw,
+        double sameOperationSpendRaw,
+        double officialCoveredRaw,
+        double observedBeforeRaw)
+    {
+        var rootedRecoveryRaw = ReconcileOfficialManaRecovery(
+            beforeRaw,
+            afterRaw,
+            sameOperationSpendRaw);
+        var sequentialRecoveryRaw = double.IsFinite(observedBeforeRaw)
+            ? Math.Max(0.0, afterRaw - observedBeforeRaw)
+            : 0.0;
+        var recoveredRaw = Math.Max(rootedRecoveryRaw, sequentialRecoveryRaw);
+        var coveredRaw = double.IsFinite(officialCoveredRaw)
+            ? Math.Max(0.0, officialCoveredRaw)
+            : 0.0;
+        return Math.Max(0.0, recoveredRaw - coveredRaw);
     }
 
     private static void TrackOfficialManaSpend(double spentRaw)

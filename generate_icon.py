@@ -29,5 +29,19 @@ draw.text((128, 123), "K", font=font, fill="#211A08", anchor="mm", stroke_width=
 png_path = ASSET_DIR / "keyview.png"
 ico_path = ASSET_DIR / "keyview.ico"
 image.save(png_path)
-image.save(ico_path, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+image.save(
+    ico_path,
+    sizes=[
+        (16, 16),
+        (20, 20),
+        (24, 24),
+        (32, 32),
+        (40, 40),
+        (48, 48),
+        (64, 64),
+        (96, 96),
+        (128, 128),
+        (256, 256),
+    ],
+)
 print(ico_path)

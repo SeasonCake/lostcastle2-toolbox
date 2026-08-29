@@ -3,10 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import logging
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
 from typing import Callable, Iterable
+
+import dnfile
+
+from .windows_input import WindowsInputError, parse_hotkey_chord
 
 
 SUPPORTED_ARCHIVES = {".zip", ".7z", ".rar"}
@@ -74,6 +79,7 @@ class ModDraft:
     summary: str
     usage_hint: str
     hotkeys: tuple[str, ...]
+    panel_hotkey: str | None
     payload: tuple[PayloadFile, ...]
     manifest: dict[str, object] | None
     evidence: tuple[str, ...]
@@ -99,6 +105,15 @@ def slugify(value: str) -> str:
         return folded[:48]
     digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
     return f"community-mod-{digest}"
+
+
+def normalize_panel_hotkey(value: str) -> str:
+    try:
+        return "+".join(parse_hotkey_chord(value))
+    except WindowsInputError as exception:
+        raise ModInspectionError(
+            "lc2-mod.json interaction.panel_hotkey 不受支持。"
+        ) from exception
 
 
 def split_versioned_dll_stem(value: str) -> tuple[str, tuple[int, ...], str] | None:
@@ -160,6 +175,37 @@ def _binary_strings(content: bytes) -> str:
     return "\n".join(chunks)
 
 
+def _dotnet_user_strings(content: bytes) -> str:
+    """Read managed #US strings without loading or executing the assembly."""
+
+    logger = logging.getLogger("dnfile.stream")
+    previous_level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        image = dnfile.dnPE(data=content)
+        if image.net is None:
+            return ""
+        heap = image.net.metadata.streams.get(b"#US")
+        if heap is None:
+            return ""
+        offset = 1
+        limit = heap.sizeof()
+        values: list[str] = []
+        while offset < limit:
+            item = heap.get(offset)
+            if item is None or item.raw_size <= 0:
+                break
+            value = item.value_bytes().decode("utf-16-le", errors="replace").rstrip("\x00")
+            if value:
+                values.append(value)
+            offset += item.raw_size
+        return "\n".join(values)
+    except Exception:
+        return ""
+    finally:
+        logger.setLevel(previous_level)
+
+
 def _unique_matches(pattern: str, text: str, *, flags: int = 0) -> tuple[str, ...]:
     values: list[str] = []
     for match in re.finditer(pattern, text, flags):
@@ -208,11 +254,13 @@ class ModPackageInspector:
             if member.suffix in DOCUMENT_EXTENSIONS and member.size_bytes <= 1024 * 1024
         )
         document_text = "\n".join(_decode_text(reader(member.path)) for member in documents)
-        binary_text = "\n".join(
-            _binary_strings(reader(member.path))
-            for member in payload_members
-            if member.suffix == ".dll" and member.size_bytes <= 8 * 1024 * 1024
-        )
+        binary_chunks: list[str] = []
+        for member in payload_members:
+            if member.suffix != ".dll" or member.size_bytes > 8 * 1024 * 1024:
+                continue
+            content = reader(member.path)
+            binary_chunks.extend((_binary_strings(content), _dotnet_user_strings(content)))
+        binary_text = "\n".join(binary_chunks)
         contextual_binary = "\n".join(
             line
             for line in binary_text.splitlines()
@@ -344,31 +392,32 @@ class ModPackageInspector:
                 if member is None or member.is_directory:
                     raise ModInspectionError(f"清单文件不存在：{normalized}")
                 selected.append(member)
-            return tuple(selected)
-
-        candidates = [
-            member
-            for member in members
-            if member.suffix in PAYLOAD_EXTENSIONS
-            and "/obj/" not in f"/{member.path.casefold()}/"
-            and "/ref/" not in f"/{member.path.casefold()}/"
-            and "/refint/" not in f"/{member.path.casefold()}/"
-        ]
-        release_dlls = [
-            member
-            for member in candidates
-            if member.suffix == ".dll" and "/bin/release/" in f"/{member.path.casefold()}"
-        ]
-        if release_dlls:
-            release_hashes = {_sha256(reader(member.path)) for member in release_dlls}
+            candidates = selected
+        else:
             candidates = [
                 member
-                for member in candidates
-                if member.suffix != ".dll"
-                or "/bin/release/" in f"/{member.path.casefold()}"
-                or _sha256(reader(member.path)) not in release_hashes
+                for member in members
+                if member.suffix in PAYLOAD_EXTENSIONS
+                and "/obj/" not in f"/{member.path.casefold()}/"
+                and "/ref/" not in f"/{member.path.casefold()}/"
+                and "/refint/" not in f"/{member.path.casefold()}/"
             ]
-        candidates = list(prefer_latest_versioned_dlls(candidates))
+            release_dlls = [
+                member
+                for member in candidates
+                if member.suffix == ".dll"
+                and "/bin/release/" in f"/{member.path.casefold()}"
+            ]
+            if release_dlls:
+                release_hashes = {_sha256(reader(member.path)) for member in release_dlls}
+                candidates = [
+                    member
+                    for member in candidates
+                    if member.suffix != ".dll"
+                    or "/bin/release/" in f"/{member.path.casefold()}"
+                    or _sha256(reader(member.path)) not in release_hashes
+                ]
+            candidates = list(prefer_latest_versioned_dlls(candidates))
         dlls = [member for member in candidates if member.suffix == ".dll"]
         if not dlls:
             raise ModInspectionError("未检测到可安装的 DLL。")
@@ -442,6 +491,32 @@ class ModPackageInspector:
             r"(?i)(?<![A-Za-z0-9])((?:(?:Ctrl|Alt|Shift)\s*\+\s*)*(?:F(?:1[0-2]|[1-9])|INS|INSERT))(?![A-Za-z0-9])",
             hotkey_text,
         )
+        interaction = manifest.get("interaction") if manifest else None
+        if interaction is not None and not isinstance(interaction, dict):
+            raise ModInspectionError("lc2-mod.json interaction 必须是对象。")
+        manifest_panel_hotkey = (
+            interaction.get("panel_hotkey") if isinstance(interaction, dict) else None
+        )
+        if manifest_panel_hotkey is not None and (
+            not isinstance(manifest_panel_hotkey, str) or not manifest_panel_hotkey.strip()
+        ):
+            raise ModInspectionError("lc2-mod.json interaction.panel_hotkey 必须是快捷键字符串。")
+        panel_hotkey = (
+            normalize_panel_hotkey(manifest_panel_hotkey)
+            if isinstance(manifest_panel_hotkey, str)
+            else None
+        )
+        if panel_hotkey is None:
+            panel_matches = _unique_matches(
+                r"(?i)((?:(?:Ctrl|Alt|Shift)\s*\+\s*)*(?:F(?:1[0-2]|[1-9])|INS|INSERT))\s*(?:键)?\s*(?:打开|显示|切换|唤出)[^\n。；]{0,16}(?:面板|界面|窗口|设置)",
+                hotkey_text,
+            )
+            if len(panel_matches) == 1:
+                panel_hotkey = normalize_panel_hotkey(panel_matches[0])
+        if panel_hotkey is not None:
+            normalized_hotkeys = tuple(normalize_panel_hotkey(item) for item in hotkeys)
+            if panel_hotkey not in normalized_hotkeys:
+                hotkeys = (*hotkeys, panel_hotkey)
         authors = _unique_matches(
             r"(?im)(?:作者\s*[:：]?|author\s*[:：=]|(?:^|\s)by\s+)([\w\u3400-\u9fff.\-]{1,30})",
             combined_text,
@@ -498,6 +573,7 @@ class ModPackageInspector:
             summary=summary,
             usage_hint=usage_hint,
             hotkeys=hotkeys,
+            panel_hotkey=panel_hotkey,
             payload=payload,
             manifest=manifest,
             evidence=tuple(evidence),

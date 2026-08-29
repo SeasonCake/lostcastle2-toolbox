@@ -110,6 +110,39 @@ def mod_tree_column_widths(available_width: int) -> dict[str, int]:
     }
 
 
+@dataclass(frozen=True)
+class ModLaunchAction:
+    kind: str
+    label: str
+    enabled: bool
+
+
+def mod_launch_action(
+    operation: Any,
+    *,
+    installed: bool,
+    busy: bool,
+    game_process_id: int | None,
+    game_started_ns: int | None,
+    installed_mtime_ns: int | None,
+) -> ModLaunchAction:
+    if operation.launchable:
+        return ModLaunchAction("launch_external", "启动", installed and not busy)
+    if not operation.has_game_panel:
+        return ModLaunchAction("launch_game", "启动游戏", installed and not busy)
+    if not installed:
+        return ModLaunchAction("install_required", "打开 MOD 面板", not busy)
+    if game_process_id is None:
+        return ModLaunchAction("launch_game", "启动游戏", not busy)
+    if (
+        game_started_ns is None
+        or installed_mtime_ns is None
+        or installed_mtime_ns >= game_started_ns
+    ):
+        return ModLaunchAction("restart_game", "需重启游戏", not busy)
+    return ModLaunchAction("open_panel", "打开 MOD 面板", not busy)
+
+
 def combat_state_label(state: str, *, compact: bool = False) -> str:
     labels = {
         "live": ("● 实时", "● 实时记录中"),
@@ -160,6 +193,7 @@ class KeyboardModule(Protocol):
     click_through: bool
     key_only: bool
     game_process_id: int | None
+    game_process_started_ns: int | None
     toolbox_window_size: tuple[int, int]
     toolbox_ui_scale: float
     hud_ui_scale: float
@@ -179,6 +213,8 @@ class KeyboardModule(Protocol):
     def set_toolbox_ui_scale(self, value: float) -> None: ...
 
     def set_hud_ui_scale(self, value: float) -> None: ...
+
+    def open_game_panel_hotkey(self, hotkey: str) -> bool: ...
 
 
 class MacroModule(Protocol):
@@ -2366,7 +2402,12 @@ class ToolboxShell:
         tree.bind("<Configure>", self._resize_mod_tree_columns)
         self.mod_tree = tree
 
-        detail_panel = RoundedPanel(mod_content, height=178, content_padx=14, content_pady=10)
+        detail_panel = RoundedPanel(
+            mod_content,
+            height=None,
+            content_padx=14,
+            content_pady=10,
+        )
         detail_panel.grid(row=1, column=0, sticky="ew")
         detail = detail_panel.content
         top = tk.Frame(detail, bg=SURFACE)
@@ -2542,6 +2583,19 @@ class ToolboxShell:
         )
         any_copy = status.state in {"installed", "integrity_error"}
         is_plugin = descriptor.operation.is_game_plugin
+        installed_mtime_ns = (
+            self.mod_manager.installed_mtime_ns(descriptor.mod_id)
+            if status.installed and descriptor.operation.has_game_panel
+            else None
+        )
+        launch_action = mod_launch_action(
+            descriptor.operation,
+            installed=status.installed,
+            busy=self._mod_busy,
+            game_process_id=self.keyboard.game_process_id,
+            game_started_ns=self.keyboard.game_process_started_ns,
+            installed_mtime_ns=installed_mtime_ns,
+        )
         self.mod_action_buttons["configure"].configure(
             text=("重新安装" if is_plugin else "重新配置")
             if any_copy
@@ -2549,8 +2603,8 @@ class ToolboxShell:
             state="disabled" if self._mod_busy else "normal",
         )
         self.mod_action_buttons["launch"].configure(
-            text="启动" if descriptor.operation.launchable else "启动游戏",
-            state="normal" if status.installed and not self._mod_busy else "disabled",
+            text=launch_action.label,
+            state="normal" if launch_action.enabled else "disabled",
         )
         self.mod_action_buttons["remove"].configure(
             text="卸载" if is_plugin else "删除副本",
@@ -2559,10 +2613,46 @@ class ToolboxShell:
 
     def _launch_selected_mod(self, mod_id: str) -> None:
         descriptor = self.mod_manager.descriptor(mod_id)
-        if descriptor.operation.launchable:
+        status = self.mod_manager.status(mod_id)
+        installed_mtime_ns = (
+            self.mod_manager.installed_mtime_ns(mod_id)
+            if status.installed and descriptor.operation.has_game_panel
+            else None
+        )
+        action = mod_launch_action(
+            descriptor.operation,
+            installed=status.installed,
+            busy=self._mod_busy,
+            game_process_id=self.keyboard.game_process_id,
+            game_started_ns=self.keyboard.game_process_started_ns,
+            installed_mtime_ns=installed_mtime_ns,
+        )
+        if not action.enabled:
+            return
+        if action.kind == "launch_external":
             self._launch_mod(mod_id)
-        else:
+        elif action.kind == "install_required":
+            messagebox.showinfo(
+                "请先安装 MOD",
+                "请先点击“一键安装”，安装完成后再启动游戏。",
+                parent=self.root,
+            )
+        elif action.kind == "launch_game":
             self._launch_game_for_mod(mod_id)
+        elif action.kind == "restart_game":
+            messagebox.showinfo(
+                "需要重启游戏",
+                "该 MOD 尚未在本次游戏进程中加载。请关闭游戏，再从工具箱启动。",
+                parent=self.root,
+            )
+        elif action.kind == "open_panel":
+            hotkey = descriptor.operation.panel_hotkey
+            if hotkey is None or not self.keyboard.open_game_panel_hotkey(hotkey):
+                messagebox.showerror(
+                    "无法打开 MOD 面板",
+                    "未能切换到游戏并打开面板；请确认游戏窗口已正常进入，并重试。",
+                    parent=self.root,
+                )
 
     def _open_mod_inbox(self) -> None:
         try:

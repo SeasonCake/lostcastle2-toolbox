@@ -234,7 +234,7 @@ def prepare(args: argparse.Namespace) -> dict[str, object]:
     ]
     manifest = {
         "schema_version": 1,
-        "runtime_version": "BepInEx 6.0.0-be.785 + LC2CombatBridge 0.4.3",
+        "runtime_version": "BepInEx 6.0.0-be.785 + LC2CombatBridge 0.4.5",
         "source_identity": source_identity,
         "runtime_archive": {
             "filename": runtime_zip.name,

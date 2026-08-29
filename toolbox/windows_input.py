@@ -3,6 +3,9 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 from pathlib import Path
+import re
+import time
+from typing import Protocol
 
 
 INPUT_MOUSE = 0
@@ -60,6 +63,7 @@ VK_CODES = {
     "CAPS": 0x14,
     "ESC": 0x1B,
     "SPACE": 0x20,
+    "INS": 0x2D,
     "LEFT": 0x25,
     "UP": 0x26,
     "RIGHT": 0x27,
@@ -75,6 +79,45 @@ MOUSE_FLAGS = {
 
 class WindowsInputError(RuntimeError):
     pass
+
+
+class HotkeyInputBackend(Protocol):
+    def is_target_foreground(self) -> bool: ...
+
+    def key_down(self, key: str) -> None: ...
+
+    def key_up(self, key: str) -> None: ...
+
+
+def parse_hotkey_chord(value: str) -> tuple[str, ...]:
+    normalized = re.sub(r"\s+", "", value).upper()
+    parts = tuple("INS" if part == "INSERT" else part for part in normalized.split("+"))
+    if not parts or any(not part for part in parts):
+        raise WindowsInputError("MOD 面板快捷键为空或格式不正确。")
+    modifiers = {"CTRL", "ALT", "SHIFT"}
+    if any(part not in modifiers for part in parts[:-1]) or parts[-1] in modifiers:
+        raise WindowsInputError("MOD 面板快捷键格式不正确。")
+    if len(set(parts)) != len(parts) or any(part not in VK_CODES for part in parts):
+        raise WindowsInputError("MOD 面板快捷键不受支持。")
+    return parts
+
+
+def send_hotkey(
+    backend: HotkeyInputBackend, value: str, *, hold_seconds: float = 0.04
+) -> None:
+    keys = parse_hotkey_chord(value)
+    if not backend.is_target_foreground():
+        raise WindowsInputError("游戏窗口未处于前台，未发送快捷键。")
+    pressed: list[str] = []
+    try:
+        for key in keys:
+            backend.key_down(key)
+            pressed.append(key)
+        if hold_seconds > 0:
+            time.sleep(hold_seconds)
+    finally:
+        for key in reversed(pressed):
+            backend.key_up(key)
 
 
 class WindowsSendInputBackend:

@@ -177,6 +177,11 @@ def main() -> int:
             isinstance(item, str) and item.strip() for item in hotkeys
         ):
             raise ValueError(f"Invalid hotkeys for {mod_id}.")
+        panel_hotkey = raw.get("panel_hotkey")
+        if panel_hotkey is not None and (
+            not isinstance(panel_hotkey, str) or not panel_hotkey.strip()
+        ):
+            raise ValueError(f"Invalid panel_hotkey for {mod_id}.")
         provides = raw.get("provides")
         if provides is None:
             provides = [
@@ -195,19 +200,22 @@ def main() -> int:
             "summary": require_text(raw, "summary"),
             "usage_hint": require_text(raw, "usage_hint"),
         }
+        operation = {
+            "kind": "bepinex_plugin",
+            "expected_filename": PurePosixPath(primary).name,
+            "bundled": True,
+            "bundle_dir": f"community_mods/{mod_id}",
+            "files": specs,
+            "provides": list(dict.fromkeys(item.strip() for item in provides)),
+            "hotkeys": list(dict.fromkeys(item.strip() for item in hotkeys)),
+        }
+        if panel_hotkey is not None:
+            operation["panel_hotkey"] = panel_hotkey.strip()
         catalog_entries.append(
             {
                 "id": mod_id,
                 "display": display,
-                "operation": {
-                    "kind": "bepinex_plugin",
-                    "expected_filename": PurePosixPath(primary).name,
-                    "bundled": True,
-                    "bundle_dir": f"community_mods/{mod_id}",
-                    "files": specs,
-                    "provides": list(dict.fromkeys(item.strip() for item in provides)),
-                    "hotkeys": list(dict.fromkeys(item.strip() for item in hotkeys)),
-                },
+                "operation": operation,
                 "integrity_policy": {
                     "version_note": f"curated community bundle {display['version']}",
                     "author_source": require_text(raw, "author_source"),

@@ -24,6 +24,9 @@
     "summary": "一句话说明 MOD 做什么",
     "usage_hint": "安装后启动游戏，按 F5 打开面板；保存后重新进图生效。"
   },
+  "interaction": {
+    "panel_hotkey": "F5"
+  },
   "install": {
     "files": [
       "MyLc2Mod.dll",
@@ -42,11 +45,12 @@
 - display.author：只填写说明、源码或程序中能确认的署名；不能确认时填写“社区未署名”，不要猜。
 - display.summary：一句话功能说明。
 - display.usage_hint：写清启动后是否自动生效、快捷键、保存或重进游戏要求。
+- interaction.panel_hotkey：可选；仅当该按键用于打开设置/操作面板时填写。填写后，工具箱会在确认 MOD 已随本次游戏启动加载后提供“打开 MOD 面板”按钮。直接执行功能的按键不要填写在这里。
 - install.files：只列这个 MOD 运行必需的文件，路径相对于压缩包或文件夹；不写电脑绝对路径，也不能包含 ..。
 
 三、可以直接交给 AI 的提示词
 
-请静态检查我提供的《失落城堡 2》MOD 压缩包或文件夹，不要执行其中的 EXE 或 DLL。请识别真正运行必需的 BepInEx 插件 DLL、同目录依赖和数据文件，排除源码、obj、ref、PDB、教程图片和重复构建产物。优先从 README、TXT、源码中的 BepInPlugin 信息和文件版本中提取 MOD 名称、版本、作者、功能与快捷键；没有作者证据时必须写“社区未署名”，不要猜测。请判断它是否包含 BepInEx 框架、winhttp.dll、游戏文件覆盖或跨目录配置；如有，请先说明，不能按普通 DLL 插件处理。最后只输出一个符合 schema_version 1 的 lc2-mod.json，id 仅使用小写字母、数字和连字符，install.files 只列运行必需文件并使用包内相对路径。
+请静态检查我提供的《失落城堡 2》MOD 压缩包或文件夹，不要执行其中的 EXE 或 DLL。请识别真正运行必需的 BepInEx 插件 DLL、同目录依赖和数据文件，排除源码、obj、ref、PDB、教程图片和重复构建产物。优先从 README、TXT、源码中的 BepInPlugin 信息和文件版本中提取 MOD 名称、版本、作者、功能与快捷键；没有作者证据时必须写“社区未署名”，不要猜测。如果某个快捷键明确用于打开设置或操作面板，请填写 interaction.panel_hotkey；直接执行丢钱、攻击或其他游戏功能的快捷键不要填写。请判断它是否包含 BepInEx 框架、winhttp.dll、游戏文件覆盖或跨目录配置；如有，请先说明，不能按普通 DLL 插件处理。最后只输出一个符合 schema_version 1 的 lc2-mod.json，id 仅使用小写字母、数字和连字符，install.files 只列运行必需文件并使用包内相对路径。
 
 四、维护建议
 

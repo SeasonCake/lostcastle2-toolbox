@@ -5,36 +5,37 @@
       "id": "player-live-stats",
       "display": {
         "name": "玩家实时属性与队友面板",
-        "version": "1.3",
+        "version": "2.0",
         "author": "懒虫桑",
-        "summary": "实时显示本地玩家属性、效果，并可查看队友数据",
-        "usage_hint": "安装后启动游戏，按 F6 打开控制面板；勾选要显示的数值，点击 2P–4P 查看对应队友数据。"
+        "summary": "实时显示本地与其他玩家属性、效果，修复房主数据偶尔缺失",
+        "usage_hint": "安装后启动游戏，按 F6 或在工具箱点击“打开 MOD 面板”；勾选要显示的数值，直接点击玩家名字查看对应数据。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "实时数据1.3.dll",
+        "expected_filename": "实时数值v2.0.dll",
         "bundled": true,
         "bundle_dir": "community_mods/player-live-stats",
         "files": [
           {
-            "path": "实时数据1.3.dll",
-            "sha256": "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
-            "size_bytes": 27136
+            "path": "实时数值v2.0.dll",
+            "sha256": "ED2183DD3DF1A9C7ECB0320D32A766893642A46AE65167E1162A2EB602610194",
+            "size_bytes": 26624
           }
         ],
         "provides": [
-          "实时数据1.3.dll"
+          "实时数值v2.0.dll"
         ],
         "hotkeys": [
           "F6"
-        ]
+        ],
+        "panel_hotkey": "F6"
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 1.3",
-        "author_source": "随包更新说明与作者提供的 QQ 上传列表截图（2026-08-29）",
+        "version_note": "curated community bundle 2.0",
+        "author_source": "2.0 DLL 内嵌界面署名“作者：懒虫桑”；随包更新说明",
         "author_channel": "local community package",
-        "sha256": "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
-        "size_bytes": 27136,
+        "sha256": "ED2183DD3DF1A9C7ECB0320D32A766893642A46AE65167E1162A2EB602610194",
+        "size_bytes": 26624,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -111,7 +112,8 @@
         ],
         "hotkeys": [
           "F6"
-        ]
+        ],
+        "panel_hotkey": "F6"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.3.6",
@@ -233,7 +235,8 @@
         ],
         "hotkeys": [
           "F3"
-        ]
+        ],
+        "panel_hotkey": "F3"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 4.3.0",
@@ -275,7 +278,8 @@
         ],
         "hotkeys": [
           "F7"
-        ]
+        ],
+        "panel_hotkey": "F7"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.5.3",
@@ -298,7 +302,7 @@
         "version": "4.8",
         "author": "茶橘柚、空容、刺心",
         "summary": "提供多项战斗、掉落与便利功能调节",
-        "usage_hint": "安装后启动游戏，按 INS 打开增强计划面板；首次启动会生成默认配置。"
+        "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，首次启动会生成默认配置。"
       },
       "operation": {
         "kind": "bepinex_plugin",
@@ -317,7 +321,8 @@
         ],
         "hotkeys": [
           "INS"
-        ]
+        ],
+        "panel_hotkey": "INS"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 4.8",
@@ -340,7 +345,7 @@
         "version": "1.1.2",
         "author": "Freenix",
         "summary": "禁用指定物品并为装备或藏品设置掉落概率",
-        "usage_hint": "安装后启动游戏，按 INS 打开界面，填写物品名称与概率并保存。"
+        "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，填写物品名称与概率并保存。"
       },
       "operation": {
         "kind": "bepinex_plugin",
@@ -359,7 +364,8 @@
         ],
         "hotkeys": [
           "INS"
-        ]
+        ],
+        "panel_hotkey": "INS"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.1.2",
@@ -401,7 +407,8 @@
         ],
         "hotkeys": [
           "F5"
-        ]
+        ],
+        "panel_hotkey": "F5"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.4.0",
@@ -443,7 +450,8 @@
         ],
         "hotkeys": [
           "F1"
-        ]
+        ],
+        "panel_hotkey": "F1"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.0.0",
@@ -525,7 +533,8 @@
         ],
         "hotkeys": [
           "F10"
-        ]
+        ],
+        "panel_hotkey": "F10"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
@@ -727,7 +736,8 @@
         ],
         "hotkeys": [
           "F8"
-        ]
+        ],
+        "panel_hotkey": "F8"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
@@ -1209,7 +1219,8 @@
         ],
         "hotkeys": [
           "F1"
-        ]
+        ],
+        "panel_hotkey": "F1"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.7.6",
@@ -1376,7 +1387,8 @@
         ],
         "hotkeys": [
           "F11"
-        ]
+        ],
+        "panel_hotkey": "F11"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
@@ -1398,8 +1410,8 @@
         "name": "诅咒硬币保底",
         "version": "1.5.0",
         "author": "刺心",
-        "summary": "为诅咒硬币相关掉落与机制增加保底逻辑",
-        "usage_hint": "安装后重启游戏自动生效。"
+        "summary": "每局首个诅咒房为每位玩家提供诅咒硬币保底",
+        "usage_hint": "安装后重启游戏自动生效；默认每位玩家仅首个诅咒房保底，可在生成的配置文件中改为每个诅咒房。"
       },
       "operation": {
         "kind": "bepinex_plugin",
@@ -1578,7 +1590,8 @@
         ],
         "hotkeys": [
           "F12"
-        ]
+        ],
+        "panel_hotkey": "F12"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
@@ -1700,7 +1713,8 @@
         ],
         "hotkeys": [
           "F11"
-        ]
+        ],
+        "panel_hotkey": "F11"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
@@ -1742,7 +1756,8 @@
         ],
         "hotkeys": [
           "Alt+1"
-        ]
+        ],
+        "panel_hotkey": "Alt+1"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
@@ -1824,7 +1839,8 @@
         ],
         "hotkeys": [
           "F9"
-        ]
+        ],
+        "panel_hotkey": "F9"
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",

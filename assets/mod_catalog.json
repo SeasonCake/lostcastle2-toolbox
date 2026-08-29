@@ -45,6 +45,7 @@
         "bundled": true,
         "provides": ["lc2goldfree.dll"],
         "hotkeys": ["F5"],
+        "panel_hotkey": "F5",
         "archive_source": {
           "expected_filename": "F5金币编辑器.7z",
           "member": "LC2GoldFree.dll",
