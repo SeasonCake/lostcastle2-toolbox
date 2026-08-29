@@ -18,7 +18,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.4.1";
+    public const string PluginVersion = "0.4.2";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
@@ -33,6 +33,10 @@ public sealed class Plugin : BasePlugin
     private static long? OfficialManaRecoveryRootOperationId;
     [ThreadStatic]
     private static double OfficialManaRecoveryCovered;
+    [ThreadStatic]
+    private static long? OfficialManaSpendRootOperationId;
+    [ThreadStatic]
+    private static double OfficialManaSpendCovered;
     private static long _nextPlayerHpOperationId;
     private static long _nextPlayerMpOperationId;
     private static bool _awaitingMapEntry = true;
@@ -43,6 +47,7 @@ public sealed class Plugin : BasePlugin
     private static double _diagnosticManaGained;
     private static int _diagnosticManaSpendEvents;
     private static int _diagnosticManaGainEvents;
+    private static long _nextPartyRosterProbeMs;
 
     private Harmony _harmony;
     private static CombatPipeServer Bridge;
@@ -108,7 +113,9 @@ public sealed class Plugin : BasePlugin
         _awaitingMapEntry = true;
         _inActiveMap = false;
         _manaRecoveryArmed = false;
+        _nextPartyRosterProbeMs = 0;
         ResetOfficialManaRecoveryCoverage();
+        ResetOfficialManaSpendCoverage();
         SyncPlayerMpObservation();
         LogRoomDiagnostic("round_start");
     }
@@ -120,7 +127,9 @@ public sealed class Plugin : BasePlugin
         _awaitingMapEntry = true;
         _inActiveMap = false;
         _manaRecoveryArmed = false;
+        _nextPartyRosterProbeMs = 0;
         ResetOfficialManaRecoveryCoverage();
+        ResetOfficialManaSpendCoverage();
         _lastObservedPlayerMp = null;
         Bridge?.EndGameSession();
     }
@@ -159,6 +168,7 @@ public sealed class Plugin : BasePlugin
             _awaitingMapEntry = false;
             _manaRecoveryArmed = false;
             ResetOfficialManaRecoveryCoverage();
+            ResetOfficialManaSpendCoverage();
             SyncPlayerMpObservation();
             ResetDiagnosticManaTotals();
             LogManaSummary("session_start");
@@ -166,6 +176,7 @@ public sealed class Plugin : BasePlugin
         }
         _inActiveMap = true;
         Bridge?.PublishRoomStarted(room);
+        RefreshPartyRoster(force: true);
     }
 
     private static RoomLocation CaptureActiveMapLocation()
@@ -321,6 +332,7 @@ public sealed class Plugin : BasePlugin
         }
         try
         {
+            RefreshPartyRoster(force: false);
             var damage = hit.mDamageInfo;
             var appliedInfo = hit.mBeHitDisposeDamageInfo;
             var realDamage = Positive(appliedInfo.mRealHPDamage);
@@ -334,6 +346,9 @@ public sealed class Plugin : BasePlugin
                 : CeilingToInt(appliedHpDamage);
             var attributes = DamageAttributes(hit);
             var isBoss = BossFlag(defender);
+            var attacker = hit.mAtker;
+            var attackerPlayer = OwnerPlayer(attacker);
+            var defenderPlayer = OwnerPlayer(defender);
             var fields = new Dictionary<string, object>
             {
                 ["damage_direction"] = direction,
@@ -351,9 +366,13 @@ public sealed class Plugin : BasePlugin
                 ["lethal"] = appliedInfo.mDead,
                 ["is_boss"] = isBoss,
                 ["damage_attributes"] = attributes,
+                ["player_id"] = PlayerToken(defenderPlayer),
+                ["actor_entity_id"] = EntityToken(attacker),
+                ["owner_player_id"] = PlayerToken(attackerPlayer),
+                ["source_entity_id"] = EntityToken(attacker),
                 ["source_token"] = direction == "taken"
                     ? "enemy.damage"
-                    : DamageSourceToken(hit.mAtker, attributes),
+                    : DamageSourceToken(attacker, attributes),
                 ["parent_operation_id"] = snapshot.ParentHitId,
                 ["nesting_depth"] = snapshot.Depth,
             };
@@ -638,11 +657,16 @@ public sealed class Plugin : BasePlugin
             {
                 stack?.Clear();
                 ResetOfficialManaRecoveryCoverage();
+                ResetOfficialManaSpendCoverage();
                 Bridge?.FailSession("mp_resource_stack_mismatch");
             }
             else
             {
                 stack.Pop();
+                if (state.Depth == 0)
+                {
+                    ResetOfficialManaSpendCoverage();
+                }
             }
         }
     }
@@ -665,6 +689,7 @@ public sealed class Plugin : BasePlugin
                 return;
             }
             _manaRecoveryArmed = true;
+            TrackOfficialManaSpend(spentRaw);
             _diagnosticManaSpent += spentRaw;
             _diagnosticManaSpendEvents += 1;
             var (currentRaw, maxRaw) = ReadMp(creature);
@@ -725,16 +750,19 @@ public sealed class Plugin : BasePlugin
                 : DisplayMpValue(beforeRaw.Value);
             var afterDisplay = DisplayMpValue(afterRaw.Value);
             var maxAfterDisplay = DisplayMpValue(maxAfterRaw.Value);
-            var effectiveDisplay = beforeDisplay is null
-                ? 0.0
-                : Math.Max(0.0, afterDisplay - beforeDisplay.Value);
+            var sameOperationSpendRaw = TakeOfficialManaSpendCoverage();
             var effectiveRaw = beforeRaw is null
                 ? 0.0
-                : Math.Max(0.0, Finite(afterRaw.Value - beforeRaw.Value));
+                : ReconcileOfficialManaRecovery(
+                    beforeRaw.Value,
+                    afterRaw.Value,
+                    sameOperationSpendRaw);
+            var effectiveDisplay = DisplayMpAmount((float)effectiveRaw);
             RuntimeLog?.LogInfo(
                 $"[LC2CB-MP] kind=recovery before_raw={DiagnosticNumber(beforeRaw)} " +
                 $"after_raw={DiagnosticNumber(afterRaw)} before_display={DiagnosticNumber(beforeDisplay)} " +
                 $"after_display={DiagnosticNumber(afterDisplay)} " +
+                $"same_operation_spend_raw={DiagnosticNumber(sameOperationSpendRaw)} " +
                 $"effective_raw={DiagnosticNumber(effectiveRaw)} " +
                 $"effective_display={DiagnosticNumber(effectiveDisplay)} " +
                 $"armed={_manaRecoveryArmed} in_map={_inActiveMap}");
@@ -821,6 +849,60 @@ public sealed class Plugin : BasePlugin
         _diagnosticManaGained = 0.0;
         _diagnosticManaSpendEvents = 0;
         _diagnosticManaGainEvents = 0;
+    }
+
+    internal static double ReconcileOfficialManaRecovery(
+        double beforeRaw,
+        double afterRaw,
+        double sameOperationSpendRaw)
+    {
+        if (!double.IsFinite(beforeRaw) || !double.IsFinite(afterRaw))
+        {
+            return 0.0;
+        }
+        var pairedSpend = double.IsFinite(sameOperationSpendRaw)
+            ? Math.Max(0.0, sameOperationSpendRaw)
+            : 0.0;
+        return Math.Max(0.0, afterRaw - beforeRaw + pairedSpend);
+    }
+
+    private static void TrackOfficialManaSpend(double spentRaw)
+    {
+        var stack = PlayerMpObservationStack;
+        if (stack is null || stack.Count == 0 || spentRaw <= 0.0001)
+        {
+            return;
+        }
+        var rootOperationId = stack.Last();
+        if (OfficialManaSpendRootOperationId != rootOperationId)
+        {
+            OfficialManaSpendRootOperationId = rootOperationId;
+            OfficialManaSpendCovered = 0.0;
+        }
+        OfficialManaSpendCovered += spentRaw;
+    }
+
+    private static double TakeOfficialManaSpendCoverage()
+    {
+        var stack = PlayerMpObservationStack;
+        if (stack is null || stack.Count == 0)
+        {
+            return 0.0;
+        }
+        var rootOperationId = stack.Last();
+        if (OfficialManaSpendRootOperationId != rootOperationId)
+        {
+            return 0.0;
+        }
+        var covered = OfficialManaSpendCovered;
+        OfficialManaSpendCovered = 0.0;
+        return covered;
+    }
+
+    private static void ResetOfficialManaSpendCoverage()
+    {
+        OfficialManaSpendRootOperationId = null;
+        OfficialManaSpendCovered = 0.0;
     }
 
     private static void TrackOfficialManaRecovery(double effectiveRaw)
@@ -1020,6 +1102,107 @@ public sealed class Plugin : BasePlugin
 
     private static string EntityToken(Entity entity) =>
         entity is null ? null : $"entity:{entity.EntityID.ToString(CultureInfo.InvariantCulture)}";
+
+    private static void RefreshPartyRoster(bool force)
+    {
+        var now = Environment.TickCount64;
+        if (!force && now < _nextPartyRosterProbeMs)
+        {
+            return;
+        }
+        _nextPartyRosterProbeMs = now + 1000;
+        var members = CapturePartyMembers();
+        if (members.Count > 0)
+        {
+            Bridge?.PublishPartyUpdated(members);
+        }
+    }
+
+    private static List<PartyMemberSnapshot> CapturePartyMembers()
+    {
+        var result = new List<PartyMemberSnapshot>();
+        try
+        {
+            var manager = PlayerManager.Instance;
+            var players = manager?.PlayerList;
+            var local = manager?.LocalPlayer;
+            if (players is not null)
+            {
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                for (var index = 0; index < players.Count && result.Count < 8; index += 1)
+                {
+                    var player = players[index];
+                    var token = PlayerToken(player);
+                    if (player is null || token is null || !seen.Add(token))
+                    {
+                        continue;
+                    }
+                    var playerIndex = player.Index;
+                    result.Add(new PartyMemberSnapshot
+                    {
+                        PlayerId = token,
+                        PlayerSlot = playerIndex is >= 0 and <= 7 ? playerIndex : null,
+                        IsLocal = local is not null && local.Pointer == player.Pointer,
+                    });
+                }
+            }
+            if (result.Count == 0 && local is not null)
+            {
+                var token = PlayerToken(local);
+                if (token is not null)
+                {
+                    var playerIndex = local.Index;
+                    result.Add(new PartyMemberSnapshot
+                    {
+                        PlayerId = token,
+                        PlayerSlot = playerIndex is >= 0 and <= 7 ? playerIndex : null,
+                        IsLocal = true,
+                    });
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeLog?.LogWarning(
+                $"Party snapshot unavailable: {exception.GetType().Name}");
+        }
+        return result;
+    }
+
+    private static Player OwnerPlayer(Entity entity)
+    {
+        try
+        {
+            return TryCreature(entity)?.OwnerPlayerIncludeMaster;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string PlayerToken(Player player)
+    {
+        if (player is null)
+        {
+            return null;
+        }
+        try
+        {
+            var identity = player.ID != 0
+                ? $"id:{player.ID.ToString(CultureInfo.InvariantCulture)}"
+                : player.ClientID != 0
+                    ? $"client:{player.ClientID.ToString(CultureInfo.InvariantCulture)}"
+                    : player.TransportID != 0
+                        ? $"transport:{player.TransportID.ToString(CultureInfo.InvariantCulture)}"
+                        : $"slot:{player.Index.ToString(CultureInfo.InvariantCulture)}";
+            return Bridge?.GetPlayerToken(identity);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private static string NullableToken(string value)
     {

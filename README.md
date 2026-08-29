@@ -14,6 +14,8 @@ The repository currently contains:
 
 The application now starts in a calculator-style main toolbox window. It manages the keyboard overlay, macros, and a compact combat HUD; full combat details live in the main window. The v2 event contract keeps game observation, aggregation, and presentation separate so new items normally require a source-registry entry instead of new UI logic.
 
+On a clean game installation, the first toolbox game launch offers an explicit one-click setup for the pinned BepInEx runtime and the read-only combat Bridge. No community MOD is enabled automatically, the BepInEx console is disabled by default, and a different existing BepInEx core is never overwritten silently.
+
 ## Project status
 
 | Area | Status |
@@ -23,8 +25,8 @@ The application now starts in a calculator-style main toolbox window. It manages
 | Damage and HP semantics | Runtime-validated on the recorded game build |
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
-| Main toolbox and external combat HUD | Local transport and Bridge 0.4.1 runtime-validated on the recorded game build |
-| MOD management | Two existing tools plus 46 latest usable community MODs bundled; local auto-import supported |
+| Main toolbox and external combat HUD | Bridge 0.4.1 is single-player runtime-validated; the 0.4.2 candidate adds dodge-recovery reconciliation and anonymous multiplayer ownership |
+| MOD management | Two existing tools plus 49 latest usable community MODs bundled; local auto-import supported |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
@@ -62,7 +64,9 @@ The pinned 7-Zip runtime and its license are included so source-mode archive ins
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 46 deduplicated latest-usable community MOD entries. Each entry carries an author label, purpose, usage guidance, hash-bound payload, one-click installation, game launch, and exact uninstall. Files or folders placed in the package's `用户MOD` inbox can be statically inspected and added through an editable preview; the package includes a Chinese `lc2-mod.json` format guide and AI prompt. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 49 deduplicated latest-usable community MOD entries. Practical combat and resource tools are listed before cosmetic entries. Each entry carries an author label, purpose, usage guidance, hash-bound payload, one-click installation, game launch, and exact uninstall. Files or folders placed in the package's `用户MOD` inbox can be statically inspected and added through an editable preview; the package includes a Chinese `lc2-mod.json` format guide and AI prompt. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+The bottom-left footer links to GitHub and the maintainer's [Bilibili space](https://space.bilibili.com/88048665?), followed by a `投喂` entry that shows the WeChat code by default and opens the local WeChat, Alipay, and explanation folder for friends who enjoy *Lost Castle 2* and want to support the maintainer or nudge an update.
 
 ## Safety and scope
 

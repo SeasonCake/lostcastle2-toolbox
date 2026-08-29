@@ -123,11 +123,27 @@
         "session_ended",
         "room_started",
         "room_ended",
+        "party_updated",
         "error",
         null
       ]
     },
     "detail": { "type": ["string", "null"], "maxLength": 512 },
+    "party_members": {
+      "type": ["array", "null"],
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["player_id", "player_slot", "is_local"],
+        "properties": {
+          "player_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "player_slot": { "type": ["integer", "null"], "minimum": 0, "maximum": 7 },
+          "is_local": { "type": "boolean" }
+        }
+      }
+    },
     "checkpoint_totals": {
       "type": ["object", "null"],
       "additionalProperties": { "type": "number", "minimum": 0 }
@@ -203,6 +219,21 @@
           "scenario_id": { "type": "string", "minLength": 1, "maxLength": 128 },
           "room_index": { "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 99, 100, 101] },
           "map_file_name": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "status" },
+          "status": { "const": "party_updated" }
+        },
+        "required": ["event_type", "status"]
+      },
+      "then": {
+        "required": ["party_members"],
+        "properties": {
+          "party_members": { "type": "array", "minItems": 1, "maxItems": 8 }
         }
       }
     }

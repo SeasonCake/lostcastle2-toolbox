@@ -27,9 +27,9 @@ The toolbox verifies the bundled DLL, installs it into a dedicated BepInEx plugi
 
 ## Curated community MOD bundle
 
-- The local package contains 46 deduplicated, latest-usable community MOD entries selected by the maintainer on 2026-08-28.
+- The local package contains 49 deduplicated, latest-usable community MOD entries selected by the maintainer through 2026-08-29.
 - Exact payload paths, sizes, SHA-256 values, displayed authors, versions, purposes, and usage guidance are recorded in `assets/community_mod_catalog.json`; source-package selection and attribution evidence are maintained in `assets/community_mod_sources.json`.
-- Entries with no reliable author evidence display `社区未署名` instead of an inferred identity. Older duplicates, test builds, unfinished or half-finished sources, and sources explicitly marked as having a bug are not in the default bundle.
+- Strong embedded or source-level author evidence takes priority. Where that is absent, maintainer-supplied QQ upload screenshots may provide a provisional uploader attribution; otherwise the entry displays `社区未署名`. The added player/live teammate panel uses the supplied `实时数据1.3.dll` only and displays provisional uploader attribution `懒虫桑`. Older duplicates, test builds, unfinished or half-finished sources, and sources explicitly marked as having a bug are not in the default bundle.
 - These MODs are not covered by this repository's MIT License. Local inclusion does not claim separate public redistribution permission; publication remains a separate maintainer decision.
 
 The toolbox installs every entry into an independent BepInEx plugin directory, verifies all registered payload files, prevents simultaneous installation of entries that provide the same DLL name, and removes only registered files during uninstall.
@@ -41,3 +41,13 @@ The toolbox installs every entry into an independent BepInEx plugin directory, v
 - The complete upstream `License.txt` is included beside those files in the package and governs their use and redistribution.
 
 The toolbox uses these components only to list and read user-selected ZIP, 7Z, and RAR packages during static MOD identification.
+
+## BepInEx 6 IL2CPP runtime
+
+- Project: <https://github.com/BepInEx/BepInEx>.
+- Bundled identity: `6.0.0-be.785+6abdba47eeebe08552282e7a58ef0f4a9ab60b62`, paired with LC2 Combat Bridge 0.4.2.
+- Prepared runtime archive: `bepinex-runtime.zip`, 40,402,401 bytes, SHA-256 `0B617BC439F53E39680444F1EFD84C2B31A96D144D3267EE06EBEA05B59738A8`.
+- The prepared archive contains 307 runtime/config files and explicitly excludes `BepInEx/plugins`, caches, generated interop, the source package's multiplayer plugin, and every research/debug probe. The toolbox installs only the separately pinned LC2 Combat Bridge into the plugin directory.
+- BepInEx is licensed under LGPL-2.1. The complete license is bundled as `运行环境/BepInEx-LICENSE.txt`; the matching source revision is linked in `运行环境/README.txt`.
+
+First-use setup is explicit and writes only to the selected Lost Castle 2 directory while the exact game process is stopped. The BepInEx console is disabled in the managed default configuration; disk logging remains available for diagnostics. Existing differing BepInEx core files fail closed and are not overwritten.

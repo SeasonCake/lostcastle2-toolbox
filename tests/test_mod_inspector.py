@@ -9,11 +9,32 @@ import unittest
 from toolbox.mod_inspector import ModInspectionError, ModPackageInspector
 from toolbox.mod_manager import ModCatalog, ModManager
 from toolbox.user_mod_registry import UserModRegistry, UserModRegistryError
+from tools.prepare_community_mods import selected_payload
 
 
 class ModInspectorTests(unittest.TestCase):
     def make_inspector(self) -> ModPackageInspector:
         return ModPackageInspector(Path(sys.executable))
+
+    def test_curated_payload_can_select_a_duplicate_filename_by_sha256(self) -> None:
+        payload = {
+            "variant-a/Plugin.dll": b"older",
+            "variant-b/Plugin.dll": b"newer",
+        }
+        import hashlib
+
+        selected = selected_payload(
+            {
+                "include": [
+                    {
+                        "sha256": hashlib.sha256(b"newer").hexdigest(),
+                        "target": "Plugin.dll",
+                    }
+                ]
+            },
+            payload,
+        )
+        self.assertEqual(selected, {"Plugin.dll": b"newer"})
 
     def test_folder_manifest_identifies_display_payload_and_hotkey(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -56,6 +77,33 @@ class ModInspectorTests(unittest.TestCase):
             self.assertEqual(len(draft.payload), 1)
             self.assertEqual(draft.payload[0].target_path, "Fixture.dll")
             self.assertEqual(draft.author, "社区未署名")
+
+    def test_same_plugin_version_series_keeps_only_the_latest_dll(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "RealtimeData1.1.dll").write_bytes(b"old")
+            (root / "RealtimeData1.2.dll").write_bytes(b"middle")
+            (root / "RealtimeData1.3.dll").write_bytes(b"latest")
+
+            draft = self.make_inspector().inspect(root)
+
+            self.assertEqual(len(draft.payload), 1)
+            self.assertEqual(draft.payload[0].target_path, "RealtimeData1.3.dll")
+            self.assertEqual(draft.version, "1.3")
+            self.assertEqual(draft.suggested_id, "realtimedata")
+
+    def test_distinct_versioned_plugin_names_are_not_collapsed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "FeatureA1.2.dll").write_bytes(b"first")
+            (root / "FeatureB1.3.dll").write_bytes(b"second")
+
+            draft = self.make_inspector().inspect(root)
+
+            self.assertEqual(
+                {item.target_path for item in draft.payload},
+                {"FeatureA1.2.dll", "FeatureB1.3.dll"},
+            )
 
     def test_framework_and_manifest_traversal_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

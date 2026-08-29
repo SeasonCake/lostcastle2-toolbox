@@ -20,6 +20,23 @@ internal sealed class RoomLocation
     public string RoomId => $"L{StageLevel}:{ScenarioId}:{RoomIndex}";
 }
 
+internal sealed class PartyMemberSnapshot
+{
+    public string PlayerId { get; init; }
+    public int? PlayerSlot { get; init; }
+    public bool IsLocal { get; init; }
+
+    public Dictionary<string, object> ToPayload() => new()
+    {
+        ["player_id"] = PlayerId,
+        ["player_slot"] = PlayerSlot,
+        ["is_local"] = IsLocal,
+    };
+
+    public string Fingerprint =>
+        $"{PlayerId}:{(PlayerSlot is null ? "null" : PlayerSlot.Value)}:{IsLocal}";
+}
+
 internal sealed class CombatPipeServer : IDisposable
 {
     internal const string PipeName = "LostCastle2Toolbox.Combat.v2";
@@ -47,6 +64,10 @@ internal sealed class CombatPipeServer : IDisposable
     private string _sessionId = Guid.NewGuid().ToString("N");
     private long _sequence;
     private RoomLocation _room;
+    private readonly Dictionary<string, string> _playerTokens = new();
+    private int _nextPlayerToken;
+    private List<PartyMemberSnapshot> _partyMembers = new();
+    private string _partyFingerprint = string.Empty;
 
     public CombatPipeServer(ManualLogSource log)
     {
@@ -66,6 +87,10 @@ internal sealed class CombatPipeServer : IDisposable
         {
             _room = null;
             _roundActive = true;
+            _playerTokens.Clear();
+            _nextPlayerToken = 0;
+            _partyMembers = new List<PartyMemberSnapshot>();
+            _partyFingerprint = string.Empty;
             if (!_connected)
             {
                 return;
@@ -117,6 +142,69 @@ internal sealed class CombatPipeServer : IDisposable
             aggregate: false,
             "bridge.room_end",
             new Dictionary<string, object> { ["status"] = "room_ended" });
+    }
+
+    public string GetPlayerToken(string stableIdentity)
+    {
+        var identity = Bound(stableIdentity, 128);
+        if (string.IsNullOrWhiteSpace(identity))
+        {
+            return null;
+        }
+        lock (_stateLock)
+        {
+            if (_playerTokens.TryGetValue(identity, out var known))
+            {
+                return known;
+            }
+            var token = $"player-{++_nextPlayerToken}";
+            _playerTokens[identity] = token;
+            return token;
+        }
+    }
+
+    public void PublishPartyUpdated(IReadOnlyList<PartyMemberSnapshot> members)
+    {
+        if (members is null || members.Count == 0)
+        {
+            return;
+        }
+        var bounded = new List<PartyMemberSnapshot>();
+        for (var index = 0; index < members.Count && bounded.Count < 8; index += 1)
+        {
+            var member = members[index];
+            if (member is null || string.IsNullOrWhiteSpace(member.PlayerId))
+            {
+                continue;
+            }
+            bounded.Add(new PartyMemberSnapshot
+            {
+                PlayerId = Bound(member.PlayerId, 128),
+                PlayerSlot = member.PlayerSlot is >= 0 and <= 7
+                    ? member.PlayerSlot
+                    : null,
+                IsLocal = member.IsLocal,
+            });
+        }
+        if (bounded.Count == 0)
+        {
+            return;
+        }
+        var fingerprint = string.Join("|", bounded.ConvertAll(member => member.Fingerprint));
+        lock (_stateLock)
+        {
+            if (string.Equals(_partyFingerprint, fingerprint, StringComparison.Ordinal))
+            {
+                return;
+            }
+            _partyMembers = bounded;
+            _partyFingerprint = fingerprint;
+            if (!_connected || !_sessionActive || _failed)
+            {
+                return;
+            }
+            EnqueuePartyUpdatedLocked();
+        }
     }
 
     public void EmitCheckpoint(IReadOnlyDictionary<string, object> totals)
@@ -290,6 +378,10 @@ internal sealed class CombatPipeServer : IDisposable
                 {
                     EnqueueRoomStartedLocked(_room);
                 }
+                if (_partyMembers.Count > 0)
+                {
+                    EnqueuePartyUpdatedLocked();
+                }
             }
             else
             {
@@ -341,6 +433,24 @@ internal sealed class CombatPipeServer : IDisposable
                 ["scenario_id"] = room.ScenarioId,
                 ["room_index"] = room.RoomIndex,
                 ["map_file_name"] = room.MapFileName,
+            }));
+    }
+
+    private void EnqueuePartyUpdatedLocked()
+    {
+        var payload = new List<Dictionary<string, object>>(_partyMembers.Count);
+        foreach (var member in _partyMembers)
+        {
+            payload.Add(member.ToPayload());
+        }
+        EnqueueLocked(CreateEventLocked(
+            "status",
+            aggregate: false,
+            "player.party_snapshot",
+            new Dictionary<string, object>
+            {
+                ["status"] = "party_updated",
+                ["party_members"] = payload,
             }));
     }
 

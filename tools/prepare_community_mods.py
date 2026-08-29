@@ -69,12 +69,33 @@ def selected_payload(
         if isinstance(item, str):
             source_path = normalize_member_path(item)
             target_path = PurePosixPath(source_path).name
+            matched = by_path.get(source_path.casefold())
         elif isinstance(item, dict):
-            source_path = normalize_member_path(require_text(item, "source"))
             target_path = normalize_member_path(require_text(item, "target"))
+            source_hash = item.get("sha256")
+            if source_hash is not None:
+                if (
+                    not isinstance(source_hash, str)
+                    or not re.fullmatch(r"[0-9A-Fa-f]{64}", source_hash.strip())
+                ):
+                    raise ValueError("Community MOD include sha256 must be 64 hex digits.")
+                matches = [
+                    (path, content)
+                    for path, content in payload.items()
+                    if hashlib.sha256(content).hexdigest().casefold()
+                    == source_hash.strip().casefold()
+                ]
+                if len(matches) != 1:
+                    raise ValueError(
+                        "Community MOD include sha256 must select exactly one payload member."
+                    )
+                matched = matches[0]
+                source_path = matched[0]
+            else:
+                source_path = normalize_member_path(require_text(item, "source"))
+                matched = by_path.get(source_path.casefold())
         else:
             raise ValueError("Community MOD include entries must be paths or mappings.")
-        matched = by_path.get(source_path.casefold())
         if matched is None:
             raise ValueError(f"Prepared payload member not found: {source_path}")
         if target_path.casefold() in {path.casefold() for path in selected}:
@@ -99,9 +120,16 @@ def main() -> int:
     report_entries: list[dict[str, object]] = []
     ids: set[str] = set()
 
-    for raw in raw_entries:
+    ranked_entries: list[tuple[int, int, dict[str, object]]] = []
+    for source_index, raw in enumerate(raw_entries):
         if not isinstance(raw, dict):
             raise ValueError("Community MOD source entry must be an object.")
+        sort_priority = raw.get("sort_priority", 500)
+        if type(sort_priority) is not int or not 0 <= sort_priority <= 999:
+            raise ValueError("Community MOD sort_priority must be an integer from 0 to 999.")
+        ranked_entries.append((sort_priority, source_index, raw))
+
+    for _sort_priority, _source_index, raw in sorted(ranked_entries):
         mod_id = require_text(raw, "id")
         if not ID_PATTERN.fullmatch(mod_id) or mod_id in ids:
             raise ValueError(f"Invalid or duplicate community MOD id: {mod_id}")

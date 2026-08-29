@@ -13,7 +13,7 @@ class CombatBridgeSourceTests(unittest.TestCase):
             PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('public const string PluginVersion = "0.4.1";', source)
+        self.assertIn('public const string PluginVersion = "0.4.2";', source)
         self.assertIn('aggregate: ShouldAggregateDamage(direction)', source)
         self.assertIn('StageMgr.Instance?.IsNonBattleRoom() is not true', source)
         self.assertNotIn('IndexOf("_Shop_", StringComparison.OrdinalIgnoreCase)', source)
@@ -44,11 +44,19 @@ class CombatBridgeSourceTests(unittest.TestCase):
         self.assertIn("[LC2CB-MP] kind=summary", source)
         self.assertIn("var spentRaw = Positive(arg.useMana);", source)
         self.assertIn('["effective_delta"] = -spentRaw', source)
-        self.assertIn(
-            "Math.Max(0.0, Finite(afterRaw.Value - beforeRaw.Value))",
-            source,
-        )
+        self.assertIn("ReconcileOfficialManaRecovery(", source)
+        self.assertIn("same_operation_spend_raw=", source)
         self.assertIn('["effective_delta"] = effectiveRaw', source)
+
+    def test_same_operation_spend_does_not_hide_recovery(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("TrackOfficialManaSpend(spentRaw);", source)
+        self.assertIn("TakeOfficialManaSpendCoverage()", source)
+        self.assertIn("afterRaw - beforeRaw + pairedSpend", source)
+        self.assertIn("ResetOfficialManaSpendCoverage();", source)
 
     def test_low_level_mana_gain_fills_callback_gaps_without_double_counting(self) -> None:
         source = (
@@ -76,6 +84,24 @@ class CombatBridgeSourceTests(unittest.TestCase):
         self.assertIn('["resource_operation"] = "loss"', source)
         self.assertIn('["effective_delta"] = effective', source)
         self.assertIn('?? "resource.self_damage"', source)
+
+    def test_multiplayer_uses_opaque_roster_and_owner_tokens(self) -> None:
+        plugin_source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+        pipe_source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "CombatPipeServer.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("RefreshPartyRoster(force: true);", plugin_source)
+        self.assertIn("OwnerPlayerIncludeMaster", plugin_source)
+        self.assertIn('["owner_player_id"] = PlayerToken(attackerPlayer)', plugin_source)
+        self.assertIn('["player_id"] = PlayerToken(defenderPlayer)', plugin_source)
+        self.assertIn('var token = $"player-{++_nextPlayerToken}";', pipe_source)
+        self.assertIn('["status"] = "party_updated"', pipe_source)
+        self.assertIn('["party_members"] = payload', pipe_source)
+        self.assertNotIn("NickName", plugin_source)
+        self.assertNotIn("PlatformUniqueID", plugin_source)
 
 
 if __name__ == "__main__":

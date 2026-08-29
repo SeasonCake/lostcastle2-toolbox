@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import io
 from itertools import combinations
 import json
 from pathlib import Path
 import random
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -15,6 +16,69 @@ import keyview
 
 
 class KeyViewTests(unittest.TestCase):
+    def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:
+        root = mock.Mock()
+        keyview.apply_app_window_icon(root)
+        root.iconbitmap.assert_called_once_with(
+            default=str(keyview.RESOURCE_DIR / "assets" / "keyview.ico")
+        )
+        build_source = (Path(__file__).resolve().parents[1] / "build.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("assets\\keyview.ico;assets", build_source)
+
+    def test_windows_fixed_and_string_versions_match_the_app_version(self) -> None:
+        version_source = (
+            Path(__file__).resolve().parents[1] / "version_info.txt"
+        ).read_text(encoding="utf-8")
+        numeric_version = tuple(int(part) for part in keyview.APP_VERSION.split(".")) + (0,)
+        rendered_numeric = ", ".join(str(part) for part in numeric_version)
+        self.assertIn(f"filevers=({rendered_numeric})", version_source)
+        self.assertIn(f"prodvers=({rendered_numeric})", version_source)
+        self.assertIn(
+            f"StringStruct('FileVersion', '{keyview.APP_VERSION}')",
+            version_source,
+        )
+        self.assertIn(
+            f"StringStruct('ProductVersion', '{keyview.APP_VERSION}')",
+            version_source,
+        )
+
+    def test_process_path_query_preserves_full_64_bit_handle_identity(self) -> None:
+        observed = keyview._process_executable_path(keyview.os.getpid())
+        self.assertIsNotNone(observed)
+        self.assertEqual(
+            str(observed).casefold(),
+            str(Path(sys.executable).resolve()).casefold(),
+        )
+
+    def test_game_process_enumeration_failure_freezes_runtime_setup(self) -> None:
+        with mock.patch.object(
+            keyview.kernel32, "CreateToolhelp32Snapshot", return_value=123
+        ), mock.patch.object(
+            keyview.kernel32, "Process32FirstW", return_value=False
+        ), mock.patch.object(keyview.kernel32, "CloseHandle") as close_handle:
+            running_or_unknown = keyview.is_exact_game_process_running(
+                Path(r"C:\fixture\Lost Castle 2\LostCastle2.exe")
+            )
+
+        self.assertTrue(running_or_unknown)
+        close_handle.assert_called_once_with(123)
+
+    def test_game_launch_preflight_can_stop_start_before_steam_or_exe(self) -> None:
+        app = keyview.KeyViewApp.__new__(keyview.KeyViewApp)
+        app.game_process_id = None
+        app.before_game_launch = lambda: False
+        app.settings = {}
+
+        with mock.patch.object(keyview.os, "startfile") as startfile, mock.patch.object(
+            keyview.subprocess, "Popen"
+        ) as popen:
+            keyview.KeyViewApp.launch_game(app)
+
+        startfile.assert_not_called()
+        popen.assert_not_called()
+
     def test_restore_interaction_recovers_hidden_pure_click_through_overlay(self) -> None:
         actions: list[object] = []
 
@@ -58,6 +122,32 @@ class KeyViewTests(unittest.TestCase):
         self.assertEqual(keyview.parse_window_size("780x560"), (780, 560))
         with self.assertRaises(argparse.ArgumentTypeError):
             keyview.parse_window_size("500x300")
+
+    def test_qa_receipt_requires_a_paired_png_capture(self) -> None:
+        args = keyview.parse_args(
+            [
+                "--qa-ui-receipt",
+                "receipt.json",
+                "--qa-ui-screenshot",
+                "capture.png",
+                "--qa-ui-window",
+                "hud",
+            ]
+        )
+        self.assertEqual(args.qa_ui_window, "hud")
+        self.assertEqual(args.qa_ui_receipt, Path("receipt.json"))
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            keyview.parse_args(["--qa-ui-receipt", "receipt.json"])
+
+    def test_png_dimensions_reads_the_capture_header(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            capture = Path(temporary_directory) / "capture.png"
+            capture.write_bytes(
+                b"\x89PNG\r\n\x1a\n"
+                b"\x00\x00\x00\rIHDR"
+                b"\x00\x00\x01\x72\x00\x00\x02\x04"
+            )
+            self.assertEqual(keyview._png_dimensions(capture), (370, 516))
 
     def test_combat_hud_opens_by_default_with_an_explicit_startup_opt_out(self) -> None:
         self.assertTrue(keyview.parse_args([]).show_combat_hud)

@@ -104,6 +104,86 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.shield_absorbs, 1)
         self.assertEqual(snapshot.recent_dps, 12.5)
         self.assertEqual(snapshot.unknown_sources["summon.wisp"], 1)
+        self.assertEqual(snapshot.unattributed_damage, 125)
+
+    def test_party_damage_is_owned_without_guessing_unattributed_events(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "opaque-local", "player_slot": 0, "is_local": True},
+                    {"player_id": "opaque-peer", "player_slot": 1, "is_local": False},
+                ],
+            )
+        )
+        for sequence, damage, boss, owner in (
+            (2, 120, False, "opaque-local"),
+            (3, 80, True, "opaque-peer"),
+            (4, 20, False, None),
+        ):
+            self.aggregator.ingest(
+                common_event(
+                    "damage_resolution",
+                    sequence,
+                    damage_direction="dealt",
+                    settlement_damage=damage,
+                    applied_hp_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    is_boss=boss,
+                    owner_player_id=owner,
+                    source_token="combat.player.normal",
+                )
+            )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.detected_player_count, 2)
+        self.assertEqual(snapshot.total_damage, 220)
+        self.assertEqual(snapshot.unattributed_damage, 20)
+        self.assertEqual(snapshot.unattributed_boss_damage, 0)
+        self.assertEqual(snapshot.player_breakdown["opaque-local"]["label"], "自己")
+        self.assertEqual(snapshot.player_breakdown["opaque-local"]["damage_dealt"], 120)
+        self.assertAlmostEqual(
+            snapshot.player_breakdown["opaque-local"]["damage_share"],
+            120 / 220,
+        )
+        self.assertEqual(snapshot.player_breakdown["opaque-peer"]["label"], "队友 1")
+        self.assertEqual(snapshot.player_breakdown["opaque-peer"]["boss_damage"], 80)
+        self.assertNotIn("nickname", str(snapshot.to_dict()).lower())
+
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                5,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "opaque-local", "player_slot": 0, "is_local": True},
+                ],
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.detected_player_count, 1)
+        self.assertFalse(snapshot.player_breakdown["opaque-peer"]["active"])
+        self.assertEqual(snapshot.player_breakdown["opaque-peer"]["damage_dealt"], 80)
+
+    def test_party_update_rejects_duplicate_player_identity(self) -> None:
+        with self.assertRaises(CombatEventError):
+            self.aggregator.ingest(
+                common_event(
+                    "status",
+                    1,
+                    status="party_updated",
+                    aggregate=False,
+                    party_members=[
+                        {"player_id": "same", "player_slot": 0, "is_local": True},
+                        {"player_id": "same", "player_slot": 1, "is_local": False},
+                    ],
+                )
+            )
 
     def test_hp_mp_overflow_blocking_and_shield_layers_are_generic_events(self) -> None:
         events = (

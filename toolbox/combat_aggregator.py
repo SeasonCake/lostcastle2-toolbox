@@ -196,6 +196,15 @@ class SourceTotals:
     trigger_count: int = 0
 
 
+@dataclass
+class PlayerTotals:
+    player_slot: int | None = None
+    is_local: bool = False
+    active: bool = False
+    damage_dealt: int = 0
+    boss_damage: int = 0
+
+
 @dataclass(frozen=True)
 class CombatSnapshot:
     session_id: str | None
@@ -228,6 +237,10 @@ class CombatSnapshot:
     checkpoint_totals: dict[str, float]
     unknown_sources: dict[str, int]
     source_breakdown: dict[str, dict[str, Any]]
+    detected_player_count: int
+    player_breakdown: dict[str, dict[str, Any]]
+    unattributed_damage: int
+    unattributed_boss_damage: int
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -272,11 +285,15 @@ class CombatAggregator:
         self.current_map_file_name: str | None = None
         self._recent_damage: deque[tuple[int, int]] = deque()
         self._source_totals: defaultdict[str, SourceTotals] = defaultdict(SourceTotals)
+        self._player_totals: defaultdict[str, PlayerTotals] = defaultdict(PlayerTotals)
+        self._party_roster_seen = False
         self._unknown_sources: Counter[str] = Counter()
         self.effect_stacks: dict[str, float] = {}
         self.checkpoint_totals: dict[str, float] = {}
         self.total_damage = 0
         self.boss_damage = 0
+        self.unattributed_damage = 0
+        self.unattributed_boss_damage = 0
         self.taken_settlement_damage = 0
         self.hp_damage_taken = 0.0
         self.mitigated_damage = 0.0
@@ -374,6 +391,42 @@ class CombatAggregator:
                 **asdict(totals),
             }
 
+        player_breakdown: dict[str, dict[str, Any]] = {}
+        ordered_players = sorted(
+            self._player_totals.items(),
+            key=lambda item: (
+                not item[1].is_local,
+                item[1].player_slot is None,
+                item[1].player_slot if item[1].player_slot is not None else 99,
+                item[0],
+            ),
+        )
+        teammate_number = 0
+        for player_id, totals in ordered_players:
+            if totals.is_local:
+                label = "自己"
+            else:
+                teammate_number += 1
+                label = f"队友 {teammate_number}"
+            player_breakdown[player_id] = {
+                "label": label,
+                "player_slot": totals.player_slot,
+                "is_local": totals.is_local,
+                "active": totals.active,
+                "damage_dealt": totals.damage_dealt,
+                "boss_damage": totals.boss_damage,
+                "damage_share": (
+                    totals.damage_dealt / self.total_damage
+                    if self.total_damage > 0
+                    else 0.0
+                ),
+            }
+        detected_player_count = (
+            sum(1 for totals in self._player_totals.values() if totals.active)
+            if self._party_roster_seen
+            else len(self._player_totals)
+        )
+
         return CombatSnapshot(
             session_id=self.session_id,
             connection_state=self.connection_state,
@@ -405,6 +458,10 @@ class CombatAggregator:
             checkpoint_totals=dict(sorted(self.checkpoint_totals.items())),
             unknown_sources=dict(sorted(self._unknown_sources.items())),
             source_breakdown=breakdown,
+            detected_player_count=detected_player_count,
+            player_breakdown=player_breakdown,
+            unattributed_damage=self.unattributed_damage,
+            unattributed_boss_damage=self.unattributed_boss_damage,
         )
 
     def _validate_common(self, event: Mapping[str, Any]) -> None:
@@ -432,6 +489,8 @@ class CombatAggregator:
             raise CombatEventError("aggregate must be boolean")
         if event["event_type"] == "status" and event.get("status") == "room_started":
             self._validate_room_started(event)
+        if event["event_type"] == "status" and event.get("status") == "party_updated":
+            self._validate_party_updated(event)
 
     @staticmethod
     def _validate_room_started(event: Mapping[str, Any]) -> None:
@@ -450,6 +509,30 @@ class CombatAggregator:
             raise CombatEventError("room_started requires a scenario_id.")
         if not isinstance(map_file_name, str) or not map_file_name:
             raise CombatEventError("room_started requires a map_file_name.")
+
+    @staticmethod
+    def _validate_party_updated(event: Mapping[str, Any]) -> None:
+        members = event.get("party_members")
+        if not isinstance(members, list) or not 1 <= len(members) <= 8:
+            raise CombatEventError("party_updated requires 1 to 8 party members.")
+        player_ids: set[str] = set()
+        for member in members:
+            if not isinstance(member, Mapping):
+                raise CombatEventError("party member must be an object.")
+            player_id = member.get("player_id")
+            player_slot = member.get("player_slot")
+            is_local = member.get("is_local")
+            if not isinstance(player_id, str) or not player_id or len(player_id) > 128:
+                raise CombatEventError("party member has an invalid player_id.")
+            if player_id in player_ids:
+                raise CombatEventError("party_updated contains a duplicate player_id.")
+            if player_slot is not None and (
+                type(player_slot) is not int or not 0 <= player_slot <= 7
+            ):
+                raise CombatEventError("party member has an invalid player_slot.")
+            if not isinstance(is_local, bool):
+                raise CombatEventError("party member has an invalid is_local flag.")
+            player_ids.add(player_id)
 
     def _source_key(self, event: Mapping[str, Any]) -> str:
         token = event.get("source_token")
@@ -470,9 +553,20 @@ class CombatAggregator:
         if direction == "dealt":
             self.total_damage += settlement
             totals.damage_dealt += settlement
+            owner_player_id = event.get("owner_player_id")
+            if isinstance(owner_player_id, str) and owner_player_id:
+                player_totals = self._player_totals[owner_player_id]
+                player_totals.damage_dealt += settlement
+            else:
+                player_totals = None
+                self.unattributed_damage += settlement
             if event.get("is_boss") is True:
                 self.boss_damage += settlement
                 totals.boss_damage += settlement
+                if player_totals is not None:
+                    player_totals.boss_damage += settlement
+                else:
+                    self.unattributed_boss_damage += settlement
             self._recent_damage.append((int(event["monotonic_ms"]), settlement))
         elif direction == "taken":
             self.taken_settlement_damage += settlement
@@ -536,7 +630,13 @@ class CombatAggregator:
 
     def _ingest_status(self, event: Mapping[str, Any]) -> None:
         status = str(event.get("status"))
-        if status in {"session_started", "live", "room_started", "room_ended"}:
+        if status in {
+            "session_started",
+            "live",
+            "room_started",
+            "room_ended",
+            "party_updated",
+        }:
             self.connection_state = "live"
             self._ended_at_clock_ms = None
             self._ended_metrics_cleared = False
@@ -554,6 +654,16 @@ class CombatAggregator:
             scenario = self.scenario_registry.resolve(self.current_scenario_id)
             self.current_scenario_label = scenario.label_zh_cn
             self.current_map_file_name = str(event["map_file_name"])
+        elif status == "party_updated":
+            self._party_roster_seen = True
+            for totals in self._player_totals.values():
+                totals.active = False
+            for member in event["party_members"]:
+                player_id = str(member["player_id"])
+                totals = self._player_totals[player_id]
+                totals.player_slot = member.get("player_slot")
+                totals.is_local = bool(member["is_local"])
+                totals.active = True
 
     def _expire_ended_metrics(self) -> None:
         if (

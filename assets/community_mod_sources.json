@@ -3,42 +3,46 @@
   "entries": [
     {
       "id": "resource-transfer-f1",
+      "sort_priority": 120,
       "source": "F1一键丢钱修复客机消失问题.zip",
       "primary": "LC2ResourceTransfer.dll",
       "name": "一键丢钱",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "墨河以轩",
       "summary": "向队友快速转移金币并修复客机金币消失问题",
       "usage_hint": "安装后启动游戏，按 F1 使用。",
       "hotkeys": ["F1"],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "loot-combat-enhancement",
+      "sort_priority": 170,
       "source": "LC2_战利品自选与战斗增强Mod.zip",
       "primary": "LC2LootWeightPatch.dll",
       "name": "战利品自选与战斗增强",
       "version": "2.5.3",
-      "author": "社区未署名",
+      "author": "茶橘柚、空容、刺心",
       "summary": "调整战利品自选、掉落与战斗手感",
       "usage_hint": "安装后启动游戏，按 F7 打开设置面板；与增强计划的掉落功能同时开启时请自行取舍。",
       "hotkeys": ["F7"],
-      "author_source": "随包说明未提供开发者署名"
+      "author_source": "随包 MOD使用说明.txt 的作者团队署名；QQ 上传者 rlyons"
     },
     {
       "id": "armor-transmog",
+      "sort_priority": 900,
       "source": "LC2ArmorTransmog服装幻化.dll",
       "primary": "LC2ArmorTransmog服装幻化.dll",
       "name": "服装幻化",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "在游戏内更换角色服装外观",
       "usage_hint": "安装后启动游戏，按 F9 打开服装幻化界面。",
       "hotkeys": ["F9"],
-      "author_source": "文件与程序集未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "all-inscriptions",
+      "sort_priority": 200,
       "source": "LC2全刻印全共鸣1.4.0.zip",
       "primary": "LC2AllInscriptions.dll",
       "name": "全刻印全共鸣",
@@ -51,6 +55,7 @@
     },
     {
       "id": "inscription-soulstone-manager",
+      "sort_priority": 130,
       "source": "LC2刻印灵魂石管理器_v1.3.6.zip",
       "primary": "LC2.InscriptionSoulstoneManager_v1.3.6_正式版.dll",
       "name": "刻印灵魂石管理器",
@@ -63,6 +68,7 @@
     },
     {
       "id": "room-type-reforger",
+      "sort_priority": 210,
       "source": "LC2区域类型重铸v2.0.zip",
       "primary": "LC2RoomTypeReforger.dll",
       "name": "区域类型重铸",
@@ -75,6 +81,7 @@
     },
     {
       "id": "enhancement-plan",
+      "sort_priority": 180,
       "source": "LC2增强计划4.8（微调）+海克斯药水_整合包.rar",
       "include": [
         {"source": "plugins/LC2EnhancementPlan_v4.8.dll", "target": "LC2EnhancementPlan_v4.8.dll"}
@@ -82,23 +89,24 @@
       "primary": "LC2EnhancementPlan_v4.8.dll",
       "name": "LC2 增强计划",
       "version": "4.8",
-      "author": "社区未署名",
+      "author": "茶橘柚、空容、刺心",
       "summary": "提供多项战斗、掉落与便利功能调节",
       "usage_hint": "安装后启动游戏，按 INS 打开增强计划面板；首次启动会生成默认配置。",
       "hotkeys": ["INS"],
-      "author_source": "4.8 整合包未提供明确作者署名"
+      "author_source": "DLL 内嵌作者团队署名；QQ 上传者时间喝奶"
     },
     {
       "id": "player-auto-reborn",
+      "sort_priority": 140,
       "source": "LC2玩家自动复活 v0.7.1（含源码）.zip",
       "primary": "LC2PlayerAutoReborn.dll",
       "name": "玩家自动复活",
       "version": "0.7.1",
-      "author": "社区未署名",
+      "author": "空容",
       "summary": "玩家力竭后按配置等待并自动复活",
       "usage_hint": "安装后重启游戏自动生效；等待时间、次数和恢复比例可在生成的配置文件中调整。",
       "hotkeys": [],
-      "author_source": "源码与使用教程未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "spark-activator",
@@ -106,23 +114,24 @@
       "primary": "LC2SparkActivator.dll",
       "name": "雷灵头环激活火电花",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "空容",
       "summary": "让雷灵头环触发火电花相关效果",
       "usage_hint": "安装后重启游戏，装备对应物品时自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "multiplayer-room-fix",
+      "sort_priority": 150,
       "source": "修复多人游戏概率产生假人+修复结算显示异常.zip",
       "primary": "LostCastle2TwoPlayerRoomFix.dll",
       "name": "多人假人与结算修复",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "墨河以轩",
       "summary": "修复多人游戏概率出现假人和结算显示异常",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "multi-resonance",
@@ -130,23 +139,24 @@
       "primary": "LC2MultiResonance.dll",
       "name": "多共鸣同时激活",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "空容",
       "summary": "允许塑能法弹、法力护盾与以太飘浮同时激活",
       "usage_hint": "安装后启动游戏，按 F8 打开相关设置。",
       "hotkeys": ["F8"],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "alchemy-capacity",
+      "sort_priority": 220,
       "source": "允许炼金全部携带.zip",
       "primary": "LostCastle2.AlchemyAmuletCapacity.dll",
       "name": "炼金全部携带",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "茶橘柚",
       "summary": "提高炼金相关可携带数量限制",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "npc-recruit-unlimited",
@@ -154,24 +164,25 @@
       "primary": "LC2_AllNpcRecruit.dll",
       "name": "全军出击",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "茶橘柚",
       "summary": "取消 NPC 招募数量上限",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "dynamic-hp",
+      "sort_priority": 160,
       "source": "倍血4.3.0正式版.7z",
       "include": ["LC2DynamicHp.dll"],
       "primary": "LC2DynamicHp.dll",
       "name": "关卡动态血量",
       "version": "4.3.0",
-      "author": "勃张",
+      "author": "刺心",
       "summary": "按配置动态调整怪物与首领血量",
       "usage_hint": "安装后重启游戏生效；按 F3 打开配置界面。",
       "hotkeys": ["F3"],
-      "author_source": "4.3.0 程序内署名"
+      "author_source": "LC2DynamicHp.dll 内嵌 GUI 与版本日志署名；QQ 上传者墨河以轩"
     },
     {
       "id": "demon-invasion",
@@ -180,11 +191,11 @@
       "primary": "LC2DemonInvasion.dll",
       "name": "魔神侵袭拓展",
       "version": "4.3.0",
-      "author": "勃张",
+      "author": "墨河以轩",
       "summary": "扩展魔神侵袭刷怪与关卡处理逻辑",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "4.3.0 程序内署名"
+      "author_source": "QQ 上传者；同包组件未发现独立作者署名"
     },
     {
       "id": "brain-core-boost",
@@ -193,11 +204,11 @@
       "primary": "LC2BrainCoreMod.dll",
       "name": "噩梦之源法球强化",
       "version": "4.3.0",
-      "author": "勃张",
+      "author": "墨河以轩",
       "summary": "提高噩梦之源符文球相关数值",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "4.3.0 程序内署名"
+      "author_source": "QQ 上传者；同包组件未发现独立作者署名"
     },
     {
       "id": "golem-shield-boost",
@@ -206,11 +217,11 @@
       "primary": "LC2GolemShieldBoost.dll",
       "name": "岩石巨兽护盾强化",
       "version": "4.3.0",
-      "author": "勃张",
+      "author": "墨河以轩",
       "summary": "强化岩石巨兽的护盾数值",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "4.3.0 程序内署名"
+      "author_source": "QQ 上传者；同包组件未发现独立作者署名"
     },
     {
       "id": "sword-break-block-buff",
@@ -218,11 +229,30 @@
       "primary": "SHWBreakBlockBuff.dll",
       "name": "单手剑破防状态增强",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "大萝卜鸡",
       "summary": "强化单手剑破防状态的速度、回蓝、冷却与防御",
       "usage_hint": "安装后重启游戏，进入对应破防状态时自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
+    },
+    {
+      "id": "evilstone-power-duration",
+      "sort_priority": 260,
+      "source": "终始武器(大剑 太刀 单手剑)buff时间改为999秒.zip",
+      "include": [
+        {
+          "sha256": "334A4C3B48E91E74AC6F25576B05CDC4798478DA1DE81A66569D570554B1A099",
+          "target": "EvilStonePowerDuration.dll"
+        }
+      ],
+      "primary": "EvilStonePowerDuration.dll",
+      "name": "终始武器魂石之力延长",
+      "version": "1.5.0",
+      "author": "大萝卜鸡",
+      "summary": "将大剑、太刀与单手剑的魂石之力持续时间延长至 999 秒",
+      "usage_hint": "安装后重启游戏自动生效；默认持续 999 秒并在切换武器时结束，可在生成的 BepInEx 配置中调整。",
+      "hotkeys": [],
+      "author_source": "BepInPlugin 版本 1.5.0；作者采用 QQ 上传者大萝卜鸡"
     },
     {
       "id": "summon-balance",
@@ -243,24 +273,25 @@
       "primary": "LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll",
       "name": "召唤邪火粉碎者",
       "version": "2.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "让离群野猪契约连协召唤邪火粉碎者",
       "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。",
       "hotkeys": [],
-      "author_source": "召唤大师 2.0 未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "nightmare-doll-skin",
+      "sort_priority": 920,
       "source": "召唤大师珀亚2.0 非整合包.rar",
       "include": ["LC2.NightmareDollNeedle噩梦娃娃皮肤.dll"],
       "primary": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
       "name": "噩梦娃娃皮肤",
       "version": "2.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "替换噩梦娃娃召唤物外观",
       "usage_hint": "安装后重启游戏，召唤对应单位时自动生效。",
       "hotkeys": [],
-      "author_source": "召唤大师 2.0 未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "hideyoshi-summon",
@@ -269,24 +300,25 @@
       "primary": "LC2.HideyoshiSummon召唤狐狸剑姬.dll",
       "name": "召唤狐狸剑姬",
       "version": "2.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "让豹骑士契约连协召唤狐狸剑姬",
       "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。",
       "hotkeys": [],
-      "author_source": "召唤大师 2.0 未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "hand-color-white",
+      "sort_priority": 930,
       "source": "召唤大师珀亚2.0 非整合包.rar",
       "include": ["LC2.HandColorWhite手掌变白.dll"],
       "primary": "LC2.HandColorWhite手掌变白.dll",
       "name": "手掌变白",
       "version": "2.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "调整角色手掌显示颜色",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "召唤大师 2.0 未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "reaper-summon",
@@ -295,39 +327,42 @@
       "primary": "LC2.ReaperSummon召唤行刑者.dll",
       "name": "召唤行刑者",
       "version": "2.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "让游荡异灵契约连协召唤行刑者",
       "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。",
       "hotkeys": [],
-      "author_source": "召唤大师 2.0 未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "summon-model-swap",
+      "sort_priority": 940,
       "source": "召唤大师珀亚2.0 非整合包.rar",
       "include": ["LC2.SummonModelSwap召唤物模型替换.dll"],
       "primary": "LC2.SummonModelSwap召唤物模型替换.dll",
       "name": "召唤物模型替换",
       "version": "2.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "按配置替换部分召唤物模型",
       "usage_hint": "安装后重启游戏生效；可在生成的配置文件中选择模型。",
       "hotkeys": [],
-      "author_source": "召唤大师 2.0 未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "damage-meter",
-      "source": "失落城堡2伤害统计v1.5.1.dll",
-      "primary": "失落城堡2伤害统计v1.5.1.dll",
+      "sort_priority": 700,
+      "source": "失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll",
+      "primary": "失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll",
       "name": "游戏内伤害统计",
-      "version": "1.5.1",
-      "author": "社区未署名",
-      "summary": "在游戏内显示独立的伤害统计信息",
-      "usage_hint": "安装后重启游戏生效；该 MOD 的游戏内界面与盒子战斗统计相互独立。",
+      "version": "1.6.4",
+      "author": "水生凛凛",
+      "summary": "在游戏内按玩家显示独立伤害统计，并逐房使用官方数据校准",
+      "usage_hint": "安装后重启游戏生效；支持联机玩家分列，该 MOD 的游戏内界面与盒子战斗统计相互独立。",
       "hotkeys": [],
-      "author_source": "文件与程序集未提供明确作者署名"
+      "author_source": "DLL 内嵌界面署名；QQ 上传者听（2026-08-29）"
     },
     {
       "id": "chest-drop-enhancement",
+      "sort_priority": 230,
       "source": "宝箱掉落增强（含多倍宝藏等）V1.0.7z",
       "primary": "LC2DropMod.dll",
       "name": "宝箱掉落增强",
@@ -344,47 +379,50 @@
       "primary": "LC2诡谲甲强化.dll",
       "name": "客机诡谲甲强化",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "墨河以轩",
       "summary": "为客机侧强化诡谲甲并配合倍血玩法",
       "usage_hint": "安装后重启游戏，在客机使用对应装备时自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "no-soulstone-drops",
+      "sort_priority": 250,
       "source": "屏蔽箱子和最终boss掉落的灵魂石.zip",
       "primary": "LC2NoSoulStone.dll",
       "name": "屏蔽灵魂石掉落",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "空容",
       "summary": "屏蔽箱子和最终首领掉落的灵魂石",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "entrance-free-refresh",
+      "sort_priority": 240,
       "source": "开局三选一不消耗硬币.zip",
       "primary": "LC2EntranceTreasureAltarFreeRefresh.dll",
       "name": "开局三选一免费刷新",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "茶橘柚",
       "summary": "让开局三选一刷新不再消耗硬币",
       "usage_hint": "安装后重启游戏自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "welcome-message",
+      "sort_priority": 800,
       "source": "智能迎宾欢迎语 V1.0.7z",
       "primary": "LC2Welcome.dll",
       "name": "智能迎宾欢迎语",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "茶橘柚",
       "summary": "为联机房间提供可配置的欢迎语",
       "usage_hint": "安装后启动游戏，按 F11 打开相关设置。",
       "hotkeys": ["F11"],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "DLL 内嵌作者字符串；QQ 上传者茶橘柚"
     },
     {
       "id": "mech-attack-inherit",
@@ -392,23 +430,37 @@
       "primary": "LC2MechAtkInherit.dll",
       "name": "机甲继承人物攻击力",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "空容",
       "summary": "让机甲按 MOD 规则继承玩家攻击力",
       "usage_hint": "安装后重启游戏，使用机甲时自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "DLL 内嵌作者字符串；QQ 上传者空容"
     },
     {
       "id": "staff-skin-swap",
-      "source": "武器皮肤V1.2 自行查看替换情况.rar",
+      "sort_priority": 910,
+      "source": "武器幻化V1.5自行查看替换情况 可在配置文件修改是否替换.rar",
       "primary": "LC2.StaffSkinSwap.dll",
       "name": "武器皮肤替换",
-      "version": "1.2",
-      "author": "社区未署名",
-      "summary": "替换部分武器的显示皮肤",
-      "usage_hint": "安装后重启游戏，进入游戏查看替换效果。",
+      "version": "1.5",
+      "author": "兔子王お",
+      "summary": "按配置替换部分武器的显示皮肤",
+      "usage_hint": "安装后重启游戏自动生效；可在生成的配置文件中关闭总开关或单独调整替换组，联机建议保持仅本地英雄开启。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
+    },
+    {
+      "id": "hide-weapon-fx",
+      "sort_priority": 850,
+      "source": "LC2.HideWeaponFX震击环绕球隐藏.dll",
+      "primary": "LC2.HideWeaponFX震击环绕球隐藏.dll",
+      "name": "隐藏震击环绕球",
+      "version": "1.0",
+      "author": "兔子王お",
+      "summary": "隐藏本地玩家的震击符文绿色环绕球特效",
+      "usage_hint": "安装后重启游戏自动生效，无快捷键；只改变本地显示。",
+      "hotkeys": [],
+      "author_source": "程序集版本与作者提供的 QQ 上传列表截图（2026-08-29）"
     },
     {
       "id": "hex-augment",
@@ -416,11 +468,11 @@
       "primary": "LC2HexAugment.dll",
       "name": "海克斯强化药水",
       "version": "2.7.6",
-      "author": "社区未署名",
+      "author": "时间喝奶",
       "summary": "在战斗房胜利后提供随机海克斯药水强化",
       "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。",
       "hotkeys": ["F1"],
-      "author_source": "发布包与源码未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "thunder-spirit-summon",
@@ -428,11 +480,11 @@
       "primary": "LC2.ThunderSpiritSummon.dll",
       "name": "增援发信仪召唤雷精灵",
       "version": "1.0.0",
-      "author": "社区未署名",
+      "author": "兔子王お",
       "summary": "持有增援发信仪时召唤并维护友方雷精灵",
       "usage_hint": "安装后重启游戏自动生效；MOD 在后台维护召唤物，没有操作面板。",
       "hotkeys": [],
-      "author_source": "源码未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "cannon-resonance-alt",
@@ -440,11 +492,11 @@
       "primary": "LostCastle2.CannonResonanceAlt.dll",
       "name": "涡炉枪增强",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "大萝卜鸡",
       "summary": "减少涡炉枪炮击消耗并强化对应效果",
       "usage_hint": "安装后重启游戏，使用对应武器时自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "reaper-contract",
@@ -452,14 +504,15 @@
       "primary": "ReaperContract.dll",
       "name": "游荡异灵契约召唤行刑者",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "啊这",
       "summary": "让游荡异灵契约召唤行刑者",
       "usage_hint": "安装后重启游戏，触发对应契约时自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "item-ban-freenix",
+      "sort_priority": 190,
       "source": "物品禁用+自定义刷率[Freenix].zip",
       "primary": "物品禁用+自定义刷率[Freenix].dll",
       "name": "物品禁用与自定义刷率",
@@ -476,14 +529,15 @@
       "primary": "BowBurst.dll",
       "name": "百分百爆裂弓",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "啊这",
       "summary": "调整爆裂弓效果与触发概率",
       "usage_hint": "安装后启动游戏，按 F11 打开控制面板。",
       "hotkeys": ["F11"],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "room-prefix",
+      "sort_priority": 810,
       "source": "自定义房间前缀（基于刺心 修改 保留违禁词系统）.zip",
       "primary": "LC2RoomPrefix.dll",
       "name": "自定义房间前缀",
@@ -539,11 +593,11 @@
       "primary": "KalionSpear.dll",
       "name": "卡利昂之枪强化",
       "version": "1.0",
-      "author": "社区未署名",
+      "author": "啊这",
       "summary": "强化剑盾武器卡利昂之枪的投矛相关效果",
       "usage_hint": "安装后重启游戏，使用对应武器时自动生效。",
       "hotkeys": [],
-      "author_source": "来源包未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "poison-fog-cap",
@@ -563,11 +617,25 @@
       "primary": "ShadowLanternManaReduce.dll",
       "name": "踏影魔人增强",
       "version": "2.2",
-      "author": "社区未署名",
+      "author": "大萝卜鸡",
       "summary": "附身期间提高防御、速度、回蓝、幽能并减少冷却",
       "usage_hint": "安装后重启游戏，进入踏影魔人附身形态自动生效；数值可在生成的配置文件中调整。",
       "hotkeys": [],
-      "author_source": "随包说明未提供明确作者署名"
+      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
+    },
+    {
+      "id": "player-live-stats",
+      "sort_priority": 100,
+      "source": "实时显示数值及查看队友数值.rar",
+      "include": ["实时数据1.3.dll"],
+      "primary": "实时数据1.3.dll",
+      "name": "玩家实时属性与队友面板",
+      "version": "1.3",
+      "author": "懒虫桑",
+      "summary": "实时显示本地玩家属性、效果，并可查看队友数据",
+      "usage_hint": "安装后启动游戏，按 F6 打开控制面板；勾选要显示的数值，点击 2P–4P 查看对应队友数据。",
+      "hotkeys": ["F6"],
+      "author_source": "随包更新说明与作者提供的 QQ 上传列表截图（2026-08-29）"
     }
   ]
 }

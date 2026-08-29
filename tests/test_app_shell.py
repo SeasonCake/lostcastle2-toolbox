@@ -11,12 +11,19 @@ from toolbox.app_shell import (
     TOOLBOX_WINDOW_PRESETS,
     TOOLBOX_UI_SCALES,
     TOOLBOX_REPOSITORY_URL,
+    TOOLBOX_BILIBILI_URL,
+    SUPPORT_LABEL,
+    SUPPORT_NOTE,
+    SUPPORT_QR_FILENAME,
     TAKEN_DAMAGE_LABEL,
     ToolboxShell,
     boss_damage_share,
     clamp_main_window_size,
     combat_state_label,
+    combat_teammate_rows,
+    combat_team_rows,
     combat_hud_size,
+    combat_hud_initial_position,
     combat_table_source_width,
     combat_table_numeric_width,
     format_location_label,
@@ -27,8 +34,11 @@ from toolbox.app_shell import (
     macro_rows,
     metric_font_size,
     hud_panel_height,
+    hud_teammate_card_height,
     main_metric_card_height,
+    main_team_panel_height,
     main_window_min_size,
+    mod_tree_column_widths,
     ordered_keyboard_keys,
     seed_demo_combat,
     toolbox_author_label,
@@ -48,6 +58,24 @@ class AppShellModelTests(unittest.TestCase):
         with patch("toolbox.app_shell.webbrowser.open", return_value=True) as opener:
             ToolboxShell._open_repository(shell)
         opener.assert_called_once_with(TOOLBOX_REPOSITORY_URL, new=2)
+        with patch("toolbox.app_shell.webbrowser.open", return_value=True) as opener:
+            ToolboxShell._open_bilibili(shell)
+        opener.assert_called_once_with(TOOLBOX_BILIBILI_URL, new=2)
+
+    def test_support_entry_keeps_the_product_free_and_opens_local_assets(self) -> None:
+        self.assertEqual(SUPPORT_LABEL, "投喂")
+        self.assertIn("喜欢《失落城堡2》", SUPPORT_NOTE)
+        self.assertIn("自愿", SUPPORT_NOTE)
+        self.assertNotIn("解锁", SUPPORT_NOTE)
+        self.assertNotIn("token", SUPPORT_NOTE)
+        self.assertNotIn("订阅", SUPPORT_NOTE)
+        self.assertNotIn("续费", SUPPORT_NOTE)
+        self.assertEqual(SUPPORT_QR_FILENAME, "微信赞助码.png")
+        support_directory = Path(__file__).resolve().parents[1] / "package_assets" / "赞助与投喂"
+        shell = SimpleNamespace(support_directory=support_directory, root=None)
+        with patch("toolbox.app_shell.os.startfile") as starter:
+            ToolboxShell._open_support_directory(shell)
+        starter.assert_called_once_with(str(support_directory.resolve()))
 
     def test_game_loaded_mod_launch_reuses_existing_game_launcher(self) -> None:
         actions: list[str] = []
@@ -91,6 +119,26 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(snapshot.effective_healing, 94)
         self.assertEqual(snapshot.mp_spent, 168)
         self.assertEqual(snapshot.mp_gained, 140)
+        self.assertEqual(snapshot.detected_player_count, 1)
+
+    def test_demo_multiplayer_rows_are_conditional_private_and_complete(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        aggregator = CombatAggregator(
+            registry=SourceRegistry.from_file(root / "assets" / "combat_sources.json"),
+            scenario_registry=ScenarioRegistry.from_file(
+                root / "assets" / "game_locations.json"
+            ),
+        )
+        seed_demo_combat(aggregator, party_size=4)
+        snapshot = aggregator.snapshot()
+        rows = combat_team_rows(snapshot)
+        self.assertEqual(snapshot.detected_player_count, 4)
+        self.assertEqual([row[0] for row in rows], ["自己", "队友 1", "队友 2", "队友 3"])
+        self.assertEqual(sum(row[1] for row in rows), snapshot.total_damage)
+        self.assertAlmostEqual(sum(row[3] for row in rows), 1.0)
+        self.assertNotIn("demo-player", str(rows))
+        teammates = combat_teammate_rows(snapshot)
+        self.assertEqual([row[0] for row in teammates], ["队友 1", "队友 2", "队友 3"])
 
     def test_keyboard_preview_order_follows_geometry_not_selection_order(self) -> None:
         shuffled = (
@@ -159,14 +207,48 @@ class AppShellModelTests(unittest.TestCase):
         self.assertNotEqual(combat_state_label("stale"), combat_state_label("disconnected"))
 
     def test_combat_hud_size_adds_only_needed_high_dpi_room(self) -> None:
-        self.assertEqual(combat_hud_size(1.5), (350, 456))
-        self.assertEqual(combat_hud_size(2.0), (370, 492))
-        self.assertEqual(combat_hud_size(2.5), (390, 528))
-        self.assertEqual(combat_hud_size(1.5, 0.85), (298, 388))
-        self.assertEqual(combat_hud_size(1.5, 1.25), (438, 570))
+        self.assertEqual(combat_hud_size(1.5), (350, 474))
+        self.assertEqual(combat_hud_size(2.0), (370, 516))
+        self.assertEqual(combat_hud_size(2.5), (390, 558))
+        self.assertEqual(combat_hud_size(1.5, 0.85), (298, 403))
+        self.assertEqual(combat_hud_size(1.5, 1.25), (438, 592))
+        self.assertEqual(combat_hud_size(1.5, player_count=2), (580, 474))
+        self.assertEqual(combat_hud_size(2.0, player_count=4), (610, 554))
         self.assertEqual(hud_panel_height(112, 1.5), 112)
         self.assertEqual(hud_panel_height(112, 2.0), 118)
         self.assertEqual(hud_panel_height(88, 2.0, high_dpi_gain=24), 100)
+
+    def test_damage_panel_reserves_structural_space_above_composition_bar(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "toolbox" / "app_shell.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('height=126, panel_key="damage"', source)
+        self.assertIn('pady=(self._px(8), 0)', source)
+        self.assertIn('pady=(self._px(1), self._px(5))', source)
+
+    def test_combat_hud_first_run_uses_visible_top_left_margin(self) -> None:
+        self.assertEqual(
+            combat_hud_initial_position(1920, 1080, 350, 456),
+            (500, 16),
+        )
+        self.assertEqual(
+            combat_hud_initial_position(800, 600, 350, 456),
+            (434, 16),
+        )
+        self.assertEqual(
+            combat_hud_initial_position(320, 300, 350, 456, ui_scale=1.25),
+            (0, 0),
+        )
+
+    def test_mod_columns_keep_version_author_and_status_structurally_separate(self) -> None:
+        compact = mod_tree_column_widths(420)
+        spacious = mod_tree_column_widths(1000)
+        self.assertEqual(sum(compact.values()), 420)
+        self.assertEqual(sum(spacious.values()), 1000)
+        self.assertGreaterEqual(compact["version"], 76)
+        self.assertGreaterEqual(compact["author"], 136)
+        self.assertGreater(spacious["name"], compact["name"])
+        self.assertGreater(spacious["author"], compact["author"])
 
     def test_hud_location_reserves_a_column_and_never_invents_an_ellipsis(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -182,10 +264,20 @@ class AppShellModelTests(unittest.TestCase):
         self.assertNotIn('rendered_text = "…"', source)
 
     def test_main_combat_layout_reserves_high_dpi_subtitles_and_numbers(self) -> None:
-        self.assertEqual(main_window_min_size(1.5), (780, 610))
-        self.assertEqual(main_window_min_size(2.0), (840, 700))
+        self.assertEqual(main_window_min_size(1.5), (780, 700))
+        self.assertEqual(main_window_min_size(2.0), (1200, 840))
         self.assertEqual(main_metric_card_height(1.5), 133)
         self.assertEqual(main_metric_card_height(2.0), 151)
+        self.assertEqual(main_team_panel_height(1.5), 115)
+        self.assertEqual(main_team_panel_height(2.0), 133)
+        self.assertEqual(hud_teammate_card_height(1.5), 150)
+        self.assertEqual(hud_teammate_card_height(2.0), 178)
+        for tk_scaling in (1.5, 2.0, 2.5):
+            _width, hud_height = combat_hud_size(tk_scaling, player_count=4)
+            self.assertGreaterEqual(
+                hud_height,
+                3 * hud_teammate_card_height(tk_scaling) + 15,
+            )
         self.assertEqual(combat_table_numeric_width(1.5), 90)
         self.assertEqual(combat_table_numeric_width(2.0), 105)
         self.assertEqual(combat_table_numeric_width(1.5, 1.15), 103)
@@ -216,7 +308,7 @@ class AppShellModelTests(unittest.TestCase):
                 screen_height=1080,
                 tk_scaling=1.5,
             ),
-            (900, 650),
+            (900, 700),
         )
         self.assertEqual(
             clamp_main_window_size(
@@ -226,7 +318,7 @@ class AppShellModelTests(unittest.TestCase):
                 screen_height=1080,
                 tk_scaling=2.0,
             ),
-            (840, 700),
+            (1200, 840),
         )
         self.assertEqual(
             clamp_main_window_size(

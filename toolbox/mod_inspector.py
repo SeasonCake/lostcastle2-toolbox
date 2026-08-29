@@ -101,6 +101,40 @@ def slugify(value: str) -> str:
     return f"community-mod-{digest}"
 
 
+def split_versioned_dll_stem(value: str) -> tuple[str, tuple[int, ...], str] | None:
+    match = re.fullmatch(
+        r"(?i)(?P<base>.+?)(?:[._ -]*v?)(?P<version>\d+(?:\.\d+){1,3})",
+        value.strip(),
+    )
+    if match is None:
+        return None
+    base = match.group("base").rstrip(" ._-")
+    if not base:
+        return None
+    version_text = match.group("version")
+    return base, tuple(int(part) for part in version_text.split(".")), version_text
+
+
+def prefer_latest_versioned_dlls(
+    candidates: Iterable[PackageMember],
+) -> tuple[PackageMember, ...]:
+    """Collapse an obvious same-plugin version series to its newest DLL."""
+
+    items = tuple(candidates)
+    dlls = tuple(item for item in items if item.suffix == ".dll")
+    if len(dlls) < 2:
+        return items
+    parsed = tuple(split_versioned_dll_stem(Path(item.path).stem) for item in dlls)
+    if any(item is None for item in parsed):
+        return items
+    resolved = tuple(item for item in parsed if item is not None)
+    if len({item[0].casefold() for item in resolved}) != 1:
+        return items
+    latest_index = max(range(len(dlls)), key=lambda index: resolved[index][1])
+    latest = dlls[latest_index]
+    return tuple(item for item in items if item.suffix != ".dll" or item == latest)
+
+
 def _sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest().upper()
 
@@ -334,6 +368,7 @@ class ModPackageInspector:
                 or "/bin/release/" in f"/{member.path.casefold()}"
                 or _sha256(reader(member.path)) not in release_hashes
             ]
+        candidates = list(prefer_latest_versioned_dlls(candidates))
         dlls = [member for member in candidates if member.suffix == ".dll"]
         if not dlls:
             raise ModInspectionError("未检测到可安装的 DLL。")
@@ -399,6 +434,9 @@ class ModPackageInspector:
             r"(?i)(?:^|[^0-9])v?(\d+\.\d+(?:\.\d+){0,2})(?:[^0-9]|$)",
             source_name,
         )
+        payload_version = (
+            split_versioned_dll_stem(dll_names[0]) if len(dll_names) == 1 else None
+        )
         hotkey_text = f"{combined_text}\n{display.get('usage_hint', '')}"
         hotkeys = _unique_matches(
             r"(?i)(?<![A-Za-z0-9])((?:(?:Ctrl|Alt|Shift)\s*\+\s*)*(?:F(?:1[0-2]|[1-9])|INS|INSERT))(?![A-Za-z0-9])",
@@ -414,9 +452,17 @@ class ModPackageInspector:
             if not MOD_ID_PATTERN.fullmatch(suggested_id):
                 raise ModInspectionError("lc2-mod.json id 只能使用小写字母、数字和连字符。")
         else:
-            suggested_id = slugify(dll_names[0] if dll_names else source_name)
+            id_seed = payload_version[0] if payload_version else (dll_names[0] if dll_names else source_name)
+            suggested_id = slugify(id_seed)
         name = str(display.get("name") or source_name).strip()
-        version = str(display.get("version") or (version_matches[0] if version_matches else "1.0")).strip()
+        detected_version = (
+            version_matches[0]
+            if version_matches
+            else payload_version[2]
+            if payload_version
+            else "1.0"
+        )
+        version = str(display.get("version") or detected_version).strip()
         author = str(display.get("author") or (authors[0] if authors else "社区未署名")).strip()
         summary = str(display.get("summary") or f"{name} 的游戏功能扩展").strip()
         manifest_usage = display.get("usage_hint")

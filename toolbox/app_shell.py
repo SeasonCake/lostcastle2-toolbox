@@ -40,6 +40,15 @@ GOLD = "#B4790D"
 HUD_TRANSPARENT = "#010203"
 TOOLBOX_AUTHOR = "加菲_barista"
 TOOLBOX_REPOSITORY_URL = "https://github.com/SeasonCake/lostcastle2-toolbox"
+TOOLBOX_BILIBILI_URL = "https://space.bilibili.com/88048665?"
+HUD_LEFT_MOD_CLEARANCE = 500
+SUPPORT_LABEL = "投喂"
+SUPPORT_TITLE = "一起为热爱投喂猫罐头"
+SUPPORT_NOTE = (
+    "我们都是因为喜欢《失落城堡2》聚在这里。愿意支持加菲、顺便催催更新的话，"
+    "可以自愿投喂一点猫罐头。"
+)
+SUPPORT_QR_FILENAME = "微信赞助码.png"
 TAKEN_DAMAGE_LABEL = "受击承伤"
 
 TOOLBOX_WINDOW_PRESETS = {
@@ -64,6 +73,40 @@ MODE_SHORT_LABELS = {
 
 def toolbox_author_label() -> str:
     return f"作者：{TOOLBOX_AUTHOR}"
+
+
+def combat_hud_initial_position(
+    screen_width: int,
+    screen_height: int,
+    hud_width: int,
+    hud_height: int,
+    *,
+    ui_scale: float = 1.0,
+) -> tuple[int, int]:
+    """Return a visible top-left first-run position in Tk screen coordinates."""
+
+    margin = max(10, round(16 * min(1.25, max(0.85, float(ui_scale)))))
+    maximum_x = max(0, int(screen_width) - int(hud_width) - margin)
+    return (
+        min(max(margin, HUD_LEFT_MOD_CLEARANCE), maximum_x),
+        min(margin, max(0, int(screen_height) - int(hud_height))),
+    )
+
+
+def mod_tree_column_widths(available_width: int) -> dict[str, int]:
+    """Allocate readable MOD columns without letting author/version run together."""
+
+    total = max(420, int(available_width))
+    version = 76
+    status = 82
+    author = min(220, max(136, round(total * 0.24)))
+    name = max(126, total - version - author - status)
+    return {
+        "name": name,
+        "version": version,
+        "author": author,
+        "status": status,
+    }
 
 
 def combat_state_label(state: str, *, compact: bool = False) -> str:
@@ -256,14 +299,23 @@ def boss_damage_share(total_damage: float | int, boss_damage: float | int) -> fl
     return max(0.0, min(1.0, float(boss_damage) / total))
 
 
-def combat_hud_size(tk_scaling: float, ui_scale: float = 1.0) -> tuple[int, int]:
+def combat_hud_size(
+    tk_scaling: float,
+    ui_scale: float = 1.0,
+    *,
+    player_count: int = 1,
+) -> tuple[int, int]:
     """Keep the compact HUD readable when Windows uses high-DPI fonts."""
 
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
     scale = min(1.25, max(0.85, float(ui_scale)))
+    teammate_column_width = 0
+    if int(player_count) >= 2:
+        teammate_column_width = round((230 + 20 * high_dpi) * scale)
+    height_gain = 160 if int(player_count) >= 2 else 84
     return (
-        round((350 + 40 * high_dpi) * scale),
-        round((456 + 72 * high_dpi) * scale),
+        round((350 + 40 * high_dpi) * scale) + teammate_column_width,
+        round((474 + height_gain * high_dpi) * scale),
     )
 
 
@@ -281,12 +333,22 @@ def hud_panel_height(
 
 def main_window_min_size(tk_scaling: float) -> tuple[int, int]:
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
-    return 780 + round(120 * high_dpi), 610 + round(180 * high_dpi)
+    return 780 + round(840 * high_dpi), 700 + round(280 * high_dpi)
 
 
 def main_metric_card_height(tk_scaling: float) -> int:
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
     return 133 + round(36 * high_dpi)
+
+
+def main_team_panel_height(tk_scaling: float) -> int:
+    high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
+    return 115 + round(36 * high_dpi)
+
+
+def hud_teammate_card_height(tk_scaling: float) -> int:
+    high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
+    return 150 + round(56 * high_dpi)
 
 
 def combat_table_numeric_width(tk_scaling: float, ui_scale: float = 1.0) -> int:
@@ -376,12 +438,59 @@ def _set_fitting_text(
     label.configure(text=text, font=("Microsoft YaHei UI", size))
 
 
+def combat_team_rows(
+    snapshot: CombatSnapshot,
+    *,
+    maximum: int = 4,
+) -> list[tuple[str, int, int, float]]:
+    """Return active privacy-safe party rows in stable display order."""
+
+    rows: list[tuple[str, int, int, float]] = []
+    for values in snapshot.player_breakdown.values():
+        if not values.get("active", False):
+            continue
+        rows.append(
+            (
+                str(values.get("label") or "队友"),
+                int(values.get("damage_dealt") or 0),
+                int(values.get("boss_damage") or 0),
+                max(0.0, min(1.0, float(values.get("damage_share") or 0.0))),
+            )
+        )
+        if len(rows) >= max(1, int(maximum)):
+            break
+    return rows
+
+
+def combat_teammate_rows(
+    snapshot: CombatSnapshot,
+) -> list[tuple[str, int, int, float]]:
+    """Return only active remote players for the HUD side cards."""
+
+    rows: list[tuple[str, int, int, float]] = []
+    for values in snapshot.player_breakdown.values():
+        if not values.get("active", False) or values.get("is_local", False):
+            continue
+        rows.append(
+            (
+                str(values.get("label") or f"队友 {len(rows) + 1}"),
+                int(values.get("damage_dealt") or 0),
+                int(values.get("boss_damage") or 0),
+                max(0.0, min(1.0, float(values.get("damage_share") or 0.0))),
+            )
+        )
+        if len(rows) >= 3:
+            break
+    return rows
+
+
 def seed_demo_combat(
     aggregator: CombatAggregator,
     *,
     scale: int = 1,
     scenario_id: str = "MudSwamp",
     room_index: int = 4,
+    party_size: int = 1,
 ) -> None:
     """Load deterministic synthetic data for visual QA; never used in normal mode."""
 
@@ -391,6 +500,8 @@ def seed_demo_combat(
         raise ValueError("scenario_id must not be empty")
     if not 0 <= room_index <= 101:
         raise ValueError("room_index must be between 0 and 101")
+    if not 1 <= party_size <= 4:
+        raise ValueError("party_size must be between 1 and 4")
 
     scenario = aggregator.scenario_registry.resolve(scenario_id)
     stage_level = scenario.stage_level if scenario.stage_level is not None else 0
@@ -424,12 +535,25 @@ def seed_demo_combat(
 
     ingest("status", status="session_started")
     ingest("status", status="room_started")
-    for damage, source, is_boss in (
+    ingest(
+        "status",
+        status="party_updated",
+        aggregate=False,
+        party_members=[
+            {
+                "player_id": f"demo-player-{index + 1}",
+                "player_slot": index,
+                "is_local": index == 0,
+            }
+            for index in range(party_size)
+        ],
+    )
+    for damage_index, (damage, source, is_boss) in enumerate((
         (18_760 * scale, "combat.player.normal", False),
         (8_940 * scale, "combat.player.element", True),
         (480 * scale, "combat.player.element", False),
         (6_148 * scale, "combat.summon", False),
-    ):
+    )):
         ingest(
             "damage_resolution",
             damage_direction="dealt",
@@ -440,6 +564,7 @@ def seed_demo_combat(
             damage_outcome="applied",
             is_boss=is_boss,
             source_token=source,
+            owner_player_id=f"demo-player-{damage_index % party_size + 1}",
         )
     ingest(
         "damage_resolution",
@@ -593,6 +718,16 @@ class CombatHudWindow:
         self._drag_origin: tuple[int, int, int, int] | None = None
         self._boss_share = 0.0
         self.boss_share_bar: tk.Canvas | None = None
+        self.panels: dict[str, RoundedPanel] = {}
+        self.team_side_host: tk.Frame | None = None
+        self.teammate_panels: list[RoundedPanel] = []
+        self.teammate_labels: list[
+            tuple[tk.Label, tk.Label, tk.Label, tk.Label]
+        ] = []
+        self.teammate_bars: list[tk.Canvas] = []
+        self._teammate_shares = [0.0, 0.0, 0.0]
+        self._team_visible = False
+        self._last_player_count = 1
         self._tk_scaling = 1.5
         self.ui_scale = min(1.25, max(0.85, float(ui_scale)))
 
@@ -620,7 +755,11 @@ class CombatHudWindow:
         if was_visible:
             self.show()
             if self.window is not None and position is not None:
-                width, height = combat_hud_size(self._tk_scaling, self.ui_scale)
+                width, height = combat_hud_size(
+                    self._tk_scaling,
+                    self.ui_scale,
+                    player_count=self._last_player_count,
+                )
                 x = min(
                     max(0, position[0]),
                     max(0, self.window.winfo_screenwidth() - width),
@@ -654,8 +793,30 @@ class CombatHudWindow:
         except tk.TclError:
             pass
 
+        self.panels.clear()
+        self.teammate_panels.clear()
+        self.teammate_labels.clear()
+        self.teammate_bars.clear()
+        self._team_visible = False
+        self._last_player_count = 1
+        layout = tk.Frame(window, bg=HUD_TRANSPARENT)
+        layout.pack(fill="both", expand=True)
+        base_width, base_height = combat_hud_size(
+            self._tk_scaling,
+            self.ui_scale,
+            player_count=1,
+        )
+        left_host = tk.Frame(
+            layout,
+            bg=HUD_TRANSPARENT,
+            width=base_width,
+            height=base_height,
+        )
+        left_host.pack(side="left", fill="y")
+        left_host.pack_propagate(False)
+
         outer = RoundedPanel(
-            window,
+            left_host,
             fill="#F8F4EB",
             outline="#E9DED0",
             radius=self._px(18),
@@ -672,7 +833,7 @@ class CombatHudWindow:
             text="LC2 战斗",
             bg="#F8F4EB",
             fg=TEXT,
-            font=self._font("Microsoft YaHei UI", 10, "bold"),
+            font=self._font("Microsoft YaHei UI", 11, "bold"),
         )
         title_label.pack(side="left")
         self.labels["hud_status"] = tk.Label(
@@ -680,7 +841,7 @@ class CombatHudWindow:
             text="● 等待数据",
             bg="#F8F4EB",
             fg=MUTED,
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         )
         self.labels["hud_status"].pack(side="left", padx=(self._px(10), 0))
         tk.Button(
@@ -695,7 +856,7 @@ class CombatHudWindow:
             padx=self._px(9),
             pady=self._px(3),
             cursor="hand2",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         ).pack(side="right")
         for widget in (header, title_label, self.labels["hud_status"]):
             widget.bind("<ButtonPress-1>", self._begin_drag)
@@ -706,7 +867,11 @@ class CombatHudWindow:
         self._build_damage_group(body)
         self._build_resource_group(body)
         self._build_recent_group(body)
+        self._build_teammate_side(layout)
         window.protocol("WM_DELETE_WINDOW", window.withdraw)
+        # Commit the single-player geometry before a demo/live party snapshot
+        # expands only the transparent window surface to the right.
+        window.update_idletasks()
         self.refresh()
 
     def _begin_drag(self, event: tk.Event[Any]) -> None:
@@ -733,6 +898,7 @@ class CombatHudWindow:
         *,
         height: int,
         high_dpi_gain: int = 12,
+        panel_key: str | None = None,
     ) -> tk.Frame:
         panel = RoundedPanel(
             parent,
@@ -750,10 +916,12 @@ class CombatHudWindow:
             content_pady=self._px(7),
         )
         panel.pack(fill="x", pady=(0, self._px(5)))
+        if panel_key is not None:
+            self.panels[panel_key] = panel
         return panel.content
 
     def _build_damage_group(self, parent: tk.Frame) -> None:
-        cell = self._hud_panel(parent, height=112)
+        cell = self._hud_panel(parent, height=126, panel_key="damage")
         tk.Frame(cell, bg=GOLD, height=self._px(2)).pack(
             fill="x", pady=(0, self._px(5))
         )
@@ -766,7 +934,7 @@ class CombatHudWindow:
         )
         # Reserve the composition bar first; the expanding number columns may
         # then use only the space that truly remains at every DPI.
-        self.boss_share_bar.pack(side="bottom", fill="x", pady=(self._px(5), 0))
+        self.boss_share_bar.pack(side="bottom", fill="x", pady=(self._px(8), 0))
         self.boss_share_bar.bind("<Configure>", self._draw_boss_share)
         columns = tk.Frame(cell, bg="#FCFAF6")
         columns.pack(fill="both", expand=True)
@@ -780,7 +948,7 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=MUTED,
             anchor="w",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         ).pack(fill="x")
         self.labels["damage"] = tk.Label(
             total,
@@ -790,7 +958,7 @@ class CombatHudWindow:
             anchor="w",
             font=self._font("Segoe UI", 19, "bold"),
         )
-        self.labels["damage"].pack(fill="x", pady=(self._px(1), 0))
+        self.labels["damage"].pack(fill="x", pady=(self._px(1), self._px(5)))
         boss = tk.Frame(columns, bg="#FCFAF6", padx=self._px(8))
         boss.grid(row=0, column=1, sticky="nsew", padx=(self._px(6), 0))
         tk.Label(
@@ -799,7 +967,7 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=RED,
             anchor="e",
-            font=self._font("Microsoft YaHei UI", 8, "bold"),
+            font=self._font("Microsoft YaHei UI", 9, "bold"),
         ).pack(fill="x")
         self.labels["boss"] = tk.Label(
             boss,
@@ -809,7 +977,90 @@ class CombatHudWindow:
             anchor="e",
             font=self._font("Segoe UI", 16, "bold"),
         )
-        self.labels["boss"].pack(fill="x")
+        self.labels["boss"].pack(fill="x", pady=(0, self._px(5)))
+
+    def _build_teammate_side(self, parent: tk.Frame) -> None:
+        full_width, _ = combat_hud_size(
+            self._tk_scaling,
+            self.ui_scale,
+            player_count=2,
+        )
+        base_width, _ = combat_hud_size(
+            self._tk_scaling,
+            self.ui_scale,
+            player_count=1,
+        )
+        host = tk.Frame(
+            parent,
+            bg=HUD_TRANSPARENT,
+            width=max(self._px(210), full_width - base_width),
+            padx=self._px(8),
+        )
+        host.pack_propagate(False)
+        self.team_side_host = host
+        card_height = self._px(hud_teammate_card_height(self._tk_scaling))
+        for index in range(3):
+            panel = RoundedPanel(
+                host,
+                fill="#FCFAF6",
+                outline="#E9DED0",
+                radius=self._px(14),
+                height=card_height,
+                content_padx=self._px(10),
+                content_pady=self._px(7),
+            )
+            cell = panel.content
+            name = tk.Label(
+                cell,
+                text=f"队友 {index + 1}",
+                bg="#FCFAF6",
+                fg=TEXT,
+                anchor="w",
+                font=self._font("Microsoft YaHei UI", 10, "bold"),
+            )
+            name.pack(fill="x")
+            damage = tk.Label(
+                cell,
+                text="0",
+                bg="#FCFAF6",
+                fg=GOLD,
+                anchor="w",
+                font=self._font("Segoe UI", 14, "bold"),
+            )
+            damage.pack(fill="x", pady=(self._px(2), 0))
+            share = tk.Label(
+                cell,
+                text="队伍占比 0%",
+                bg="#FCFAF6",
+                fg=MUTED,
+                anchor="w",
+                font=self._font("Microsoft YaHei UI", 8),
+            )
+            share.pack(fill="x")
+            bar = tk.Canvas(
+                cell,
+                bg="#FCFAF6",
+                height=self._px(8),
+                highlightthickness=0,
+                bd=0,
+            )
+            bar.pack(fill="x", pady=(self._px(3), self._px(3)))
+            bar.bind(
+                "<Configure>",
+                lambda _event, bar_index=index: self._draw_teammate_share(bar_index),
+            )
+            boss = tk.Label(
+                cell,
+                text="Boss 0",
+                bg="#FCFAF6",
+                fg=RED,
+                anchor="w",
+                font=self._font("Microsoft YaHei UI", 9),
+            )
+            boss.pack(fill="x")
+            self.teammate_panels.append(panel)
+            self.teammate_labels.append((name, damage, share, boss))
+            self.teammate_bars.append(bar)
 
     def _draw_boss_share(self, _event: tk.Event[Any] | None = None) -> None:
         bar = self.boss_share_bar
@@ -843,8 +1094,38 @@ class CombatHudWindow:
                 capstyle=tk.ROUND,
             )
 
+    def _draw_teammate_share(self, index: int) -> None:
+        if not 0 <= index < len(self.teammate_bars):
+            return
+        bar = self.teammate_bars[index]
+        width = max(1, bar.winfo_width())
+        height = max(1, bar.winfo_height())
+        left, right = 4, max(4, width - 4)
+        y = height / 2
+        share = max(0.0, min(1.0, self._teammate_shares[index]))
+        bar.delete("all")
+        bar.create_line(
+            left,
+            y,
+            right,
+            y,
+            fill="#E4D8C7",
+            width=self._px(6),
+            capstyle=tk.ROUND,
+        )
+        if share > 0:
+            bar.create_line(
+                left,
+                y,
+                left + (right - left) * share,
+                y,
+                fill=GOLD,
+                width=self._px(6),
+                capstyle=tk.ROUND,
+            )
+
     def _build_resource_group(self, parent: tk.Frame) -> None:
-        cell = self._hud_panel(parent, height=152)
+        cell = self._hud_panel(parent, height=152, panel_key="resource")
         columns = tk.Frame(cell, bg="#FCFAF6")
         columns.pack(fill="both", expand=True)
         for column in range(3):
@@ -860,7 +1141,7 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=MUTED,
             anchor="w",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         ).pack(fill="x")
         self.labels["hp_loss"] = tk.Label(
             hp,
@@ -877,7 +1158,7 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=GREEN,
             anchor="w",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         )
         self.labels["healing"].pack(fill="x")
         tk.Frame(columns, bg="#E9DED0", width=self._px(1)).grid(
@@ -894,7 +1175,7 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=MUTED,
             anchor="w",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         ).pack(fill="x")
         self.labels["mp_spent"] = tk.Label(
             mp,
@@ -911,12 +1192,17 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=BLUE,
             anchor="w",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         )
         self.labels["mp_gained"].pack(fill="x")
 
     def _build_recent_group(self, parent: tk.Frame) -> None:
-        cell = self._hud_panel(parent, height=114, high_dpi_gain=34)
+        cell = self._hud_panel(
+            parent,
+            height=114,
+            high_dpi_gain=34,
+            panel_key="recent",
+        )
         tk.Frame(cell, bg=GREEN, height=self._px(2)).pack(
             fill="x", pady=(0, self._px(4))
         )
@@ -933,7 +1219,7 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=MUTED,
             anchor="w",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         ).pack(fill="x")
         self.labels["dps"] = tk.Label(
             copy,
@@ -950,7 +1236,7 @@ class CombatHudWindow:
             bg="#FCFAF6",
             fg=MUTED,
             anchor="e",
-            font=self._font("Microsoft YaHei UI", 8),
+            font=self._font("Microsoft YaHei UI", 9),
         )
         self.labels["room"].grid(
             row=0,
@@ -1012,11 +1298,67 @@ class CombatHudWindow:
             _set_fitting_text(
                 self.labels["room"],
                 format_location_label(snapshot),
-                base_size=max(7, round(8 * self.ui_scale)),
-                minimum_size=max(6, round(6 * self.ui_scale)),
+                base_size=max(8, round(9 * self.ui_scale)),
+                minimum_size=max(7, round(7 * self.ui_scale)),
             )
+            self._refresh_team(snapshot)
         except tk.TclError:
             self.window = None
+
+    def _refresh_team(self, snapshot: CombatSnapshot) -> None:
+        rows = combat_teammate_rows(snapshot)
+        player_count = 1 + len(rows)
+        visible = bool(rows)
+        if visible != self._team_visible:
+            self._team_visible = visible
+            self._last_player_count = player_count if visible else 1
+            if self.team_side_host is not None:
+                if visible:
+                    self.team_side_host.pack(side="left", fill="y")
+                else:
+                    self.team_side_host.pack_forget()
+            self._resize_for_party()
+        elif visible:
+            self._last_player_count = player_count
+
+        for index, panel in enumerate(self.teammate_panels):
+            if visible and index < len(rows):
+                label, damage, boss, share = rows[index]
+                name_label, damage_label, share_label, boss_label = self.teammate_labels[index]
+                name_label.configure(text=label)
+                _set_metric_label(
+                    damage_label,
+                    format_metric(damage),
+                    base_size=max(8, round(14 * self.ui_scale)),
+                    characters_at_base=10,
+                    minimum_size=max(7, round(9 * self.ui_scale)),
+                )
+                share_label.configure(text=f"队伍占比 {round(share * 100)}%")
+                boss_label.configure(text=f"Boss {format_metric(boss)}")
+                self._teammate_shares[index] = share
+                panel.pack(fill="x", pady=(0, self._px(5)))
+                self._draw_teammate_share(index)
+            else:
+                self._teammate_shares[index] = 0.0
+                panel.pack_forget()
+
+    def _resize_for_party(self) -> None:
+        if self.window is None:
+            return
+        width, height = combat_hud_size(
+            self._tk_scaling,
+            self.ui_scale,
+            player_count=self._last_player_count,
+        )
+        x = min(
+            max(0, self.window.winfo_x()),
+            max(0, self.window.winfo_screenwidth() - width),
+        )
+        y = min(
+            max(0, self.window.winfo_y()),
+            max(0, self.window.winfo_screenheight() - height),
+        )
+        self.window.geometry(f"{width}x{height}+{x}+{y}")
 
     def close(self) -> None:
         if self.window is not None:
@@ -1032,10 +1374,17 @@ class CombatHudWindow:
         # fonts receive only the extra pixels they need instead of a permanent
         # empty footer on lower-scale displays.
         width, height = combat_hud_size(
-            float(window.tk.call("tk", "scaling")), self.ui_scale
+            float(window.tk.call("tk", "scaling")),
+            self.ui_scale,
+            player_count=self._last_player_count,
         )
-        x = max(10, (window.winfo_screenwidth() - width) // 2)
-        y = max(10, window.winfo_screenheight() - height - 90)
+        x, y = combat_hud_initial_position(
+            window.winfo_screenwidth(),
+            window.winfo_screenheight(),
+            width,
+            height,
+            ui_scale=self.ui_scale,
+        )
         return f"{width}x{height}+{x}+{y}"
 
 
@@ -1052,12 +1401,14 @@ class ToolboxShell:
         mod_inspector: ModPackageInspector,
         user_mod_registry: UserModRegistry,
         mod_inbox: Path,
+        support_directory: Path | None = None,
         combat_aggregator: CombatAggregator,
         combat_event_pump: CombatEventPump | None,
         keyboard_preview_provider: Callable[
             [], Iterable[tuple[str, str, tuple[int, int, int, int]]]
         ],
         launch_game: Callable[[], None],
+        ensure_game_runtime: Callable[[], bool],
         choose_game_path: Callable[[], None],
         close_command: Callable[[], None],
         app_version: str,
@@ -1071,10 +1422,14 @@ class ToolboxShell:
         self.user_mod_registry = user_mod_registry
         self.mod_inbox = mod_inbox.resolve()
         self.mod_help_file = self.mod_inbox.parent / "MOD自动添加说明.txt"
+        self.support_directory = (
+            support_directory.resolve() if support_directory is not None else None
+        )
         self.combat_aggregator = combat_aggregator
         self.combat_event_pump = combat_event_pump
         self.keyboard_preview_provider = keyboard_preview_provider
         self.launch_game = launch_game
+        self.ensure_game_runtime = ensure_game_runtime
         self.choose_game_path = choose_game_path
         self.close_command = close_command
         self.app_version = app_version
@@ -1096,12 +1451,22 @@ class ToolboxShell:
         self.mod_detail_labels: dict[str, tk.Label] = {}
         self.mod_action_buttons: dict[str, tk.Button] = {}
         self.input_mode_buttons: dict[str, tk.Button] = {}
+        self.combat_team_panel: RoundedPanel | None = None
+        self.combat_detail_panel: RoundedPanel | None = None
+        self.combat_team_cells: list[tk.Frame] = []
+        self.combat_team_labels: list[tuple[tk.Label, tk.Label, tk.Label]] = []
+        self.combat_team_bars: list[tk.Canvas] = []
+        self._combat_team_shares = [0.0, 0.0, 0.0, 0.0]
         self._mod_busy = False
         self._mod_results: queue.Queue[tuple[bool, Exception | None]] = queue.Queue()
         self._mod_import_results: queue.Queue[
             tuple[list[ModDraft], list[tuple[str, str]]]
         ] = queue.Queue()
         self._after_id: str | None = None
+        self._support_hide_after_id: str | None = None
+        self._support_popup: tk.Toplevel | None = None
+        self._support_qr_image: tk.PhotoImage | None = None
+        self._support_button: tk.Button | None = None
         self._closed = False
         self._main_roots: list[tk.Misc] = []
         self._main_font_bases: dict[tk.Misc, tuple[str, int, str, str]] = {}
@@ -1322,6 +1687,37 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 8),
         ).pack(side="left", padx=(8, 0))
         tk.Button(
+            footer_meta,
+            text="bilibili",
+            command=self._open_bilibili,
+            bg="#F8F4EB",
+            fg="#E05A72",
+            activebackground="#F4E4E7",
+            activeforeground="#C8435B",
+            relief="flat",
+            bd=0,
+            padx=8,
+            cursor="hand2",
+            font=("Microsoft YaHei UI", 8),
+        ).pack(side="left", padx=(4, 0))
+        self._support_button = tk.Button(
+            footer_meta,
+            text=SUPPORT_LABEL,
+            command=self._open_support_directory,
+            bg="#F8F4EB",
+            fg=GOLD,
+            activebackground="#F4E8CC",
+            activeforeground=GOLD,
+            relief="flat",
+            bd=0,
+            padx=8,
+            cursor="hand2",
+            font=("Microsoft YaHei UI", 8, "bold"),
+        )
+        self._support_button.pack(side="left", padx=(4, 0))
+        self._support_button.bind("<Enter>", self._show_support_popup)
+        self._support_button.bind("<Leave>", self._schedule_support_popup_hide)
+        tk.Button(
             footer,
             text="退出工具箱",
             command=self.close_command,
@@ -1520,12 +1916,100 @@ class ToolboxShell:
         self._metric_card(cards, 1, TAKEN_DAMAGE_LABEL, "combat_hp", "combat_heal", RED)
         self._metric_card(cards, 2, "法力消耗", "combat_mp", "combat_mp_gain", BLUE)
 
+        team_panel = RoundedPanel(
+            page,
+            height=main_team_panel_height(
+                float(self.root.tk.call("tk", "scaling"))
+            ),
+            content_padx=12,
+            content_pady=6,
+        )
+        self.combat_team_panel = team_panel
+        team = team_panel.content
+        team_heading = tk.Frame(team, bg=SURFACE)
+        team_heading.pack(fill="x", pady=(0, 4))
+        self.labels["combat_team_heading"] = tk.Label(
+            team_heading,
+            text="队伍伤害",
+            bg=SURFACE,
+            fg=TEXT,
+            anchor="w",
+            font=("Microsoft YaHei UI", 9, "bold"),
+        )
+        self.labels["combat_team_heading"].pack(side="left")
+        self.labels["combat_team_unattributed"] = tk.Label(
+            team_heading,
+            text="",
+            bg=SURFACE,
+            fg=MUTED,
+            anchor="e",
+            font=("Microsoft YaHei UI", 7),
+        )
+        self.labels["combat_team_unattributed"].pack(side="right")
+        team_grid = tk.Frame(team, bg=SURFACE)
+        team_grid.pack(fill="both", expand=True)
+        for column in range(4):
+            team_grid.grid_columnconfigure(column, weight=1, uniform="party")
+        for index in range(4):
+            player = tk.Frame(team_grid, bg=SURFACE)
+            player.grid(
+                row=0,
+                column=index,
+                sticky="nsew",
+                padx=(0 if index == 0 else 7, 7 if index < 3 else 0),
+            )
+            player_heading = tk.Frame(player, bg=SURFACE)
+            player_heading.pack(fill="x")
+            name = tk.Label(
+                player_heading,
+                text="队友",
+                bg=SURFACE,
+                fg=TEXT,
+                anchor="w",
+                font=("Microsoft YaHei UI", 9, "bold"),
+            )
+            name.pack(side="left")
+            boss = tk.Label(
+                player_heading,
+                text="Boss 0",
+                bg=SURFACE,
+                fg=RED,
+                anchor="e",
+                font=("Microsoft YaHei UI", 7),
+            )
+            boss.pack(side="right")
+            damage = tk.Label(
+                player,
+                text="伤害 0 · 0%",
+                bg=SURFACE,
+                fg=GOLD,
+                anchor="w",
+                font=("Microsoft YaHei UI", 8),
+            )
+            damage.pack(fill="x")
+            share_bar = tk.Canvas(
+                player,
+                bg=SURFACE,
+                height=max(4, round(7 * self.main_ui_scale)),
+                highlightthickness=0,
+                bd=0,
+            )
+            share_bar.pack(fill="x", pady=(2, 2))
+            share_bar.bind(
+                "<Configure>",
+                lambda _event, bar_index=index: self._draw_combat_team_share(bar_index),
+            )
+            self.combat_team_cells.append(player)
+            self.combat_team_labels.append((name, damage, boss))
+            self.combat_team_bars.append(share_bar)
+
         detail_panel = RoundedPanel(
             page,
             height=265,
             content_padx=12,
             content_pady=5,
         )
+        self.combat_detail_panel = detail_panel
         detail_panel.pack(fill="both", expand=True, pady=(9, 0))
         detail = detail_panel.content
         heading = tk.Frame(detail, bg=SURFACE)
@@ -1808,7 +2292,6 @@ class ToolboxShell:
             insertbackground=TEXT,
             font=("Microsoft YaHei UI", 9),
         )
-        search.pack(side="left", fill="x", expand=True, padx=(6, 10), ipady=4)
         self._button(toolbar, "打开目录", self._open_mod_inbox, width=9).pack(
             side="right", padx=(6, 0)
         )
@@ -1818,6 +2301,7 @@ class ToolboxShell:
         self._button(toolbar, "添加 MOD", self._add_user_mod, accent=True, width=10).pack(
             side="right"
         )
+        search.pack(side="left", fill="x", expand=True, padx=(6, 10), ipady=4)
 
         mod_content = tk.Frame(page, bg=BG)
         mod_content.pack(fill="both", expand=True)
@@ -1839,15 +2323,37 @@ class ToolboxShell:
         tree.heading("version", text="版本")
         tree.heading("author", text="作者")
         tree.heading("status", text="状态")
-        tree.column("name", width=190, minwidth=110, stretch=True, anchor="w")
-        tree.column("version", width=58, minwidth=48, stretch=False, anchor="center")
-        tree.column("author", width=105, minwidth=70, stretch=True, anchor="w")
-        tree.column("status", width=78, minwidth=68, stretch=False, anchor="center")
+        initial_widths = mod_tree_column_widths(560)
+        tree.column(
+            "name", width=initial_widths["name"], minwidth=126, stretch=False, anchor="w"
+        )
+        tree.column(
+            "version",
+            width=initial_widths["version"],
+            minwidth=68,
+            stretch=False,
+            anchor="center",
+        )
+        tree.column(
+            "author",
+            width=initial_widths["author"],
+            minwidth=118,
+            stretch=False,
+            anchor="w",
+        )
+        tree.column(
+            "status",
+            width=initial_widths["status"],
+            minwidth=72,
+            stretch=False,
+            anchor="center",
+        )
         scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         tree.bind("<<TreeviewSelect>>", self._on_mod_selected)
+        tree.bind("<Configure>", self._resize_mod_tree_columns)
         self.mod_tree = tree
 
         detail_panel = RoundedPanel(mod_content, height=178, content_padx=14, content_pady=10)
@@ -2375,6 +2881,11 @@ class ToolboxShell:
             parent=self.root,
         ):
             return
+        if (
+            descriptor.operation.kind == "bepinex_plugin"
+            and not self.ensure_game_runtime()
+        ):
+            return
         self._mod_busy = True
         self._refresh_mod_page()
 
@@ -2573,6 +3084,179 @@ class ToolboxShell:
             parent=self.root,
         )
 
+    def _open_bilibili(self) -> None:
+        if webbrowser.open(TOOLBOX_BILIBILI_URL, new=2):
+            return
+        messagebox.showerror(
+            "无法打开 Bilibili",
+            f"请手动访问：\n{TOOLBOX_BILIBILI_URL}",
+            parent=self.root,
+        )
+
+    def _open_support_directory(self) -> None:
+        directory = self.support_directory
+        if directory is None or not directory.is_dir():
+            messagebox.showinfo(
+                "赞助与投喂",
+                f"{SUPPORT_NOTE}\n\n当前副本未找到赞助素材目录。",
+                parent=self.root,
+            )
+            return
+        try:
+            os.startfile(str(directory))
+        except OSError:
+            messagebox.showerror(
+                "无法打开目录",
+                f"请手动打开：\n{directory}",
+                parent=self.root,
+            )
+
+    def _show_support_popup(self, _event: tk.Event[Any] | None = None) -> None:
+        self._cancel_support_popup_hide()
+        if self._support_popup is not None:
+            try:
+                self._support_popup.deiconify()
+                self._position_support_popup()
+                return
+            except tk.TclError:
+                self._support_popup = None
+
+        popup = tk.Toplevel(self.root)
+        self._support_popup = popup
+        popup.title("赞助与投喂")
+        popup.overrideredirect(True)
+        popup.transient(self.root)
+        try:
+            popup.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        panel = tk.Frame(
+            popup,
+            bg=SURFACE,
+            padx=14,
+            pady=12,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+        )
+        panel.pack(fill="both", expand=True)
+        tk.Label(
+            panel,
+            text=SUPPORT_TITLE,
+            bg=SURFACE,
+            fg=TEXT,
+            font=("Microsoft YaHei UI", 10, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            panel,
+            text=SUPPORT_NOTE,
+            bg=SURFACE,
+            fg=MUTED,
+            justify="left",
+            wraplength=300,
+            font=("Microsoft YaHei UI", 8),
+        ).pack(anchor="w", pady=(5, 8))
+
+        qr_path = (
+            self.support_directory / SUPPORT_QR_FILENAME
+            if self.support_directory is not None
+            else None
+        )
+        if qr_path is not None and qr_path.is_file():
+            try:
+                image = tk.PhotoImage(file=str(qr_path))
+                factor = max(
+                    1,
+                    (image.width() + 259) // 260,
+                    (image.height() + 359) // 360,
+                )
+                if factor > 1:
+                    image = image.subsample(factor, factor)
+                self._support_qr_image = image
+                tk.Label(panel, image=image, bg=SURFACE, cursor="hand2").pack()
+            except tk.TclError:
+                self._support_qr_image = None
+        if self._support_qr_image is None:
+            tk.Label(
+                panel,
+                text="点击打开本地赞助说明与收款码",
+                bg="#F4E8CC",
+                fg=GOLD,
+                padx=12,
+                pady=10,
+                font=("Microsoft YaHei UI", 8, "bold"),
+                cursor="hand2",
+            ).pack(fill="x")
+        tk.Label(
+            panel,
+            text="点击查看微信 / 支付宝与完整说明",
+            bg=SURFACE,
+            fg=GOLD,
+            font=("Microsoft YaHei UI", 8),
+            cursor="hand2",
+        ).pack(pady=(8, 0))
+
+        def bind_popup_tree(widget: tk.Misc) -> None:
+            widget.bind("<Enter>", self._cancel_support_popup_hide, add="+")
+            widget.bind("<Leave>", self._schedule_support_popup_hide, add="+")
+            widget.bind("<Button-1>", lambda _click: self._open_support_directory(), add="+")
+            for child in widget.winfo_children():
+                bind_popup_tree(child)
+
+        bind_popup_tree(popup)
+        popup.update_idletasks()
+        self._position_support_popup()
+
+    def _position_support_popup(self) -> None:
+        popup = self._support_popup
+        button = self._support_button
+        if popup is None or button is None:
+            return
+        try:
+            popup.update_idletasks()
+            width = popup.winfo_reqwidth()
+            height = popup.winfo_reqheight()
+            x = button.winfo_rootx()
+            y = button.winfo_rooty() - height - 8
+            x = min(max(8, x), max(8, popup.winfo_screenwidth() - width - 8))
+            y = min(max(8, y), max(8, popup.winfo_screenheight() - height - 8))
+            popup.geometry(f"+{x}+{y}")
+        except tk.TclError:
+            self._support_popup = None
+
+    def _schedule_support_popup_hide(self, _event: tk.Event[Any] | None = None) -> None:
+        self._cancel_support_popup_hide()
+        try:
+            self._support_hide_after_id = self.root.after(
+                220, self._hide_support_popup
+            )
+        except tk.TclError:
+            self._support_hide_after_id = None
+
+    def _cancel_support_popup_hide(self, _event: tk.Event[Any] | None = None) -> None:
+        if self._support_hide_after_id is None:
+            return
+        try:
+            self.root.after_cancel(self._support_hide_after_id)
+        except tk.TclError:
+            pass
+        self._support_hide_after_id = None
+
+    def _hide_support_popup(self) -> None:
+        self._support_hide_after_id = None
+        if self._support_popup is not None:
+            try:
+                self._support_popup.withdraw()
+            except tk.TclError:
+                self._support_popup = None
+
+    def _resize_mod_tree_columns(self, event: tk.Event[Any]) -> None:
+        tree = self.mod_tree
+        if tree is None or event.widget is not tree:
+            return
+        widths = mod_tree_column_widths(event.width)
+        for column, width in widths.items():
+            tree.column(column, width=width)
+
     def _display_control_row(
         self,
         parent: tk.Frame,
@@ -2582,6 +3266,13 @@ class ToolboxShell:
     ) -> None:
         row = tk.Frame(parent, bg=SURFACE, pady=4)
         row.pack(fill="x")
+        controls = tk.Frame(row, bg=SURFACE)
+        controls.pack(side="right")
+        for index, (label, command) in enumerate(actions):
+            self._button(controls, label, command, width=6).pack(
+                side="left",
+                padx=(0 if index == 0 else 5, 0),
+            )
         copy = tk.Frame(row, bg=SURFACE)
         copy.pack(side="left", fill="x", expand=True)
         tk.Label(
@@ -2600,13 +3291,6 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 8),
         )
         self.labels[value_key].pack(side="left", padx=(10, 0))
-        controls = tk.Frame(row, bg=SURFACE)
-        controls.pack(side="right")
-        for index, (label, command) in enumerate(actions):
-            self._button(controls, label, command, width=6).pack(
-                side="left",
-                padx=(0 if index == 0 else 5, 0),
-            )
 
     def _settings_row(
         self,
@@ -2872,6 +3556,42 @@ class ToolboxShell:
         self.labels["combat_mp_gain"].configure(
             text=f"恢复 +{format_whole_metric(snapshot.mp_gained)}"
         )
+        team_rows = combat_team_rows(snapshot)
+        team_visible = snapshot.detected_player_count >= 2 and len(team_rows) >= 2
+        if self.combat_team_panel is not None:
+            if team_visible and not self.combat_team_panel.winfo_manager():
+                self.combat_team_panel.pack(
+                    fill="x",
+                    pady=(9, 0),
+                    before=self.combat_detail_panel,
+                )
+            elif not team_visible and self.combat_team_panel.winfo_manager():
+                self.combat_team_panel.pack_forget()
+        self.labels["combat_team_heading"].configure(
+            text=f"队伍伤害 · {max(1, snapshot.detected_player_count)} 人"
+        )
+        self.labels["combat_team_unattributed"].configure(
+            text=(
+                f"未归属 {format_metric(snapshot.unattributed_damage)}"
+                if snapshot.unattributed_damage > 0
+                else ""
+            )
+        )
+        for index, cell in enumerate(self.combat_team_cells):
+            if team_visible and index < len(team_rows):
+                label, damage, boss, share = team_rows[index]
+                name_label, damage_label, boss_label = self.combat_team_labels[index]
+                name_label.configure(text=label)
+                damage_label.configure(
+                    text=f"伤害 {format_metric(damage)} · {round(share * 100)}%"
+                )
+                boss_label.configure(text=f"Boss {format_metric(boss)}")
+                self._combat_team_shares[index] = share
+                cell.grid()
+                self._draw_combat_team_share(index)
+            else:
+                self._combat_team_shares[index] = 0.0
+                cell.grid_remove()
         for item_id in self.combat_tree.get_children():
             self.combat_tree.delete(item_id)
         ranked = sorted(
@@ -2907,6 +3627,37 @@ class ToolboxShell:
                 f"治疗溢出 {format_whole_metric(snapshot.resource_overflow)}"
             )
         )
+
+    def _draw_combat_team_share(self, index: int) -> None:
+        if not 0 <= index < len(self.combat_team_bars):
+            return
+        bar = self.combat_team_bars[index]
+        width = max(1, bar.winfo_width())
+        height = max(1, bar.winfo_height())
+        left, right = 3, max(3, width - 3)
+        y = height / 2
+        share = max(0.0, min(1.0, self._combat_team_shares[index]))
+        line_width = max(3, round(5 * self.main_ui_scale))
+        bar.delete("all")
+        bar.create_line(
+            left,
+            y,
+            right,
+            y,
+            fill="#E4D8C7",
+            width=line_width,
+            capstyle=tk.ROUND,
+        )
+        if share > 0:
+            bar.create_line(
+                left,
+                y,
+                left + (right - left) * share,
+                y,
+                fill=GOLD,
+                width=line_width,
+                capstyle=tk.ROUND,
+            )
 
     def _refresh_macro_rows(self) -> None:
         rows = macro_rows(self.macro_feature.profiles)
@@ -3020,6 +3771,14 @@ class ToolboxShell:
 
     def close(self) -> None:
         self._closed = True
+        self._cancel_support_popup_hide()
+        if self._support_popup is not None:
+            try:
+                self._support_popup.destroy()
+            except tk.TclError:
+                pass
+            self._support_popup = None
+        self._support_qr_image = None
         if self._after_id is not None:
             try:
                 self.root.after_cancel(self._after_id)

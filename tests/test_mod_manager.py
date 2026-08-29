@@ -316,7 +316,7 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 46)
+        self.assertEqual(len(catalog.entries), 49)
         bundled_root = PROJECT_ROOT / "third_party"
         for descriptor in catalog.entries:
             self.assertTrue(descriptor.operation.files)
@@ -329,6 +329,74 @@ class ModManagerTests(unittest.TestCase):
                     hashlib.sha256(payload.read_bytes()).hexdigest().upper(),
                     spec.sha256,
                 )
+
+    def test_latest_mod_family_versions_and_new_payload_identities_are_frozen(self) -> None:
+        catalog = ModCatalog.from_file(
+            PROJECT_ROOT / "assets" / "community_mod_catalog.json"
+        )
+        loot = catalog.get("loot-combat-enhancement")
+        staff = catalog.get("staff-skin-swap")
+        hide_fx = catalog.get("hide-weapon-fx")
+
+        self.assertEqual(loot.display.version, "2.5.3")
+        self.assertEqual(loot.display.author, "茶橘柚、空容、刺心")
+        self.assertEqual(catalog.get("enhancement-plan").display.author, "茶橘柚、空容、刺心")
+        self.assertEqual(catalog.get("dynamic-hp").display.author, "刺心")
+        self.assertEqual(catalog.get("demon-invasion").display.author, "墨河以轩")
+        self.assertEqual(staff.display.version, "1.5")
+        self.assertEqual(staff.display.author, "兔子王お")
+        self.assertEqual(hide_fx.display.version, "1.0")
+        self.assertEqual(hide_fx.display.author, "兔子王お")
+        self.assertEqual(
+            hide_fx.operation.expected_filename,
+            "LC2.HideWeaponFX震击环绕球隐藏.dll",
+        )
+        self.assertEqual(
+            hide_fx.integrity_policy.sha256,
+            "7A0C082EFE54CFAF7977515A09668EFB01E3CE9C25E22845249FDF1C1291D3E5",
+        )
+        self.assertIn("自动生效", hide_fx.display.usage_hint)
+
+        live_stats = catalog.get("player-live-stats")
+        self.assertEqual(live_stats.display.version, "1.3")
+        self.assertEqual(live_stats.display.author, "懒虫桑")
+        self.assertEqual(live_stats.operation.expected_filename, "实时数据1.3.dll")
+        self.assertEqual(live_stats.operation.hotkeys, ("F6",))
+        self.assertIn("2P–4P", live_stats.display.usage_hint)
+        self.assertEqual(len(live_stats.operation.files), 1)
+
+        damage_meter = catalog.get("damage-meter")
+        self.assertEqual(damage_meter.display.version, "1.6.4")
+        self.assertEqual(damage_meter.display.author, "水生凛凛")
+        self.assertEqual(
+            damage_meter.integrity_policy.sha256,
+            "915764422A72CE28D268BC19CDF794E781132F3A732EFE4004780EB5A3875A11",
+        )
+        self.assertIn("联机玩家分列", damage_meter.display.usage_hint)
+
+        duration = catalog.get("evilstone-power-duration")
+        self.assertEqual(duration.display.version, "1.5.0")
+        self.assertEqual(duration.display.author, "大萝卜鸡")
+        self.assertEqual(duration.operation.expected_filename, "EvilStonePowerDuration.dll")
+        self.assertEqual(
+            duration.integrity_policy.sha256,
+            "334A4C3B48E91E74AC6F25576B05CDC4798478DA1DE81A66569D570554B1A099",
+        )
+
+    def test_community_catalog_prioritizes_practical_mods_over_cosmetics(self) -> None:
+        catalog = ModCatalog.from_file(
+            PROJECT_ROOT / "assets" / "community_mod_catalog.json"
+        )
+        ids = [descriptor.mod_id for descriptor in catalog.entries]
+
+        self.assertEqual(
+            ids[:3],
+            ["player-live-stats", "resource-transfer-f1", "inscription-soulstone-manager"],
+        )
+        self.assertLess(ids.index("item-ban-freenix"), ids.index("armor-transmog"))
+        self.assertLess(ids.index("dynamic-hp"), ids.index("staff-skin-swap"))
+        self.assertLess(ids.index("evilstone-power-duration"), ids.index("damage-meter"))
+        self.assertLess(ids.index("damage-meter"), ids.index("welcome-message"))
 
     def test_all_community_mods_install_and_uninstall_in_isolated_game(self) -> None:
         catalog = ModCatalog.from_file(

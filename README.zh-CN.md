@@ -25,8 +25,8 @@
 | 造成伤害、承伤与生命恢复口径 | 已在记录的游戏版本完成运行时验证 |
 | 战斗事件 v2 与回放聚合 | 已实现并有行为测试 |
 | 法力与护盾观察桥 | 法力消耗/恢复已完成运行时验证；护盾仍待独立样本 |
-| 综合主窗口与外部战斗 HUD | 本地管道与 Bridge 0.4.1 已在记录的游戏构建完成聚焦实测 |
-| MOD 管理 | 2 个原有工具与 46 个最新可用社区 MOD 随包；支持本地自动识别与添加 |
+| 综合主窗口与外部战斗 HUD | Bridge 0.4.1 已完成单机实测；0.4.2 候选补齐闪避同操作回蓝与匿名多人归属 |
+| MOD 管理 | 2 个原有工具与 49 个最新可用社区 MOD 随包；支持本地自动识别与添加 |
 
 研究结论只适用于计划文档记录的游戏构建。游戏更新后，Hook 兼容性与数据口径都需要重新验证。
 
@@ -36,6 +36,7 @@
 - 从“按键显示”页面打开悬浮窗或设置；默认显示键盘，支持最多 20 个键，也可切换为手柄布局。
 - `F8` 显示/隐藏，`F9` 开关鼠标穿透，`F11` 开关纯净模式。
 - 点击“启动游戏”会优先从 Steam 安装信息定位游戏；找不到时可手动选择 `LostCastle2.exe`。
+- 全新游戏环境首次启动时会明确询问是否一键初始化 HUD / MOD 运行环境；盒子只安装固定身份的 BepInEx 与只读战斗 Bridge，不会默认启用任何社区 MOD，BepInEx 控制台默认关闭。
 - “设置”页可调整主窗口尺寸与字体档位，并分别调整按键悬浮窗和战斗 HUD 缩放。
 - 主窗口首次启动默认使用宽敞档 `1280×900、115%`，战斗 HUD 默认同时打开；已保存的标准、紧凑或自定义尺寸保持不变。
 - 设置保存在程序目录的 `config/settings.json`；该目录不会提交到 Git。
@@ -49,12 +50,14 @@
 
 ## MOD 管理
 
-- 当前收录“灵魂石修改器 1.2”（作者：恨你不见）、“金币编辑器 1.0”（作者：刺心）与 46 个按功能族去重的最新可用社区 MOD。
+- 当前收录“灵魂石修改器 1.2”（作者：恨你不见）、“金币编辑器 1.0”（作者：刺心）与 49 个按功能族去重的最新可用社区 MOD；实战/资源工具优先，外观类靠后。
 - 灵魂石修改器支持配置、启动和删除盒子副本；金币编辑器随包提供登记 DLL，可一键安装到独占 BepInEx 插件目录，并只卸载自身文件。
 - 金币编辑器安装完成后可从 MOD 卡片直接启动游戏；进入游戏按 `F5` 打开窗口，输入数量并保存，返回主菜单再进入游戏生效。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 - 社区目录剔除了旧版重复、测试、未完成、半成品和明确有 bug 的来源；每个条目显示作者、功能和使用方法，作者证据不足时明确标为“社区未署名”。
 - 用户可把 DLL、ZIP、7Z、RAR 或文件夹放入工具箱旁的“用户MOD”，点击“添加 MOD”静态识别并编辑预览；完整清单与 AI 提示词见包内 `MOD自动添加说明.txt`。
 - 普通插件安装到各自独占目录；卸载只移除登记文件，同名 DLL 冲突会阻止重复安装。BepInEx 前置整包和游戏文件覆盖不会按普通 MOD 自动添加。
+- 首次安装 DLL MOD 时会复用同一初始化入口；若已有不同身份的 BepInEx 核心，盒子停止并保留原文件，不盲目覆盖。
+- 主窗口左下角依次提供 GitHub、[bilibili](https://space.bilibili.com/88048665?) 和“投喂”；“投喂”可悬停查看默认微信赞助码，点击打开微信、支付宝与完整说明。工具箱源于玩家对《失落城堡2》的热爱，想支持加菲或催催更新时可以自愿投喂猫罐头。
 
 ## 开发与测试
 
@@ -90,7 +93,7 @@ py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo
 
 仓库包含固定版本的 7-Zip 运行组件及其许可证，clone 后可直接使用源码模式的压缩包识别。其他第三方 EXE、DLL、压缩包及生成的 `third_party/community_mods` 载荷不会提交到 Git。打包前需在本机准备 `THIRD_PARTY_NOTICES.md` 和 `assets/community_mod_catalog.json` 登记的精确输入；`build.ps1` 会核对数量、大小和 SHA-256，缺失或不一致时直接停止。
 
-实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.1 已在索引记录的游戏构建完成位置与官方法力恢复分支实测；官方回调缺失时的底层恢复兜底仍等待自然样本。
+实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.1 已在索引记录的游戏构建完成位置与官方法力恢复分支实测；0.4.2 根据真实闪避回蓝日志修正同操作扣蓝/回蓝，并提供不含昵称或平台账号的多人归属候选，仍需联机实测。
 
 ## 数据与安全边界
 

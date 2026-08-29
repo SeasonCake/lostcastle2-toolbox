@@ -2,11 +2,53 @@
   "schema_version": 2,
   "entries": [
     {
+      "id": "player-live-stats",
+      "display": {
+        "name": "玩家实时属性与队友面板",
+        "version": "1.3",
+        "author": "懒虫桑",
+        "summary": "实时显示本地玩家属性、效果，并可查看队友数据",
+        "usage_hint": "安装后启动游戏，按 F6 打开控制面板；勾选要显示的数值，点击 2P–4P 查看对应队友数据。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "实时数据1.3.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/player-live-stats",
+        "files": [
+          {
+            "path": "实时数据1.3.dll",
+            "sha256": "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
+            "size_bytes": 27136
+          }
+        ],
+        "provides": [
+          "实时数据1.3.dll"
+        ],
+        "hotkeys": [
+          "F6"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.3",
+        "author_source": "随包更新说明与作者提供的 QQ 上传列表截图（2026-08-29）",
+        "author_channel": "local community package",
+        "sha256": "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
+        "size_bytes": 27136,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
       "id": "resource-transfer-f1",
       "display": {
         "name": "一键丢钱",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "墨河以轩",
         "summary": "向队友快速转移金币并修复客机金币消失问题",
         "usage_hint": "安装后启动游戏，按 F1 使用。"
       },
@@ -31,136 +73,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "ABB944819858632AAC6C7E3137A32BF35B3B010716A0495A9C51461326122A39",
         "size_bytes": 14336,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "loot-combat-enhancement",
-      "display": {
-        "name": "战利品自选与战斗增强",
-        "version": "2.5.3",
-        "author": "社区未署名",
-        "summary": "调整战利品自选、掉落与战斗手感",
-        "usage_hint": "安装后启动游戏，按 F7 打开设置面板；与增强计划的掉落功能同时开启时请自行取舍。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2LootWeightPatch.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/loot-combat-enhancement",
-        "files": [
-          {
-            "path": "LC2LootWeightPatch.dll",
-            "sha256": "400CD89165C48B33BFE86AF89386C1117ACBAC2C975AFD8CCDB48EA35B0C50C2",
-            "size_bytes": 55808
-          }
-        ],
-        "provides": [
-          "lc2lootweightpatch.dll"
-        ],
-        "hotkeys": [
-          "F7"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 2.5.3",
-        "author_source": "随包说明未提供开发者署名",
-        "author_channel": "local community package",
-        "sha256": "400CD89165C48B33BFE86AF89386C1117ACBAC2C975AFD8CCDB48EA35B0C50C2",
-        "size_bytes": 55808,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "armor-transmog",
-      "display": {
-        "name": "服装幻化",
-        "version": "1.0",
-        "author": "社区未署名",
-        "summary": "在游戏内更换角色服装外观",
-        "usage_hint": "安装后启动游戏，按 F9 打开服装幻化界面。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2ArmorTransmog服装幻化.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/armor-transmog",
-        "files": [
-          {
-            "path": "LC2ArmorTransmog服装幻化.dll",
-            "sha256": "00BC89F9CCFCBE8CAF4F38316A951D0B45820C1978ABA1729ECE570BC2BA0E16",
-            "size_bytes": 41472
-          }
-        ],
-        "provides": [
-          "lc2armortransmog服装幻化.dll"
-        ],
-        "hotkeys": [
-          "F9"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "文件与程序集未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "00BC89F9CCFCBE8CAF4F38316A951D0B45820C1978ABA1729ECE570BC2BA0E16",
-        "size_bytes": 41472,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "all-inscriptions",
-      "display": {
-        "name": "全刻印全共鸣",
-        "version": "1.4.0",
-        "author": "空容",
-        "summary": "为武器选择并激活额外刻印与共鸣",
-        "usage_hint": "进入营地读取数据；面板会自动出现，也可按 F5 打开或关闭，按原说明完成主刻印刷新。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2AllInscriptions.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/all-inscriptions",
-        "files": [
-          {
-            "path": "LC2AllInscriptions.dll",
-            "sha256": "35E4685082B562609B03795902156E71B3CC78AFF364FFF320BF404D57DDCBC2",
-            "size_bytes": 46080
-          }
-        ],
-        "provides": [
-          "lc2allinscriptions.dll"
-        ],
-        "hotkeys": [
-          "F5"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.4.0",
-        "author_source": "含源码版本 README 署名",
-        "author_channel": "local community package",
-        "sha256": "35E4685082B562609B03795902156E71B3CC78AFF364FFF320BF404D57DDCBC2",
-        "size_bytes": 46080,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -212,6 +128,296 @@
       }
     },
     {
+      "id": "player-auto-reborn",
+      "display": {
+        "name": "玩家自动复活",
+        "version": "0.7.1",
+        "author": "空容",
+        "summary": "玩家力竭后按配置等待并自动复活",
+        "usage_hint": "安装后重启游戏自动生效；等待时间、次数和恢复比例可在生成的配置文件中调整。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2PlayerAutoReborn.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/player-auto-reborn",
+        "files": [
+          {
+            "path": "LC2PlayerAutoReborn.dll",
+            "sha256": "2C3D0BDF10834F76B9A2B41848C8DAF6DEC762BF70C543EA35E9F53CD16D4846",
+            "size_bytes": 16896
+          }
+        ],
+        "provides": [
+          "lc2playerautoreborn.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 0.7.1",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "2C3D0BDF10834F76B9A2B41848C8DAF6DEC762BF70C543EA35E9F53CD16D4846",
+        "size_bytes": 16896,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "multiplayer-room-fix",
+      "display": {
+        "name": "多人假人与结算修复",
+        "version": "1.0",
+        "author": "墨河以轩",
+        "summary": "修复多人游戏概率出现假人和结算显示异常",
+        "usage_hint": "安装后重启游戏自动生效。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LostCastle2TwoPlayerRoomFix.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/multiplayer-room-fix",
+        "files": [
+          {
+            "path": "LostCastle2TwoPlayerRoomFix.dll",
+            "sha256": "470FA150E68CCCFE8574F7ABE7C3853F6250255FBA8B36AAE83A987AD1C2DABB",
+            "size_bytes": 8192
+          }
+        ],
+        "provides": [
+          "lostcastle2twoplayerroomfix.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "470FA150E68CCCFE8574F7ABE7C3853F6250255FBA8B36AAE83A987AD1C2DABB",
+        "size_bytes": 8192,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "dynamic-hp",
+      "display": {
+        "name": "关卡动态血量",
+        "version": "4.3.0",
+        "author": "刺心",
+        "summary": "按配置动态调整怪物与首领血量",
+        "usage_hint": "安装后重启游戏生效；按 F3 打开配置界面。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2DynamicHp.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/dynamic-hp",
+        "files": [
+          {
+            "path": "LC2DynamicHp.dll",
+            "sha256": "58868BAB99DA35E1DAB19AED62731589D65F6276A59CC89CECAA7A54D315885E",
+            "size_bytes": 44032
+          }
+        ],
+        "provides": [
+          "lc2dynamichp.dll"
+        ],
+        "hotkeys": [
+          "F3"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 4.3.0",
+        "author_source": "LC2DynamicHp.dll 内嵌 GUI 与版本日志署名；QQ 上传者墨河以轩",
+        "author_channel": "local community package",
+        "sha256": "58868BAB99DA35E1DAB19AED62731589D65F6276A59CC89CECAA7A54D315885E",
+        "size_bytes": 44032,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "loot-combat-enhancement",
+      "display": {
+        "name": "战利品自选与战斗增强",
+        "version": "2.5.3",
+        "author": "茶橘柚、空容、刺心",
+        "summary": "调整战利品自选、掉落与战斗手感",
+        "usage_hint": "安装后启动游戏，按 F7 打开设置面板；与增强计划的掉落功能同时开启时请自行取舍。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2LootWeightPatch.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/loot-combat-enhancement",
+        "files": [
+          {
+            "path": "LC2LootWeightPatch.dll",
+            "sha256": "400CD89165C48B33BFE86AF89386C1117ACBAC2C975AFD8CCDB48EA35B0C50C2",
+            "size_bytes": 55808
+          }
+        ],
+        "provides": [
+          "lc2lootweightpatch.dll"
+        ],
+        "hotkeys": [
+          "F7"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 2.5.3",
+        "author_source": "随包 MOD使用说明.txt 的作者团队署名；QQ 上传者 rlyons",
+        "author_channel": "local community package",
+        "sha256": "400CD89165C48B33BFE86AF89386C1117ACBAC2C975AFD8CCDB48EA35B0C50C2",
+        "size_bytes": 55808,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "enhancement-plan",
+      "display": {
+        "name": "LC2 增强计划",
+        "version": "4.8",
+        "author": "茶橘柚、空容、刺心",
+        "summary": "提供多项战斗、掉落与便利功能调节",
+        "usage_hint": "安装后启动游戏，按 INS 打开增强计划面板；首次启动会生成默认配置。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2EnhancementPlan_v4.8.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/enhancement-plan",
+        "files": [
+          {
+            "path": "LC2EnhancementPlan_v4.8.dll",
+            "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+            "size_bytes": 328192
+          }
+        ],
+        "provides": [
+          "lc2enhancementplan_v4.8.dll"
+        ],
+        "hotkeys": [
+          "INS"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 4.8",
+        "author_source": "DLL 内嵌作者团队署名；QQ 上传者时间喝奶",
+        "author_channel": "local community package",
+        "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+        "size_bytes": 328192,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "item-ban-freenix",
+      "display": {
+        "name": "物品禁用与自定义刷率",
+        "version": "1.1.2",
+        "author": "Freenix",
+        "summary": "禁用指定物品并为装备或藏品设置掉落概率",
+        "usage_hint": "安装后启动游戏，按 INS 打开界面，填写物品名称与概率并保存。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "物品禁用+自定义刷率[Freenix].dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/item-ban-freenix",
+        "files": [
+          {
+            "path": "物品禁用+自定义刷率[Freenix].dll",
+            "sha256": "D7B130B70D41717B4B809C878BB99AEB840D6326DD545F33AA372FB47A249EB8",
+            "size_bytes": 1715712
+          }
+        ],
+        "provides": [
+          "物品禁用+自定义刷率[freenix].dll"
+        ],
+        "hotkeys": [
+          "INS"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.1.2",
+        "author_source": "随包说明署名",
+        "author_channel": "local community package",
+        "sha256": "D7B130B70D41717B4B809C878BB99AEB840D6326DD545F33AA372FB47A249EB8",
+        "size_bytes": 1715712,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "all-inscriptions",
+      "display": {
+        "name": "全刻印全共鸣",
+        "version": "1.4.0",
+        "author": "空容",
+        "summary": "为武器选择并激活额外刻印与共鸣",
+        "usage_hint": "进入营地读取数据；面板会自动出现，也可按 F5 打开或关闭，按原说明完成主刻印刷新。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2AllInscriptions.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/all-inscriptions",
+        "files": [
+          {
+            "path": "LC2AllInscriptions.dll",
+            "sha256": "35E4685082B562609B03795902156E71B3CC78AFF364FFF320BF404D57DDCBC2",
+            "size_bytes": 46080
+          }
+        ],
+        "provides": [
+          "lc2allinscriptions.dll"
+        ],
+        "hotkeys": [
+          "F5"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.4.0",
+        "author_source": "含源码版本 README 署名",
+        "author_channel": "local community package",
+        "sha256": "35E4685082B562609B03795902156E71B3CC78AFF364FFF320BF404D57DDCBC2",
+        "size_bytes": 46080,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
       "id": "room-type-reforger",
       "display": {
         "name": "区域类型重铸",
@@ -254,39 +460,37 @@
       }
     },
     {
-      "id": "enhancement-plan",
+      "id": "alchemy-capacity",
       "display": {
-        "name": "LC2 增强计划",
-        "version": "4.8",
-        "author": "社区未署名",
-        "summary": "提供多项战斗、掉落与便利功能调节",
-        "usage_hint": "安装后启动游戏，按 INS 打开增强计划面板；首次启动会生成默认配置。"
+        "name": "炼金全部携带",
+        "version": "1.0",
+        "author": "茶橘柚",
+        "summary": "提高炼金相关可携带数量限制",
+        "usage_hint": "安装后重启游戏自动生效。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "LC2EnhancementPlan_v4.8.dll",
+        "expected_filename": "LostCastle2.AlchemyAmuletCapacity.dll",
         "bundled": true,
-        "bundle_dir": "community_mods/enhancement-plan",
+        "bundle_dir": "community_mods/alchemy-capacity",
         "files": [
           {
-            "path": "LC2EnhancementPlan_v4.8.dll",
-            "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
-            "size_bytes": 328192
+            "path": "LostCastle2.AlchemyAmuletCapacity.dll",
+            "sha256": "82697EBEAE1BA2360442259583208CE10DD53C252B409E08F1B5B40C4512CEAD",
+            "size_bytes": 8704
           }
         ],
         "provides": [
-          "lc2enhancementplan_v4.8.dll"
+          "lostcastle2.alchemyamuletcapacity.dll"
         ],
-        "hotkeys": [
-          "INS"
-        ]
+        "hotkeys": []
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 4.8",
-        "author_source": "4.8 整合包未提供明确作者署名",
+        "version_note": "curated community bundle 1.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
-        "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
-        "size_bytes": 328192,
+        "sha256": "82697EBEAE1BA2360442259583208CE10DD53C252B409E08F1B5B40C4512CEAD",
+        "size_bytes": 8704,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -296,37 +500,159 @@
       }
     },
     {
-      "id": "player-auto-reborn",
+      "id": "chest-drop-enhancement",
       "display": {
-        "name": "玩家自动复活",
-        "version": "0.7.1",
-        "author": "社区未署名",
-        "summary": "玩家力竭后按配置等待并自动复活",
-        "usage_hint": "安装后重启游戏自动生效；等待时间、次数和恢复比例可在生成的配置文件中调整。"
+        "name": "宝箱掉落增强",
+        "version": "1.0",
+        "author": "茶橘柚",
+        "summary": "调整宝箱宝藏数量与相关掉落效果",
+        "usage_hint": "安装后启动游戏，按 F10 打开设置面板。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "LC2PlayerAutoReborn.dll",
+        "expected_filename": "LC2DropMod.dll",
         "bundled": true,
-        "bundle_dir": "community_mods/player-auto-reborn",
+        "bundle_dir": "community_mods/chest-drop-enhancement",
         "files": [
           {
-            "path": "LC2PlayerAutoReborn.dll",
-            "sha256": "2C3D0BDF10834F76B9A2B41848C8DAF6DEC762BF70C543EA35E9F53CD16D4846",
-            "size_bytes": 16896
+            "path": "LC2DropMod.dll",
+            "sha256": "F7C7D7003EFDD0C10A16ACAD26D42BE11165816F12CDDE4B28D378C6883003FC",
+            "size_bytes": 17408
           }
         ],
         "provides": [
-          "lc2playerautoreborn.dll"
+          "lc2dropmod.dll"
+        ],
+        "hotkeys": [
+          "F10"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0",
+        "author_source": "程序内署名",
+        "author_channel": "local community package",
+        "sha256": "F7C7D7003EFDD0C10A16ACAD26D42BE11165816F12CDDE4B28D378C6883003FC",
+        "size_bytes": 17408,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "entrance-free-refresh",
+      "display": {
+        "name": "开局三选一免费刷新",
+        "version": "1.0",
+        "author": "茶橘柚",
+        "summary": "让开局三选一刷新不再消耗硬币",
+        "usage_hint": "安装后重启游戏自动生效。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2EntranceTreasureAltarFreeRefresh.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/entrance-free-refresh",
+        "files": [
+          {
+            "path": "LC2EntranceTreasureAltarFreeRefresh.dll",
+            "sha256": "D97FD866D4FBD32A402396A32417D10C714F849C4100BA2CFDDE764EFD27BA2C",
+            "size_bytes": 7168
+          }
+        ],
+        "provides": [
+          "lc2entrancetreasurealtarfreerefresh.dll"
         ],
         "hotkeys": []
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 0.7.1",
-        "author_source": "源码与使用教程未提供明确作者署名",
+        "version_note": "curated community bundle 1.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
-        "sha256": "2C3D0BDF10834F76B9A2B41848C8DAF6DEC762BF70C543EA35E9F53CD16D4846",
-        "size_bytes": 16896,
+        "sha256": "D97FD866D4FBD32A402396A32417D10C714F849C4100BA2CFDDE764EFD27BA2C",
+        "size_bytes": 7168,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "no-soulstone-drops",
+      "display": {
+        "name": "屏蔽灵魂石掉落",
+        "version": "1.0",
+        "author": "空容",
+        "summary": "屏蔽箱子和最终首领掉落的灵魂石",
+        "usage_hint": "安装后重启游戏自动生效。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2NoSoulStone.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/no-soulstone-drops",
+        "files": [
+          {
+            "path": "LC2NoSoulStone.dll",
+            "sha256": "E10FEDA58713A00BB6A4F9471243008687CEB20CE3A8B8B851D25898B7F27865",
+            "size_bytes": 9728
+          }
+        ],
+        "provides": [
+          "lc2nosoulstone.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "E10FEDA58713A00BB6A4F9471243008687CEB20CE3A8B8B851D25898B7F27865",
+        "size_bytes": 9728,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "evilstone-power-duration",
+      "display": {
+        "name": "终始武器魂石之力延长",
+        "version": "1.5.0",
+        "author": "大萝卜鸡",
+        "summary": "将大剑、太刀与单手剑的魂石之力持续时间延长至 999 秒",
+        "usage_hint": "安装后重启游戏自动生效；默认持续 999 秒并在切换武器时结束，可在生成的 BepInEx 配置中调整。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "EvilStonePowerDuration.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/evilstone-power-duration",
+        "files": [
+          {
+            "path": "EvilStonePowerDuration.dll",
+            "sha256": "334A4C3B48E91E74AC6F25576B05CDC4798478DA1DE81A66569D570554B1A099",
+            "size_bytes": 27648
+          }
+        ],
+        "provides": [
+          "evilstonepowerduration.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.5.0",
+        "author_source": "BepInPlugin 版本 1.5.0；作者采用 QQ 上传者大萝卜鸡",
+        "author_channel": "local community package",
+        "sha256": "334A4C3B48E91E74AC6F25576B05CDC4798478DA1DE81A66569D570554B1A099",
+        "size_bytes": 27648,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -340,7 +666,7 @@
       "display": {
         "name": "雷灵头环激活火电花",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "空容",
         "summary": "让雷灵头环触发火电花相关效果",
         "usage_hint": "安装后重启游戏，装备对应物品时自动生效。"
       },
@@ -363,50 +689,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "927963AEBBDDA3B36AAB284AFEB9CD32C83A342E9138F1590C53C1F0F627AABD",
         "size_bytes": 10752,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "multiplayer-room-fix",
-      "display": {
-        "name": "多人假人与结算修复",
-        "version": "1.0",
-        "author": "社区未署名",
-        "summary": "修复多人游戏概率出现假人和结算显示异常",
-        "usage_hint": "安装后重启游戏自动生效。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LostCastle2TwoPlayerRoomFix.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/multiplayer-room-fix",
-        "files": [
-          {
-            "path": "LostCastle2TwoPlayerRoomFix.dll",
-            "sha256": "470FA150E68CCCFE8574F7ABE7C3853F6250255FBA8B36AAE83A987AD1C2DABB",
-            "size_bytes": 8192
-          }
-        ],
-        "provides": [
-          "lostcastle2twoplayerroomfix.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "470FA150E68CCCFE8574F7ABE7C3853F6250255FBA8B36AAE83A987AD1C2DABB",
-        "size_bytes": 8192,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -420,7 +706,7 @@
       "display": {
         "name": "多共鸣同时激活",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "空容",
         "summary": "允许塑能法弹、法力护盾与以太飘浮同时激活",
         "usage_hint": "安装后启动游戏，按 F8 打开相关设置。"
       },
@@ -445,50 +731,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "831E678FBF070FC41F64921430374F4C384D26CFC770FDE39ACFD1196BF4A1E4",
         "size_bytes": 28672,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "alchemy-capacity",
-      "display": {
-        "name": "炼金全部携带",
-        "version": "1.0",
-        "author": "社区未署名",
-        "summary": "提高炼金相关可携带数量限制",
-        "usage_hint": "安装后重启游戏自动生效。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LostCastle2.AlchemyAmuletCapacity.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/alchemy-capacity",
-        "files": [
-          {
-            "path": "LostCastle2.AlchemyAmuletCapacity.dll",
-            "sha256": "82697EBEAE1BA2360442259583208CE10DD53C252B409E08F1B5B40C4512CEAD",
-            "size_bytes": 8704
-          }
-        ],
-        "provides": [
-          "lostcastle2.alchemyamuletcapacity.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "82697EBEAE1BA2360442259583208CE10DD53C252B409E08F1B5B40C4512CEAD",
-        "size_bytes": 8704,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -502,7 +748,7 @@
       "display": {
         "name": "全军出击",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "茶橘柚",
         "summary": "取消 NPC 招募数量上限",
         "usage_hint": "安装后重启游戏自动生效。"
       },
@@ -525,52 +771,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "A2536A059C116DCB3114B2068A6CFF4B4FF2F44E7B60F5AACF1DD50367247D8C",
         "size_bytes": 8704,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "dynamic-hp",
-      "display": {
-        "name": "关卡动态血量",
-        "version": "4.3.0",
-        "author": "勃张",
-        "summary": "按配置动态调整怪物与首领血量",
-        "usage_hint": "安装后重启游戏生效；按 F3 打开配置界面。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2DynamicHp.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/dynamic-hp",
-        "files": [
-          {
-            "path": "LC2DynamicHp.dll",
-            "sha256": "58868BAB99DA35E1DAB19AED62731589D65F6276A59CC89CECAA7A54D315885E",
-            "size_bytes": 44032
-          }
-        ],
-        "provides": [
-          "lc2dynamichp.dll"
-        ],
-        "hotkeys": [
-          "F3"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 4.3.0",
-        "author_source": "4.3.0 程序内署名",
-        "author_channel": "local community package",
-        "sha256": "58868BAB99DA35E1DAB19AED62731589D65F6276A59CC89CECAA7A54D315885E",
-        "size_bytes": 44032,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -584,7 +788,7 @@
       "display": {
         "name": "魔神侵袭拓展",
         "version": "4.3.0",
-        "author": "勃张",
+        "author": "墨河以轩",
         "summary": "扩展魔神侵袭刷怪与关卡处理逻辑",
         "usage_hint": "安装后重启游戏自动生效。"
       },
@@ -607,7 +811,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 4.3.0",
-        "author_source": "4.3.0 程序内署名",
+        "author_source": "QQ 上传者；同包组件未发现独立作者署名",
         "author_channel": "local community package",
         "sha256": "5ADDBAFD53EDF1C6F47B131C77FC5611C8E8AD6860724BEF57107827ED9C8AA1",
         "size_bytes": 25600,
@@ -624,7 +828,7 @@
       "display": {
         "name": "噩梦之源法球强化",
         "version": "4.3.0",
-        "author": "勃张",
+        "author": "墨河以轩",
         "summary": "提高噩梦之源符文球相关数值",
         "usage_hint": "安装后重启游戏自动生效。"
       },
@@ -647,7 +851,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 4.3.0",
-        "author_source": "4.3.0 程序内署名",
+        "author_source": "QQ 上传者；同包组件未发现独立作者署名",
         "author_channel": "local community package",
         "sha256": "375AE07F8C27B8C50B4925C8B300A05EC7EA669593C8484AE7EFD8A69B25FB43",
         "size_bytes": 9728,
@@ -664,7 +868,7 @@
       "display": {
         "name": "岩石巨兽护盾强化",
         "version": "4.3.0",
-        "author": "勃张",
+        "author": "墨河以轩",
         "summary": "强化岩石巨兽的护盾数值",
         "usage_hint": "安装后重启游戏自动生效。"
       },
@@ -687,7 +891,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 4.3.0",
-        "author_source": "4.3.0 程序内署名",
+        "author_source": "QQ 上传者；同包组件未发现独立作者署名",
         "author_channel": "local community package",
         "sha256": "D58F6FA58DB23F3DA9272E952F3350DAA183F832EFEE5F8E274DE337DDA46E56",
         "size_bytes": 10752,
@@ -704,7 +908,7 @@
       "display": {
         "name": "单手剑破防状态增强",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "大萝卜鸡",
         "summary": "强化单手剑破防状态的速度、回蓝、冷却与防御",
         "usage_hint": "安装后重启游戏，进入对应破防状态时自动生效。"
       },
@@ -727,7 +931,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "96B4C353D639BF3D217D1C289C9B3E62A9B10F9FF67A25A9124AE1ED2FAA6935",
         "size_bytes": 22016,
@@ -784,7 +988,7 @@
       "display": {
         "name": "召唤邪火粉碎者",
         "version": "2.0",
-        "author": "社区未署名",
+        "author": "兔子王お",
         "summary": "让离群野猪契约连协召唤邪火粉碎者",
         "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。"
       },
@@ -807,50 +1011,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.0",
-        "author_source": "召唤大师 2.0 未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "CADAEEA51269D395646342FF7F40FC85677103744D1AB527EB1CFE5814204B0A",
         "size_bytes": 29696,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "nightmare-doll-skin",
-      "display": {
-        "name": "噩梦娃娃皮肤",
-        "version": "2.0",
-        "author": "社区未署名",
-        "summary": "替换噩梦娃娃召唤物外观",
-        "usage_hint": "安装后重启游戏，召唤对应单位时自动生效。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/nightmare-doll-skin",
-        "files": [
-          {
-            "path": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
-            "sha256": "C1256E175D6C8F95E014A1BD39F1CD35639E281D065A05DBC25748398D8D345E",
-            "size_bytes": 10240
-          }
-        ],
-        "provides": [
-          "lc2.nightmaredollneedle噩梦娃娃皮肤.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 2.0",
-        "author_source": "召唤大师 2.0 未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "C1256E175D6C8F95E014A1BD39F1CD35639E281D065A05DBC25748398D8D345E",
-        "size_bytes": 10240,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -864,7 +1028,7 @@
       "display": {
         "name": "召唤狐狸剑姬",
         "version": "2.0",
-        "author": "社区未署名",
+        "author": "兔子王お",
         "summary": "让豹骑士契约连协召唤狐狸剑姬",
         "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。"
       },
@@ -887,50 +1051,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.0",
-        "author_source": "召唤大师 2.0 未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C",
         "size_bytes": 21504,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "hand-color-white",
-      "display": {
-        "name": "手掌变白",
-        "version": "2.0",
-        "author": "社区未署名",
-        "summary": "调整角色手掌显示颜色",
-        "usage_hint": "安装后重启游戏自动生效。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2.HandColorWhite手掌变白.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/hand-color-white",
-        "files": [
-          {
-            "path": "LC2.HandColorWhite手掌变白.dll",
-            "sha256": "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
-            "size_bytes": 10752
-          }
-        ],
-        "provides": [
-          "lc2.handcolorwhite手掌变白.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 2.0",
-        "author_source": "召唤大师 2.0 未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
-        "size_bytes": 10752,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -944,7 +1068,7 @@
       "display": {
         "name": "召唤行刑者",
         "version": "2.0",
-        "author": "社区未署名",
+        "author": "兔子王お",
         "summary": "让游荡异灵契约连协召唤行刑者",
         "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。"
       },
@@ -967,132 +1091,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.0",
-        "author_source": "召唤大师 2.0 未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "4023ABE192F3F6CFFD6E701328558454D28A3DF792844DE7AA39C87519E63118",
         "size_bytes": 24064,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "summon-model-swap",
-      "display": {
-        "name": "召唤物模型替换",
-        "version": "2.0",
-        "author": "社区未署名",
-        "summary": "按配置替换部分召唤物模型",
-        "usage_hint": "安装后重启游戏生效；可在生成的配置文件中选择模型。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2.SummonModelSwap召唤物模型替换.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/summon-model-swap",
-        "files": [
-          {
-            "path": "LC2.SummonModelSwap召唤物模型替换.dll",
-            "sha256": "5F4EB7890A3F14919DD0F5C1854D84594137F4DD6BE9586C4D118FD0C3E65D4E",
-            "size_bytes": 10752
-          }
-        ],
-        "provides": [
-          "lc2.summonmodelswap召唤物模型替换.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 2.0",
-        "author_source": "召唤大师 2.0 未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "5F4EB7890A3F14919DD0F5C1854D84594137F4DD6BE9586C4D118FD0C3E65D4E",
-        "size_bytes": 10752,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "damage-meter",
-      "display": {
-        "name": "游戏内伤害统计",
-        "version": "1.5.1",
-        "author": "社区未署名",
-        "summary": "在游戏内显示独立的伤害统计信息",
-        "usage_hint": "安装后重启游戏生效；该 MOD 的游戏内界面与盒子战斗统计相互独立。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "失落城堡2伤害统计v1.5.1.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/damage-meter",
-        "files": [
-          {
-            "path": "失落城堡2伤害统计v1.5.1.dll",
-            "sha256": "64677F4DBEA9316911862D68A09B67615C1CA1B8BC7742A0108D0CC7D579A8D6",
-            "size_bytes": 59392
-          }
-        ],
-        "provides": [
-          "失落城堡2伤害统计v1.5.1.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.5.1",
-        "author_source": "文件与程序集未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "64677F4DBEA9316911862D68A09B67615C1CA1B8BC7742A0108D0CC7D579A8D6",
-        "size_bytes": 59392,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "chest-drop-enhancement",
-      "display": {
-        "name": "宝箱掉落增强",
-        "version": "1.0",
-        "author": "茶橘柚",
-        "summary": "调整宝箱宝藏数量与相关掉落效果",
-        "usage_hint": "安装后启动游戏，按 F10 打开设置面板。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2DropMod.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/chest-drop-enhancement",
-        "files": [
-          {
-            "path": "LC2DropMod.dll",
-            "sha256": "F7C7D7003EFDD0C10A16ACAD26D42BE11165816F12CDDE4B28D378C6883003FC",
-            "size_bytes": 17408
-          }
-        ],
-        "provides": [
-          "lc2dropmod.dll"
-        ],
-        "hotkeys": [
-          "F10"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "程序内署名",
-        "author_channel": "local community package",
-        "sha256": "F7C7D7003EFDD0C10A16ACAD26D42BE11165816F12CDDE4B28D378C6883003FC",
-        "size_bytes": 17408,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1106,7 +1108,7 @@
       "display": {
         "name": "客机诡谲甲强化",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "墨河以轩",
         "summary": "为客机侧强化诡谲甲并配合倍血玩法",
         "usage_hint": "安装后重启游戏，在客机使用对应装备时自动生效。"
       },
@@ -1129,132 +1131,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "ED04FEFFCD5C9890ABE750CFA70027023EB04B8D1BF5653CD6E63861A727172F",
         "size_bytes": 9728,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "no-soulstone-drops",
-      "display": {
-        "name": "屏蔽灵魂石掉落",
-        "version": "1.0",
-        "author": "社区未署名",
-        "summary": "屏蔽箱子和最终首领掉落的灵魂石",
-        "usage_hint": "安装后重启游戏自动生效。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2NoSoulStone.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/no-soulstone-drops",
-        "files": [
-          {
-            "path": "LC2NoSoulStone.dll",
-            "sha256": "E10FEDA58713A00BB6A4F9471243008687CEB20CE3A8B8B851D25898B7F27865",
-            "size_bytes": 9728
-          }
-        ],
-        "provides": [
-          "lc2nosoulstone.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "E10FEDA58713A00BB6A4F9471243008687CEB20CE3A8B8B851D25898B7F27865",
-        "size_bytes": 9728,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "entrance-free-refresh",
-      "display": {
-        "name": "开局三选一免费刷新",
-        "version": "1.0",
-        "author": "社区未署名",
-        "summary": "让开局三选一刷新不再消耗硬币",
-        "usage_hint": "安装后重启游戏自动生效。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2EntranceTreasureAltarFreeRefresh.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/entrance-free-refresh",
-        "files": [
-          {
-            "path": "LC2EntranceTreasureAltarFreeRefresh.dll",
-            "sha256": "D97FD866D4FBD32A402396A32417D10C714F849C4100BA2CFDDE764EFD27BA2C",
-            "size_bytes": 7168
-          }
-        ],
-        "provides": [
-          "lc2entrancetreasurealtarfreerefresh.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "D97FD866D4FBD32A402396A32417D10C714F849C4100BA2CFDDE764EFD27BA2C",
-        "size_bytes": 7168,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "welcome-message",
-      "display": {
-        "name": "智能迎宾欢迎语",
-        "version": "1.0",
-        "author": "社区未署名",
-        "summary": "为联机房间提供可配置的欢迎语",
-        "usage_hint": "安装后启动游戏，按 F11 打开相关设置。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2Welcome.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/welcome-message",
-        "files": [
-          {
-            "path": "LC2Welcome.dll",
-            "sha256": "001D461C23F989848B98E2E4A8F4374732F777EA11609B871C12FE9594E2ADE2",
-            "size_bytes": 18432
-          }
-        ],
-        "provides": [
-          "lc2welcome.dll"
-        ],
-        "hotkeys": [
-          "F11"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "001D461C23F989848B98E2E4A8F4374732F777EA11609B871C12FE9594E2ADE2",
-        "size_bytes": 18432,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1268,7 +1148,7 @@
       "display": {
         "name": "机甲继承人物攻击力",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "空容",
         "summary": "让机甲按 MOD 规则继承玩家攻击力",
         "usage_hint": "安装后重启游戏，使用机甲时自动生效。"
       },
@@ -1291,50 +1171,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "DLL 内嵌作者字符串；QQ 上传者空容",
         "author_channel": "local community package",
         "sha256": "0FB7B7F2CF55A660B3CC6EFCD60C5C9E0BDD7236078F67724FBEFE803DA7DBFA",
         "size_bytes": 18432,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "staff-skin-swap",
-      "display": {
-        "name": "武器皮肤替换",
-        "version": "1.2",
-        "author": "社区未署名",
-        "summary": "替换部分武器的显示皮肤",
-        "usage_hint": "安装后重启游戏，进入游戏查看替换效果。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2.StaffSkinSwap.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/staff-skin-swap",
-        "files": [
-          {
-            "path": "LC2.StaffSkinSwap.dll",
-            "sha256": "4008961F4C2B49F29B17A67F926BDAF353EAFD3DF7AA6C6E9745A4043070F003",
-            "size_bytes": 19968
-          }
-        ],
-        "provides": [
-          "lc2.staffskinswap.dll"
-        ],
-        "hotkeys": []
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.2",
-        "author_source": "来源包未提供明确作者署名",
-        "author_channel": "local community package",
-        "sha256": "4008961F4C2B49F29B17A67F926BDAF353EAFD3DF7AA6C6E9745A4043070F003",
-        "size_bytes": 19968,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1348,7 +1188,7 @@
       "display": {
         "name": "海克斯强化药水",
         "version": "2.7.6",
-        "author": "社区未署名",
+        "author": "时间喝奶",
         "summary": "在战斗房胜利后提供随机海克斯药水强化",
         "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。"
       },
@@ -1373,7 +1213,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.7.6",
-        "author_source": "发布包与源码未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "50CEB677DE7AB88D8E4E4FD8059CEA5FBC440D709DAA7E4A215B059938E04ECC",
         "size_bytes": 40960,
@@ -1390,7 +1230,7 @@
       "display": {
         "name": "增援发信仪召唤雷精灵",
         "version": "1.0.0",
-        "author": "社区未署名",
+        "author": "兔子王お",
         "summary": "持有增援发信仪时召唤并维护友方雷精灵",
         "usage_hint": "安装后重启游戏自动生效；MOD 在后台维护召唤物，没有操作面板。"
       },
@@ -1418,7 +1258,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0.0",
-        "author_source": "源码未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "0F9B09B33981CA2392945414DB59DC354E661050602757E6EF120578BC4C8D74",
         "size_bytes": 28160,
@@ -1435,7 +1275,7 @@
       "display": {
         "name": "涡炉枪增强",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "大萝卜鸡",
         "summary": "减少涡炉枪炮击消耗并强化对应效果",
         "usage_hint": "安装后重启游戏，使用对应武器时自动生效。"
       },
@@ -1458,7 +1298,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "AC53F66A526BE21218E56283C6B14BD986457F08A11BC0D3AF88E5DA1FDB2DB9",
         "size_bytes": 13824,
@@ -1475,7 +1315,7 @@
       "display": {
         "name": "游荡异灵契约召唤行刑者",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "啊这",
         "summary": "让游荡异灵契约召唤行刑者",
         "usage_hint": "安装后重启游戏，触发对应契约时自动生效。"
       },
@@ -1498,52 +1338,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "7908276D7FE336F421B15AFA1E0E51AF6844CA1BBB5D94E6CF8DE2FA526B218A",
         "size_bytes": 22016,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "item-ban-freenix",
-      "display": {
-        "name": "物品禁用与自定义刷率",
-        "version": "1.1.2",
-        "author": "Freenix",
-        "summary": "禁用指定物品并为装备或藏品设置掉落概率",
-        "usage_hint": "安装后启动游戏，按 INS 打开界面，填写物品名称与概率并保存。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "物品禁用+自定义刷率[Freenix].dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/item-ban-freenix",
-        "files": [
-          {
-            "path": "物品禁用+自定义刷率[Freenix].dll",
-            "sha256": "D7B130B70D41717B4B809C878BB99AEB840D6326DD545F33AA372FB47A249EB8",
-            "size_bytes": 1715712
-          }
-        ],
-        "provides": [
-          "物品禁用+自定义刷率[freenix].dll"
-        ],
-        "hotkeys": [
-          "INS"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.1.2",
-        "author_source": "随包说明署名",
-        "author_channel": "local community package",
-        "sha256": "D7B130B70D41717B4B809C878BB99AEB840D6326DD545F33AA372FB47A249EB8",
-        "size_bytes": 1715712,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1557,7 +1355,7 @@
       "display": {
         "name": "百分百爆裂弓",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "啊这",
         "summary": "调整爆裂弓效果与触发概率",
         "usage_hint": "安装后启动游戏，按 F11 打开控制面板。"
       },
@@ -1582,52 +1380,10 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "A9C09AC74C5FD48B4775CB41785CE1A366F3F3E948D0E1815217F3C89EE0E8D8",
         "size_bytes": 16896,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "room-prefix",
-      "display": {
-        "name": "自定义房间前缀",
-        "version": "1.0",
-        "author": "社区修改（基于刺心版本）",
-        "summary": "自定义联机房间标题前缀并保留违禁词系统",
-        "usage_hint": "安装后启动游戏，按 Alt+1 打开面板；面板标题下方可控制开关。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2RoomPrefix.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/room-prefix",
-        "files": [
-          {
-            "path": "LC2RoomPrefix.dll",
-            "sha256": "D78C7182039A181423958F4D2220249852EED90D34E2CE3508B3CABC7E573784",
-            "size_bytes": 32768
-          }
-        ],
-        "provides": [
-          "lc2roomprefix.dll"
-        ],
-        "hotkeys": [
-          "Alt+1"
-        ]
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 1.0",
-        "author_source": "来源文件名与随包说明",
-        "author_channel": "local community package",
-        "sha256": "D78C7182039A181423958F4D2220249852EED90D34E2CE3508B3CABC7E573784",
-        "size_bytes": 32768,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1761,7 +1517,7 @@
       "display": {
         "name": "卡利昂之枪强化",
         "version": "1.0",
-        "author": "社区未署名",
+        "author": "啊这",
         "summary": "强化剑盾武器卡利昂之枪的投矛相关效果",
         "usage_hint": "安装后重启游戏，使用对应武器时自动生效。"
       },
@@ -1784,7 +1540,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0",
-        "author_source": "来源包未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "59C64EEDC50E5F3D87B18141635A0D49F4BF3ACD50CD14F4F614E99AF868021F",
         "size_bytes": 13312,
@@ -1843,7 +1599,7 @@
       "display": {
         "name": "踏影魔人增强",
         "version": "2.2",
-        "author": "社区未署名",
+        "author": "大萝卜鸡",
         "summary": "附身期间提高防御、速度、回蓝、幽能并减少冷却",
         "usage_hint": "安装后重启游戏，进入踏影魔人附身形态自动生效；数值可在生成的配置文件中调整。"
       },
@@ -1866,10 +1622,376 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 2.2",
-        "author_source": "随包说明未提供明确作者署名",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
         "author_channel": "local community package",
         "sha256": "4AEB38BD03F9CEEFB49FD1AD1D1142BF7D470EA17CA45881C69692DE3C0F319A",
         "size_bytes": 27136,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "damage-meter",
+      "display": {
+        "name": "游戏内伤害统计",
+        "version": "1.6.4",
+        "author": "水生凛凛",
+        "summary": "在游戏内按玩家显示独立伤害统计，并逐房使用官方数据校准",
+        "usage_hint": "安装后重启游戏生效；支持联机玩家分列，该 MOD 的游戏内界面与盒子战斗统计相互独立。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/damage-meter",
+        "files": [
+          {
+            "path": "失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll",
+            "sha256": "915764422A72CE28D268BC19CDF794E781132F3A732EFE4004780EB5A3875A11",
+            "size_bytes": 59392
+          }
+        ],
+        "provides": [
+          "失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.6.4",
+        "author_source": "DLL 内嵌界面署名；QQ 上传者听（2026-08-29）",
+        "author_channel": "local community package",
+        "sha256": "915764422A72CE28D268BC19CDF794E781132F3A732EFE4004780EB5A3875A11",
+        "size_bytes": 59392,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "welcome-message",
+      "display": {
+        "name": "智能迎宾欢迎语",
+        "version": "1.0",
+        "author": "茶橘柚",
+        "summary": "为联机房间提供可配置的欢迎语",
+        "usage_hint": "安装后启动游戏，按 F11 打开相关设置。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2Welcome.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/welcome-message",
+        "files": [
+          {
+            "path": "LC2Welcome.dll",
+            "sha256": "001D461C23F989848B98E2E4A8F4374732F777EA11609B871C12FE9594E2ADE2",
+            "size_bytes": 18432
+          }
+        ],
+        "provides": [
+          "lc2welcome.dll"
+        ],
+        "hotkeys": [
+          "F11"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0",
+        "author_source": "DLL 内嵌作者字符串；QQ 上传者茶橘柚",
+        "author_channel": "local community package",
+        "sha256": "001D461C23F989848B98E2E4A8F4374732F777EA11609B871C12FE9594E2ADE2",
+        "size_bytes": 18432,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "room-prefix",
+      "display": {
+        "name": "自定义房间前缀",
+        "version": "1.0",
+        "author": "社区修改（基于刺心版本）",
+        "summary": "自定义联机房间标题前缀并保留违禁词系统",
+        "usage_hint": "安装后启动游戏，按 Alt+1 打开面板；面板标题下方可控制开关。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2RoomPrefix.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/room-prefix",
+        "files": [
+          {
+            "path": "LC2RoomPrefix.dll",
+            "sha256": "D78C7182039A181423958F4D2220249852EED90D34E2CE3508B3CABC7E573784",
+            "size_bytes": 32768
+          }
+        ],
+        "provides": [
+          "lc2roomprefix.dll"
+        ],
+        "hotkeys": [
+          "Alt+1"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0",
+        "author_source": "来源文件名与随包说明",
+        "author_channel": "local community package",
+        "sha256": "D78C7182039A181423958F4D2220249852EED90D34E2CE3508B3CABC7E573784",
+        "size_bytes": 32768,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "hide-weapon-fx",
+      "display": {
+        "name": "隐藏震击环绕球",
+        "version": "1.0",
+        "author": "兔子王お",
+        "summary": "隐藏本地玩家的震击符文绿色环绕球特效",
+        "usage_hint": "安装后重启游戏自动生效，无快捷键；只改变本地显示。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.HideWeaponFX震击环绕球隐藏.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/hide-weapon-fx",
+        "files": [
+          {
+            "path": "LC2.HideWeaponFX震击环绕球隐藏.dll",
+            "sha256": "7A0C082EFE54CFAF7977515A09668EFB01E3CE9C25E22845249FDF1C1291D3E5",
+            "size_bytes": 11776
+          }
+        ],
+        "provides": [
+          "lc2.hideweaponfx震击环绕球隐藏.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0",
+        "author_source": "程序集版本与作者提供的 QQ 上传列表截图（2026-08-29）",
+        "author_channel": "local community package",
+        "sha256": "7A0C082EFE54CFAF7977515A09668EFB01E3CE9C25E22845249FDF1C1291D3E5",
+        "size_bytes": 11776,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "armor-transmog",
+      "display": {
+        "name": "服装幻化",
+        "version": "1.0",
+        "author": "兔子王お",
+        "summary": "在游戏内更换角色服装外观",
+        "usage_hint": "安装后启动游戏，按 F9 打开服装幻化界面。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2ArmorTransmog服装幻化.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/armor-transmog",
+        "files": [
+          {
+            "path": "LC2ArmorTransmog服装幻化.dll",
+            "sha256": "00BC89F9CCFCBE8CAF4F38316A951D0B45820C1978ABA1729ECE570BC2BA0E16",
+            "size_bytes": 41472
+          }
+        ],
+        "provides": [
+          "lc2armortransmog服装幻化.dll"
+        ],
+        "hotkeys": [
+          "F9"
+        ]
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "00BC89F9CCFCBE8CAF4F38316A951D0B45820C1978ABA1729ECE570BC2BA0E16",
+        "size_bytes": 41472,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "staff-skin-swap",
+      "display": {
+        "name": "武器皮肤替换",
+        "version": "1.5",
+        "author": "兔子王お",
+        "summary": "按配置替换部分武器的显示皮肤",
+        "usage_hint": "安装后重启游戏自动生效；可在生成的配置文件中关闭总开关或单独调整替换组，联机建议保持仅本地英雄开启。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.StaffSkinSwap.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/staff-skin-swap",
+        "files": [
+          {
+            "path": "LC2.StaffSkinSwap.dll",
+            "sha256": "5827C562C7E614B366EC7D2C4907AA72729D611CEFC5012598DBADC57FA614C0",
+            "size_bytes": 20992
+          }
+        ],
+        "provides": [
+          "lc2.staffskinswap.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.5",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "5827C562C7E614B366EC7D2C4907AA72729D611CEFC5012598DBADC57FA614C0",
+        "size_bytes": 20992,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "nightmare-doll-skin",
+      "display": {
+        "name": "噩梦娃娃皮肤",
+        "version": "2.0",
+        "author": "兔子王お",
+        "summary": "替换噩梦娃娃召唤物外观",
+        "usage_hint": "安装后重启游戏，召唤对应单位时自动生效。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/nightmare-doll-skin",
+        "files": [
+          {
+            "path": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
+            "sha256": "C1256E175D6C8F95E014A1BD39F1CD35639E281D065A05DBC25748398D8D345E",
+            "size_bytes": 10240
+          }
+        ],
+        "provides": [
+          "lc2.nightmaredollneedle噩梦娃娃皮肤.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 2.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "C1256E175D6C8F95E014A1BD39F1CD35639E281D065A05DBC25748398D8D345E",
+        "size_bytes": 10240,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "hand-color-white",
+      "display": {
+        "name": "手掌变白",
+        "version": "2.0",
+        "author": "兔子王お",
+        "summary": "调整角色手掌显示颜色",
+        "usage_hint": "安装后重启游戏自动生效。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.HandColorWhite手掌变白.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/hand-color-white",
+        "files": [
+          {
+            "path": "LC2.HandColorWhite手掌变白.dll",
+            "sha256": "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
+            "size_bytes": 10752
+          }
+        ],
+        "provides": [
+          "lc2.handcolorwhite手掌变白.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 2.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
+        "size_bytes": 10752,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "summon-model-swap",
+      "display": {
+        "name": "召唤物模型替换",
+        "version": "2.0",
+        "author": "兔子王お",
+        "summary": "按配置替换部分召唤物模型",
+        "usage_hint": "安装后重启游戏生效；可在生成的配置文件中选择模型。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.SummonModelSwap召唤物模型替换.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/summon-model-swap",
+        "files": [
+          {
+            "path": "LC2.SummonModelSwap召唤物模型替换.dll",
+            "sha256": "5F4EB7890A3F14919DD0F5C1854D84594137F4DD6BE9586C4D118FD0C3E65D4E",
+            "size_bytes": 10752
+          }
+        ],
+        "provides": [
+          "lc2.summonmodelswap召唤物模型替换.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 2.0",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "5F4EB7890A3F14919DD0F5C1854D84594137F4DD6BE9586C4D118FD0C3E65D4E",
+        "size_bytes": 10752,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [

@@ -100,6 +100,27 @@ class ContractTests(unittest.TestCase):
                 "map_file_name": "Map_MS_Battle_A003",
             }
         )
+        validator.validate(
+            {
+                **common,
+                "event_id": "qa-session:5-party",
+                "sequence": 6,
+                "event_type": "status",
+                "status": "party_updated",
+                "party_members": [
+                    {
+                        "player_id": "player-1",
+                        "player_slot": 0,
+                        "is_local": True,
+                    },
+                    {
+                        "player_id": "player-2",
+                        "player_slot": 1,
+                        "is_local": False,
+                    },
+                ],
+            }
+        )
 
         invalid_room_start = {
             **common,
@@ -125,6 +146,16 @@ class ContractTests(unittest.TestCase):
         }
         with self.assertRaises(ValidationError):
             validator.validate(invalid_room_index)
+
+        invalid_party_update = {
+            **common,
+            "event_id": "qa-session:8",
+            "sequence": 8,
+            "event_type": "status",
+            "status": "party_updated",
+        }
+        with self.assertRaises(ValidationError):
+            validator.validate(invalid_party_update)
 
         invalid_resource = {
             **common,

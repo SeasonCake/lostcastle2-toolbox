@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import ctypes
 from ctypes import wintypes
+import hashlib
 import json
 import os
 from pathlib import Path
 import random
 import subprocess
+import struct
 import sys
 import time
 import tkinter as tk
@@ -33,11 +35,18 @@ from toolbox.combat_transport import (
 from toolbox.macro_ui import MacroFeature
 from toolbox.mod_inspector import ModPackageInspector
 from toolbox.mod_manager import ModCatalog, ModManager
+from toolbox.runtime_setup import (
+    RuntimeSetupConflict,
+    RuntimeSetupError,
+    RuntimeSetupGameRunning,
+    RuntimeSetupManager,
+)
 from toolbox.user_mod_registry import UserModRegistry
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.8"
+APP_VERSION = "1.5.11"
+APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
     os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
@@ -599,6 +608,15 @@ def read_gamepad_state(index: int = 0) -> tuple[bool, dict[str, bool]]:
 
 kernel32.CreateToolhelp32Snapshot.argtypes = (wintypes.DWORD, wintypes.DWORD)
 kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+kernel32.OpenProcess.restype = wintypes.HANDLE
+kernel32.QueryFullProcessImageNameW.argtypes = (
+    wintypes.HANDLE,
+    wintypes.DWORD,
+    wintypes.LPWSTR,
+    ctypes.POINTER(wintypes.DWORD),
+)
+kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
 kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
 kernel32.CloseHandle.restype = wintypes.BOOL
 kernel32.CreateMutexW.argtypes = (ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR)
@@ -609,6 +627,18 @@ user32.GetParent.argtypes = (wintypes.HWND,)
 user32.GetParent.restype = wintypes.HWND
 user32.GetAncestor.argtypes = (wintypes.HWND, wintypes.UINT)
 user32.GetAncestor.restype = wintypes.HWND
+user32.GetWindowRect.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.RECT))
+user32.GetWindowRect.restype = wintypes.BOOL
+user32.SendMessageW.argtypes = (
+    wintypes.HWND,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+)
+user32.SendMessageW.restype = wintypes.LPARAM
+_get_class_long_ptr = getattr(user32, "GetClassLongPtrW", user32.GetClassLongW)
+_get_class_long_ptr.argtypes = (wintypes.HWND, ctypes.c_int)
+_get_class_long_ptr.restype = ctypes.c_void_p
 user32.GetAsyncKeyState.argtypes = (ctypes.c_int,)
 user32.GetAsyncKeyState.restype = ctypes.c_short
 user32.GetWindowLongW.argtypes = (wintypes.HWND, ctypes.c_int)
@@ -758,6 +788,179 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
     return defaults
 
 
+def enable_windows_app_identity() -> None:
+    """Give source and packaged windows one stable taskbar application identity."""
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            APP_USER_MODEL_ID
+        )
+    except (AttributeError, OSError):
+        pass
+
+
+def apply_app_window_icon(root: tk.Misc) -> None:
+    icon_path = RESOURCE_DIR / "assets" / "keyview.ico"
+    if not icon_path.is_file():
+        return
+    try:
+        root.iconbitmap(default=str(icon_path))
+    except tk.TclError:
+        pass
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest().upper()
+
+
+def _png_dimensions(path: Path) -> tuple[int, int]:
+    header = path.read_bytes()[:24]
+    if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("QA screenshot must be a PNG file.")
+    return struct.unpack(">II", header[16:24])
+
+
+def _top_level_window_rect(window: tk.Misc) -> tuple[int, int, int, int, int]:
+    client_hwnd = int(window.winfo_id())
+    hwnd = int(user32.GetAncestor(client_hwnd, 2) or client_hwnd)
+    rect = wintypes.RECT()
+    if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+        raise OSError("GetWindowRect failed for QA window")
+    return (
+        hwnd,
+        int(rect.left),
+        int(rect.top),
+        int(rect.right - rect.left),
+        int(rect.bottom - rect.top),
+    )
+
+
+def _widget_receipt(
+    widget: tk.Label,
+    *,
+    window_left: int,
+    window_top: int,
+) -> dict[str, object]:
+    font = tkfont.Font(root=widget, font=widget.cget("font"))
+    x = widget.winfo_rootx() - window_left
+    y = widget.winfo_rooty() - window_top
+    width = widget.winfo_width()
+    height = widget.winfo_height()
+    requested_width = widget.winfo_reqwidth()
+    requested_height = widget.winfo_reqheight()
+    measured_text_width = font.measure(str(widget.cget("text")))
+    font_linespace = font.metrics("linespace")
+    return {
+        "actual": {
+            "x": x,
+            "y": y,
+            "width": width,
+            "height": height,
+        },
+        "requested": {
+            "width": requested_width,
+            "height": requested_height,
+        },
+        "font": {
+            "measure": measured_text_width,
+            "linespace": font_linespace,
+        },
+        # Flat aliases keep the receipt compatible with the acceptance
+        # checker's original schema as well as its newer grouped fields.
+        "requested_width": requested_width,
+        "requested_height": requested_height,
+        "measured_text_width": measured_text_width,
+        "font_linespace": font_linespace,
+        "text": str(widget.cget("text")),
+    }
+
+
+def write_qa_ui_receipt(
+    *,
+    window: tk.Misc,
+    labels: dict[str, tk.Label],
+    receipt_path: Path,
+    screenshot_path: Path,
+) -> None:
+    window.update_idletasks()
+    hwnd, window_left, window_top, window_width, window_height = (
+        _top_level_window_rect(window)
+    )
+    screenshot = screenshot_path.resolve()
+    width, height = _png_dimensions(screenshot)
+    candidate_files = (
+        Path(sys.executable).resolve(),
+        (RESOURCE_DIR / "assets" / "keyview.ico").resolve(),
+        (RESOURCE_DIR / "assets" / "community_mod_catalog.json").resolve(),
+        (RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json").resolve(),
+    )
+    source_files: dict[str, str] = {}
+    for path in candidate_files:
+        if not path.is_file():
+            continue
+        try:
+            key = path.relative_to(APP_DIR).as_posix()
+        except ValueError:
+            key = path.name
+        source_files[key] = _file_sha256(path)
+    try:
+        ctypes.windll.kernel32.GetCommandLineW.restype = ctypes.c_wchar_p
+        command_line = str(ctypes.windll.kernel32.GetCommandLineW())
+    except (AttributeError, OSError):
+        command_line = subprocess.list2cmdline([sys.executable, *sys.argv])
+    payload = {
+        "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "process": {
+            "pid": os.getpid(),
+            "executable": str(Path(sys.executable).resolve()),
+            "command_line": command_line,
+            "hwnd": hwnd,
+        },
+        "source": {
+            "root": str(APP_DIR.resolve()),
+            "files": source_files,
+        },
+        "window": {
+            "title": str(window.wm_title()),
+            "width": window_width,
+            "height": window_height,
+            "icon_handles": {
+                "small": int(user32.SendMessageW(hwnd, 0x007F, 0, 0)),
+                "big": int(user32.SendMessageW(hwnd, 0x007F, 1, 0)),
+                "small2": int(user32.SendMessageW(hwnd, 0x007F, 2, 0)),
+                "class_big": int(_get_class_long_ptr(hwnd, -14) or 0),
+                "class_small": int(_get_class_long_ptr(hwnd, -34) or 0),
+            },
+        },
+        "screenshot": {
+            "path": str(screenshot),
+            "bytes": screenshot.stat().st_size,
+            "sha256": _file_sha256(screenshot),
+            "width": width,
+            "height": height,
+        },
+        "labels": {
+            key: _widget_receipt(
+                widget,
+                window_left=window_left,
+                window_top=window_top,
+            )
+            for key, widget in labels.items()
+            if widget.winfo_ismapped()
+        },
+    }
+    destination = receipt_path.resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def save_settings(settings: dict[str, Any], path: Path = CONFIG_FILE) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(".tmp")
@@ -820,6 +1023,44 @@ kernel32.Process32FirstW.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessEntr
 kernel32.Process32FirstW.restype = wintypes.BOOL
 kernel32.Process32NextW.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W))
 kernel32.Process32NextW.restype = wintypes.BOOL
+
+
+def _process_executable_path(process_id: int) -> Path | None:
+    handle = kernel32.OpenProcess(0x1000, False, process_id)
+    if not handle:
+        return None
+    try:
+        buffer = ctypes.create_unicode_buffer(32_768)
+        size = wintypes.DWORD(len(buffer))
+        if not kernel32.QueryFullProcessImageNameW(
+            handle, 0, buffer, ctypes.byref(size)
+        ):
+            return None
+        return Path(buffer.value).resolve()
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def is_exact_game_process_running(game_exe: Path) -> bool:
+    expected = str(game_exe.resolve()).casefold()
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+    if snapshot in (0, ctypes.c_void_p(-1).value):
+        return True
+    entry = ProcessEntry32W()
+    entry.dwSize = ctypes.sizeof(ProcessEntry32W)
+    try:
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+            return True
+        while True:
+            if entry.szExeFile.casefold() == "lostcastle2.exe":
+                observed = _process_executable_path(int(entry.th32ProcessID))
+                if observed is None or str(observed).casefold() == expected:
+                    return True
+            if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                break
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return False
 
 
 def find_game_process_id() -> int | None:
@@ -966,6 +1207,7 @@ class KeyViewApp:
         self._owns_macro_feature = macro_feature is None
         self.macro_feature = macro_feature or MacroFeature(root, CONFIG_DIR)
         self._on_request_close = on_request_close
+        self.before_game_launch: Any | None = None
 
         root.title(os.environ.get("KEYVIEW_WINDOW_TITLE", APP_NAME))
         root.overrideredirect(True)
@@ -1654,6 +1896,8 @@ class KeyViewApp:
 
     def launch_game(self) -> None:
         if self.game_process_id and focus_process_window(self.game_process_id):
+            return
+        if self.before_game_launch is not None and not self.before_game_launch():
             return
         game_exe = resolve_game_exe(self.settings.get("game_path"))
         try:
@@ -2478,6 +2722,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="开发验证：战斗演示使用的区域序号",
     )
     parser.add_argument(
+        "--demo-party-size",
+        type=int,
+        default=1,
+        choices=range(1, 5),
+        metavar="1..4",
+        help="开发验证：战斗演示显示的玩家数量",
+    )
+    parser.add_argument(
         "--window-size",
         type=parse_window_size,
         help="开发验证：主窗口尺寸，例如 780x560",
@@ -2492,8 +2744,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--qa-open-mod-import", action="store_true", help=argparse.SUPPRESS
     )
+    parser.add_argument("--qa-ui-receipt", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--qa-ui-screenshot", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--qa-ui-window",
+        choices=("main", "hud"),
+        default="main",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--self-test", action="store_true", help="运行无界面结构检查")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if bool(args.qa_ui_receipt) != bool(args.qa_ui_screenshot):
+        parser.error("--qa-ui-receipt and --qa-ui-screenshot must be used together")
+    return args
 
 
 def self_test() -> int:
@@ -2516,6 +2779,12 @@ def self_test() -> int:
             assert x + width <= WINDOW_WIDTH
             assert y + key_height <= pad_height
     game_exe = resolve_game_exe(DEFAULT_GAME_EXE)
+    runtime_setup = RuntimeSetupManager(
+        RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json",
+        RESOURCE_DIR / "third_party" / "lc2_runtime",
+        game_exe_provider=lambda: None,
+    )
+    runtime_setup.verify_bundle()
     print(
         json.dumps(
             {
@@ -2536,10 +2805,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.self_test:
         return self_test()
     enable_dpi_awareness()
+    enable_windows_app_identity()
     mutex = ensure_single_instance()
     if mutex is None:
         return 0
     root = tk.Tk()
+    apply_app_window_icon(root)
     root.withdraw()
     if args.tk_scaling is not None:
         root.tk.call("tk", "scaling", max(0.75, min(2.5, args.tk_scaling)))
@@ -2578,6 +2849,72 @@ def main(argv: list[str] | None = None) -> int:
         ),
         source_overrides=user_mod_sources,
     )
+    runtime_setup = RuntimeSetupManager(
+        RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json",
+        RESOURCE_DIR / "third_party" / "lc2_runtime",
+        game_exe_provider=lambda: resolve_game_exe(
+            keyboard_app.settings.get("game_path")
+        ),
+        game_running_provider=is_exact_game_process_running,
+        backup_root=CONFIG_DIR / "runtime_backups",
+    )
+
+    def ensure_game_runtime() -> bool:
+        status = runtime_setup.status()
+        if status.ready:
+            return True
+        if status.state == "game_not_configured":
+            messagebox.showerror(
+                APP_NAME,
+                "没有找到 LostCastle2.exe，请先在设置中定位游戏程序。",
+                parent=root,
+            )
+            return False
+        if status.state == "conflict":
+            messagebox.showerror(
+                APP_NAME,
+                f"检测到不同的现有 BepInEx 运行环境，盒子没有覆盖。\n\n{status.detail}",
+                parent=root,
+            )
+            return False
+        if not messagebox.askyesno(
+            "首次初始化",
+            (
+                "战斗 HUD 和 DLL MOD 需要先初始化游戏运行环境。\n\n"
+                "盒子只会安装已验证的 BepInEx 与只读战斗 HUD Bridge，"
+                "不会自动安装或启用任何社区 MOD，也会默认关闭调试控制台。\n\n"
+                "是否现在一键初始化？"
+            ),
+            parent=root,
+        ):
+            return False
+        try:
+            runtime_setup.install()
+        except RuntimeSetupGameRunning as error:
+            messagebox.showerror(APP_NAME, str(error), parent=root)
+            return False
+        except RuntimeSetupConflict as error:
+            messagebox.showerror(
+                APP_NAME,
+                f"检测到不同的现有运行环境，盒子没有覆盖。\n\n{error}",
+                parent=root,
+            )
+            return False
+        except (RuntimeSetupError, OSError) as error:
+            messagebox.showerror(
+                APP_NAME,
+                f"初始化失败，游戏尚未启动。\n\n{error}",
+                parent=root,
+            )
+            return False
+        messagebox.showinfo(
+            "初始化完成",
+            "HUD / MOD 运行环境已就绪。首次启动游戏会生成兼容文件，可能比平时稍慢。",
+            parent=root,
+        )
+        return True
+
+    keyboard_app.before_game_launch = ensure_game_runtime
     registry = SourceRegistry.from_file(
         RESOURCE_DIR / "assets" / "combat_sources.json"
     )
@@ -2596,6 +2933,7 @@ def main(argv: list[str] | None = None) -> int:
             scale=1000 if args.demo_large_values else 1,
             scenario_id=args.demo_scenario,
             room_index=args.demo_room_index,
+            party_size=args.demo_party_size,
         )
     else:
         combat_inbox = CombatInbox()
@@ -2632,6 +2970,10 @@ def main(argv: list[str] | None = None) -> int:
             for key_id, geometry in keyboard_app.current_layout.items()
         ]
 
+    support_directory = APP_DIR / "赞助与投喂"
+    if not support_directory.is_dir():
+        support_directory = RESOURCE_DIR / "package_assets" / "赞助与投喂"
+
     shell = ToolboxShell(
         root,
         keyboard=keyboard_app,
@@ -2642,10 +2984,12 @@ def main(argv: list[str] | None = None) -> int:
         mod_inbox=Path(
             os.environ.get("KEYVIEW_MOD_INBOX_DIR", APP_DIR / "用户MOD")
         ),
+        support_directory=support_directory,
         combat_aggregator=combat_aggregator,
         combat_event_pump=combat_pump,
         keyboard_preview_provider=keyboard_preview,
         launch_game=keyboard_app.launch_game,
+        ensure_game_runtime=ensure_game_runtime,
         choose_game_path=keyboard_app.choose_game_path,
         close_command=close_all,
         app_version=APP_VERSION,
@@ -2667,6 +3011,77 @@ def main(argv: list[str] | None = None) -> int:
         root.after(250, keyboard_app.toggle_visible)
     if args.show_combat_hud:
         root.after(250, shell.hud.show)
+    if args.qa_ui_receipt is not None and args.qa_ui_screenshot is not None:
+        qa_started_ns = time.time_ns()
+        qa_state: dict[str, int | None] = {"attempts": 0, "last_size": None}
+
+        def emit_qa_ui_receipt_when_captured() -> None:
+            qa_state["attempts"] = int(qa_state["attempts"] or 0) + 1
+            window: tk.Misc | None
+            labels: dict[str, tk.Label]
+            if args.qa_ui_window == "hud":
+                window = shell.hud.window
+                labels = dict(shell.hud.labels)
+                for index, row in enumerate(shell.hud.teammate_labels, start=1):
+                    name, damage, share, boss = row
+                    labels.update(
+                        {
+                            f"teammate_{index}_name": name,
+                            f"teammate_{index}_damage": damage,
+                            f"teammate_{index}_share": share,
+                            f"teammate_{index}_boss": boss,
+                        }
+                    )
+            else:
+                window = root
+                labels = dict(shell.labels)
+
+            screenshot = args.qa_ui_screenshot.resolve()
+            try:
+                window_ready = window is not None and bool(window.winfo_viewable())
+                stat = screenshot.stat()
+                screenshot_ready = (
+                    stat.st_mtime_ns >= qa_started_ns
+                    and stat.st_size > 0
+                    and qa_state["last_size"] == stat.st_size
+                )
+                qa_state["last_size"] = stat.st_size
+            except (OSError, tk.TclError):
+                window_ready = False
+                screenshot_ready = False
+
+            if window_ready and screenshot_ready and window is not None:
+                try:
+                    write_qa_ui_receipt(
+                        window=window,
+                        labels=labels,
+                        receipt_path=args.qa_ui_receipt,
+                        screenshot_path=screenshot,
+                    )
+                    return
+                except (OSError, ValueError, tk.TclError) as error:
+                    error_path = args.qa_ui_receipt.with_suffix(".error.json")
+                    try:
+                        error_path.parent.mkdir(parents=True, exist_ok=True)
+                        error_path.write_text(
+                            json.dumps(
+                                {
+                                    "error_type": type(error).__name__,
+                                    "error": str(error),
+                                },
+                                ensure_ascii=False,
+                                indent=2,
+                            )
+                            + "\n",
+                            encoding="utf-8",
+                        )
+                    except OSError:
+                        pass
+                    return
+            if int(qa_state["attempts"] or 0) < 80:
+                root.after(250, emit_qa_ui_receipt_when_captured)
+
+        root.after(500, emit_qa_ui_receipt_when_captured)
     if args.exit_after > 0:
         root.after(round(args.exit_after * 1000), close_all)
     try:
