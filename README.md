@@ -25,7 +25,7 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 | Damage and HP semantics | Runtime-validated on the recorded game build |
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
-| Main toolbox and external combat HUD | Bridge 0.4.1 is single-player runtime-validated; the 0.4.2 candidate adds dodge-recovery reconciliation and anonymous multiplayer ownership |
+| Main toolbox and external combat HUD | Bridge 0.4.3 has single-player mana and 65% HP-lock validation; anonymous multiplayer ownership still needs live testing |
 | MOD management | Two existing tools plus 49 latest usable community MODs bundled; local auto-import supported |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.

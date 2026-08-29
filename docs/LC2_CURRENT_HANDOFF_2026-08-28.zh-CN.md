@@ -2,28 +2,28 @@
 
 ## 角色、目标与阶段
 
-- 当前角色：LC2 工具箱 1.5.11 与 Bridge 0.4.2 本地候选、运行时、MOD 目录和 UI 验收负责人。
-- 当前目标：以最终候选 `3A6B08D9...BF6D8C` 完成预备正式版的精确提交、push 和 GitHub 预发布；真实 2P–4P 继续作为后续自然实测。
-- 当前阶段：`1.5.11 PRE-RELEASE CANDIDATE / SINGLE-PLAYER MP ROUNDING PASS / REAL MULTIPLAYER NOT RUN`；旧桌面包保留为历史候选，不覆盖。
-- 当前授权边界：已授权本地实现、测试、构建、桌面/ZIP 候选、commit、push 和 GitHub Release；未授权新的真实游戏 MOD 部署或自动执行第三方 DLL。
+- 当前角色：LC2 工具箱 1.5.12 与 Bridge 0.4.3 锁血兼容候选、运行时和 UI 验收负责人。
+- 当前目标：以已通过真实 65% 生命锁定正控的 1.5.12 / 0.4.3 完成干净 ZIP、commit、push 和 GitHub 预发布更新；真实 2P–4P 继续作为后续自然实测。
+- 当前阶段：`1.5.12 HP-STATE HOTFIX / PACKAGE VERIFIED / REAL 65% HP LOCK PASS / REAL MULTIPLAYER NOT RUN`；1.5.11 预发布和旧桌面包保留为历史身份，不覆盖。
+- 当前授权边界：已授权本地实现、测试、构建、桌面/ZIP 候选、commit、push 和 GitHub Release；未自动执行任何第三方 MOD DLL。
 
 ## 仓库与运行身份
 
 | 项目 | 当前值 |
 | --- | --- |
 | 仓库 | `C:\xiangmuyunxing\biancheng\2026\lostcastle2-keyview` |
-| 产品 source / remote | 以本文件所在提交为 1.5.11 source 身份；本轮 push 后必须以 `origin/main` 回读为准 |
-| 工作树 | 本轮只纳入连续的 1.5.9–1.5.11 源码、目录、测试与文档差异；本地生成载荷/包/UI 回执按既有 ignore 合同保留 |
-| 游戏进程 | `0 / 0`（2026-08-29 exact name + ExecutablePath 连续两次复核） |
-| 工具箱 | 干净桌面 `1.5.11-预备正式版` 已生成；EXE SHA-256 `3A6B08D9...14BF6D8C`，验收进程均已关闭 |
-| 游戏目录 Bridge | `0.4.2` runtime 候选；0.4.1 官方回蓝实测 PASS，0.4.2 闪避回蓝与多人路径等待实测 |
-| 运行 DLL SHA-256 | `2D87EFA3B1805310595626AFBC27926CEAB389EB74CA8CD84E556ECDB402A57F` |
-| `Plugin.cs` SHA-256 | `B26C2769650D2D5EEA4D70A6BA8F18C036C1C2B98EF2BABFB99A45FB08BA3811` |
+| 产品 source / remote | 基线 `24ee1e08602f685c986131f8edcd73011e97c56e` 与 `origin/main` 对齐；1.5.12/0.4.3 为未提交工作树候选 |
+| 工作树 | 只包含 1.5.12/0.4.3 锁血合同、本地玩家资源过滤、法力取整说明、版本/运行时清单、测试与本节记录；本地生成包/UI 回执按既有 ignore 合同保留 |
+| 游戏进程 | 真实正控采集时 exact `LostCastle2.exe` 正在运行，路径为本机 Steam 游戏目录；提交前状态另行回读 |
+| 工具箱 | 干净项目包冻结为 1,757 文件 / `166,217,064` B；桌面 `1.5.12-锁血兼容测试版` 已由作者启动实测，EXE `6,237,686` B / SHA-256 `4E48267FFDBB5868FFC0890FBC67E7B74CB2B2353EC38A5EB8404FABEB8DAD31` |
+| 游戏目录 Bridge | 已精确部署 `0.4.3`，等待作者真实生命锁定切换正控 |
+| 运行 DLL SHA-256 | `2837F6C485F691BB743CEAF3EB5EBE2BB5FA1D66A19E1FB2D4B87F029CF562A3` |
+| `Plugin.cs` SHA-256 | `BD66896DCB203A31808D193D3A69F6ECE537D2DF6A70814E390952E4FB5318F8` |
 | Harmony Patch 数 | `14`；0.3.4 的 `ResetDataBy` 探针已删除 |
 
 本文所有 `artifacts/runtime-deploy/...` 定位都指向本机被 `.gitignore` 排除的二进制/回滚证据，fresh clone 不包含，故只作本机恢复定位，不声称是仓库链接。
 
-0.4.2 的 0.4.1 exact rollback 与部署回执位于本机 `artifacts/runtime-deploy/2026-08-29-bridge-0.4.2/`。当前游戏目录已逐字节核验为 0.4.2。
+0.4.3 的 0.4.2 exact rollback、候选和可提交摘要位于本机 `artifacts/runtime-deploy/2026-08-29-bridge-0.4.3/`。当前游戏目录已逐字节核验为 0.4.3。
 
 0.3.6 候选、PDB、回滚和完整运行 receipt 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.6/`。
 
@@ -281,3 +281,15 @@
 - 分享 ZIP：`C:\Users\shenc\Desktop\失落城堡2工具箱1.5.11-实时数值监测+一键MOD安装.zip`，`136,726,230` 字节，SHA-256 `524C3BBA642C308DA03CCF7B9FC9777668C8D37D7F253E397517290E22062982`。
 - 7-Zip 完整性测试退出码 0；强制 UTF-8 文件名后，Windows/.NET 回读唯一顶层目录为“失落城堡2工具箱 1.5.11-预备正式版”，且唯一主 EXE 名称正确。首个错误代码页 ZIP 已按精确身份删除，不得分发。
 - 发布包采用 PyInstaller EXE/PYZ 封装，不直接散发 `.py`，但没有新增加密、反调试或重保护；这是作者选定的适度封装，便于群友共享和后续维护。
+
+## 2026-08-29 1.5.12 / Bridge 0.4.3 锁血兼容候选
+
+- 作者稳定复现：1.5.11 重启后正常，选择锁定 65% 生命的噩梦/诅咒后立刻变为“异常”。根因已定位为 Bridge 0.4.2 发出合法意图的 `resource_operation=loss`，而 1.5.11 schema 枚举遗漏 `loss`，第一条事件被客户端按合同拒绝；不是锁血数值本身越界，也不是第三方锁血 MOD 冲突。
+- 两类生命语义已明确分开：锁 20%/40%/65% 不改变真实 `max`，只把当前可用上限限制为 80%/60%/35%；染血的冠军腰带是实际 `max 100→60`。清除诅咒、房间药剂与宝物引起的当前/最大生命增减使用统一资源变化合同，不增加逐道具 Hook。
+- Bridge 0.4.3 将承伤、HP/MP 观察和官方法力路径限定为 `LocalPlayer.OwnerCreature`；队友资源或锁血不会进入本地指标，队友仍只参与匿名伤害归属。直接负 HP 的 `loss` 只进入内部 `hp_loss_other`，不污染“受击承伤”或“回复”。
+- 源码全量 `149/149 PASS`；Bridge 构建 `0 warnings / 0 errors`。候选/随包/当前游戏目录 DLL 均为 `46,592` B / `2837F6C4...CF562A3`，0.4.2 exact rollback 已冻结。
+- 桌面 `1.5.12-锁血兼容测试版` 与项目包逐文件零差异，均为 1,757 文件、162 目录、`166,217,064` B；EXE 版本 `1.5.12`，SHA-256 `4E48267F...B8DAD31`。运行时首次/重复安装、控制台关闭与不同核心写前阻断均 PASS。
+- 主战斗页新增一行低强调说明：“法力按底层小数累计，界面最终取整；与逐次整数相加可能有少量差异。”；紧凑 HUD 不增加说明。冻结 EXE 的 100%/200% 战斗页和 200% 四人 HUD 均经几何 checker 与像素审阅 `VERIFIED`。
+- 真实 65% 锁血正控 `R-PASS`：游戏画面 `49/140`，即真实 max 仍为 140、可用 35% 精确为 49；HUD 保持绿色“实时”，结算保留总伤害 `63,952`、Boss `26,969`、受击承伤 `205`、回复 `191`、法力消耗/恢复 `162/162`。BepInEx 明确加载 0.4.3、pipe connected，Bridge error/resource conversion/stack mismatch 匹配均为 0。
+- 干净分享 ZIP：`C:\Users\shenc\Desktop\失落城堡2工具箱1.5.12-实时数值监测+一键MOD安装.zip`，`136,662,047` B / SHA-256 `103E8A1363343CF031FC32F4C39C4EC4C4AF3A83B31979340E262E9809EF947F`。7-Zip 完整性 PASS；.NET 回读唯一 UTF-8 顶层目录为 `失落城堡2工具箱 1.5.12`，1,757 个文件、唯一主 EXE、0 个 config 文件。
+- `NOT RUN`：20%/40% 档位逐档真实选择、洗掉生命锁定、冠军腰带/药剂的当前与最大生命变化、2P–4P 队友独立锁血；自动合同正控不能替代这些人口。

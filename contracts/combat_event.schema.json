@@ -95,7 +95,7 @@
     },
 
     "resource": { "enum": ["hp", "mp", "temporary_hp", "unknown", null] },
-    "resource_operation": { "enum": ["gain", "spend", "set", "attempt", "unknown", null] },
+    "resource_operation": { "enum": ["gain", "spend", "loss", "set", "attempt", "unknown", null] },
     "requested_delta": { "type": ["number", "null"] },
     "effective_delta": { "type": ["number", "null"] },
     "value_before": { "type": ["number", "null"], "minimum": 0 },

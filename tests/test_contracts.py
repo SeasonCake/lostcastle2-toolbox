@@ -19,6 +19,7 @@ class ContractTests(unittest.TestCase):
         )
         Draft202012Validator.check_schema(schema)
         validator = Draft202012Validator(schema)
+        self.assertIn("loss", schema["properties"]["resource_operation"]["enum"])
         common = {
             "schema_version": 2,
             "event_id": "qa-session:1",

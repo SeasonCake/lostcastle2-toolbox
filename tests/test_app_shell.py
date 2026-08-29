@@ -7,6 +7,7 @@ from unittest.mock import patch
 from pathlib import Path
 
 from toolbox.app_shell import (
+    COMBAT_ROUNDING_HINT,
     DEFAULT_TOOLBOX_WINDOW_PRESET,
     TOOLBOX_WINDOW_PRESETS,
     TOOLBOX_UI_SCALES,
@@ -49,6 +50,13 @@ from toolbox.macro_model import parse_macro_profile
 
 
 class AppShellModelTests(unittest.TestCase):
+    def test_main_combat_page_explains_final_rounding_without_claiming_an_error(self) -> None:
+        self.assertIn("底层小数累计", COMBAT_ROUNDING_HINT)
+        self.assertIn("界面最终取整", COMBAT_ROUNDING_HINT)
+        self.assertIn("少量差异", COMBAT_ROUNDING_HINT)
+        self.assertNotIn("漏记", COMBAT_ROUNDING_HINT)
+        self.assertNotIn("异常", COMBAT_ROUNDING_HINT)
+
     def test_public_taken_damage_label_uses_player_facing_language(self) -> None:
         self.assertEqual(TAKEN_DAMAGE_LABEL, "受击承伤")
 

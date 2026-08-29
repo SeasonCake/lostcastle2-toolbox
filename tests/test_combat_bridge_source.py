@@ -13,7 +13,7 @@ class CombatBridgeSourceTests(unittest.TestCase):
             PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('public const string PluginVersion = "0.4.2";', source)
+        self.assertIn('public const string PluginVersion = "0.4.3";', source)
         self.assertIn('aggregate: ShouldAggregateDamage(direction)', source)
         self.assertIn('StageMgr.Instance?.IsNonBattleRoom() is not true', source)
         self.assertNotIn('IndexOf("_Shop_", StringComparison.OrdinalIgnoreCase)', source)
@@ -84,6 +84,22 @@ class CombatBridgeSourceTests(unittest.TestCase):
         self.assertIn('["resource_operation"] = "loss"', source)
         self.assertIn('["effective_delta"] = effective', source)
         self.assertIn('?? "resource.self_damage"', source)
+
+    def test_local_resource_and_taken_paths_ignore_remote_player_state(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("private static bool IsLocalPlayerRootCreature", source)
+        self.assertIn("PlayerManager.Instance?.LocalPlayer?.OwnerCreature", source)
+        self.assertIn(
+            'direction == "taken" && !IsLocalPlayerRootCreature(TryCreature(defender))',
+            source,
+        )
+        self.assertGreaterEqual(source.count("!IsLocalPlayerRootCreature("), 5)
+        self.assertIn('["resource_operation"] = "loss"', source)
+        self.assertGreaterEqual(source.count('["value_before"] = Positive('), 4)
+        self.assertGreaterEqual(source.count('["max_after"] = Positive('), 4)
 
     def test_multiplayer_uses_opaque_roster_and_owner_tokens(self) -> None:
         plugin_source = (

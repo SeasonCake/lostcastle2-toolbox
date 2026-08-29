@@ -25,7 +25,7 @@
 | 造成伤害、承伤与生命恢复口径 | 已在记录的游戏版本完成运行时验证 |
 | 战斗事件 v2 与回放聚合 | 已实现并有行为测试 |
 | 法力与护盾观察桥 | 法力消耗/恢复已完成运行时验证；护盾仍待独立样本 |
-| 综合主窗口与外部战斗 HUD | Bridge 0.4.1 已完成单机实测；0.4.2 候选补齐闪避同操作回蓝与匿名多人归属 |
+| 综合主窗口与外部战斗 HUD | Bridge 0.4.3 已完成单机法力与 65% 生命锁定实测；匿名多人归属仍待联机实测 |
 | MOD 管理 | 2 个原有工具与 49 个最新可用社区 MOD 随包；支持本地自动识别与添加 |
 
 研究结论只适用于计划文档记录的游戏构建。游戏更新后，Hook 兼容性与数据口径都需要重新验证。
@@ -93,7 +93,7 @@ py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo
 
 仓库包含固定版本的 7-Zip 运行组件及其许可证，clone 后可直接使用源码模式的压缩包识别。其他第三方 EXE、DLL、压缩包及生成的 `third_party/community_mods` 载荷不会提交到 Git。打包前需在本机准备 `THIRD_PARTY_NOTICES.md` 和 `assets/community_mod_catalog.json` 登记的精确输入；`build.ps1` 会核对数量、大小和 SHA-256，缺失或不一致时直接停止。
 
-实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.1 已在索引记录的游戏构建完成位置与官方法力恢复分支实测；0.4.2 根据真实闪避回蓝日志修正同操作扣蓝/回蓝，并提供不含昵称或平台账号的多人归属候选，仍需联机实测。
+实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.2 已用真实日志闭合法力小数累计与闪避同操作回蓝；0.4.3 补齐官方生命锁定产生的 `loss` 事件合同，并把本地承伤与 HP/MP 资源观察和队友匿名伤害归属分开。65% 锁血已完成 `49/140` 实机正控；2P–4P 仍需实机验证。
 
 ## 数据与安全边界
 

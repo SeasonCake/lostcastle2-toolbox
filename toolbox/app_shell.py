@@ -50,6 +50,7 @@ SUPPORT_NOTE = (
 )
 SUPPORT_QR_FILENAME = "微信赞助码.png"
 TAKEN_DAMAGE_LABEL = "受击承伤"
+COMBAT_ROUNDING_HINT = "法力按底层小数累计，界面最终取整；与逐次整数相加可能有少量差异。"
 
 TOOLBOX_WINDOW_PRESETS = {
     "compact": (840, 650),
@@ -1915,6 +1916,15 @@ class ToolboxShell:
         self._metric_card(cards, 0, "造成伤害", "combat_damage", "combat_boss", GOLD)
         self._metric_card(cards, 1, TAKEN_DAMAGE_LABEL, "combat_hp", "combat_heal", RED)
         self._metric_card(cards, 2, "法力消耗", "combat_mp", "combat_mp_gain", BLUE)
+        self.labels["combat_rounding_hint"] = tk.Label(
+            page,
+            text=COMBAT_ROUNDING_HINT,
+            bg=BG,
+            fg=MUTED,
+            anchor="w",
+            font=("Microsoft YaHei UI", 8),
+        )
+        self.labels["combat_rounding_hint"].pack(fill="x", pady=(5, 0))
 
         team_panel = RoundedPanel(
             page,

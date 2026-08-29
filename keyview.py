@@ -45,7 +45,7 @@ from toolbox.user_mod_registry import UserModRegistry
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.5.11"
+APP_VERSION = "1.5.12"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(

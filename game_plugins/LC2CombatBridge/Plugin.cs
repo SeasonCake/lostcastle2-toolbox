@@ -18,7 +18,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.4.2";
+    public const string PluginVersion = "0.4.3";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
@@ -321,7 +321,7 @@ public sealed class Plugin : BasePlugin
             HpSnapshots.Remove(hit.ID);
         }
         var defender = hit.mBeAtker;
-        if (direction == "taken" && !IsPlayerRootCreature(TryCreature(defender)))
+        if (direction == "taken" && !IsLocalPlayerRootCreature(TryCreature(defender)))
         {
             return;
         }
@@ -391,7 +391,7 @@ public sealed class Plugin : BasePlugin
     internal static PlayerHpChangeState BeginPlayerHpObservation(CreatureRuntimeData runtime)
     {
         var owner = runtime?.OwnerCreature;
-        if (!IsPlayerRootCreature(owner))
+        if (!IsLocalPlayerRootCreature(owner))
         {
             return null;
         }
@@ -477,10 +477,10 @@ public sealed class Plugin : BasePlugin
                         ["resource_operation"] = "loss",
                         ["requested_delta"] = requested,
                         ["effective_delta"] = effective,
-                        ["value_before"] = Finite(state.Before),
-                        ["value_after"] = Finite(after.Value),
-                        ["max_before"] = Finite(state.MaxBefore),
-                        ["max_after"] = Finite(maxAfter.Value),
+                        ["value_before"] = Positive(state.Before),
+                        ["value_after"] = Positive(after.Value),
+                        ["max_before"] = Positive(state.MaxBefore),
+                        ["max_after"] = Positive(maxAfter.Value),
                         ["blocked"] = false,
                         ["overflow"] = 0.0,
                         ["source_token"] = NullableToken(sourceToken)
@@ -507,10 +507,10 @@ public sealed class Plugin : BasePlugin
                     ["resource_operation"] = effective > 0 ? operation : "attempt",
                     ["requested_delta"] = requested,
                     ["effective_delta"] = effective,
-                    ["value_before"] = Finite(state.Before),
-                    ["value_after"] = Finite(after.Value),
-                    ["max_before"] = Finite(state.MaxBefore),
-                    ["max_after"] = Finite(maxAfter.Value),
+                    ["value_before"] = Positive(state.Before),
+                    ["value_after"] = Positive(after.Value),
+                    ["max_before"] = Positive(state.MaxBefore),
+                    ["max_after"] = Positive(maxAfter.Value),
                     ["blocked"] = blocked,
                     ["overflow"] = overflow,
                     ["source_token"] = NullableToken(sourceToken),
@@ -543,7 +543,7 @@ public sealed class Plugin : BasePlugin
     internal static PlayerMpChangeState BeginPlayerMpObservation(CreatureRuntimeData runtime)
     {
         var owner = runtime?.OwnerCreature;
-        if (!IsPlayerRootCreature(owner))
+        if (!IsLocalPlayerRootCreature(owner))
         {
             return null;
         }
@@ -635,10 +635,10 @@ public sealed class Plugin : BasePlugin
                     ["resource_operation"] = operation,
                     ["requested_delta"] = aggregateFallback ? fallbackGain : requested,
                     ["effective_delta"] = aggregateFallback ? fallbackGain : effective,
-                    ["value_before"] = Finite(state.Before),
-                    ["value_after"] = Finite(after.Value),
-                    ["max_before"] = Finite(state.MaxBefore),
-                    ["max_after"] = Finite(maxAfter.Value),
+                    ["value_before"] = Positive(state.Before),
+                    ["value_after"] = Positive(after.Value),
+                    ["max_before"] = Positive(state.MaxBefore),
+                    ["max_after"] = Positive(maxAfter.Value),
                     ["blocked"] = blocked,
                     ["overflow"] = overflow,
                     ["source_token"] = sourceToken,
@@ -678,7 +678,7 @@ public sealed class Plugin : BasePlugin
             EnsureRecoverManaCallback();
             var entity = EntityMgr.Instance?.GetEntity(arg.creatureID);
             var creature = TryCreature(entity);
-            if (!IsPlayerRootCreature(creature))
+            if (!IsLocalPlayerRootCreature(creature))
             {
                 return;
             }
@@ -734,7 +734,7 @@ public sealed class Plugin : BasePlugin
         {
             var entity = EntityMgr.Instance?.GetEntity(arg.creatureID);
             var creature = TryCreature(entity);
-            if (!IsPlayerRootCreature(creature))
+            if (!IsLocalPlayerRootCreature(creature))
             {
                 return;
             }
@@ -790,10 +790,10 @@ public sealed class Plugin : BasePlugin
                     ["resource_operation"] = "gain",
                     ["requested_delta"] = effectiveRaw,
                     ["effective_delta"] = effectiveRaw,
-                    ["value_before"] = Finite(beforeRaw.Value),
-                    ["value_after"] = Finite(afterRaw.Value),
-                    ["max_before"] = Finite(maxAfterRaw.Value),
-                    ["max_after"] = Finite(maxAfterRaw.Value),
+                    ["value_before"] = Positive(beforeRaw.Value),
+                    ["value_after"] = Positive(afterRaw.Value),
+                    ["max_before"] = Positive(maxAfterRaw.Value),
+                    ["max_after"] = Positive(maxAfterRaw.Value),
                     ["blocked"] = false,
                     ["overflow"] = 0.0,
                     ["source_token"] = "resource.mana_recovery",
@@ -1252,6 +1252,23 @@ public sealed class Plugin : BasePlugin
         {
             var playerCreature = creature.OwnerPlayerIncludeMaster?.OwnerCreature;
             return playerCreature is not null && playerCreature.EntityID == creature.EntityID;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsLocalPlayerRootCreature(Creature creature)
+    {
+        if (!IsPlayerRootCreature(creature))
+        {
+            return false;
+        }
+        try
+        {
+            var localCreature = PlayerManager.Instance?.LocalPlayer?.OwnerCreature;
+            return localCreature is not null && localCreature.EntityID == creature.EntityID;
         }
         catch
         {

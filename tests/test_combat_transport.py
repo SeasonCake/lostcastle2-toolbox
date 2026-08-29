@@ -177,6 +177,93 @@ class CombatTransportContractTests(unittest.TestCase):
         event.pop("status")
         self.validator.validate(event)
 
+    def test_hp_lock_loss_is_valid_for_all_observed_nightmare_tiers(self) -> None:
+        for locked_ratio, value_after in ((0.20, 112), (0.40, 84), (0.65, 49)):
+            with self.subTest(locked_ratio=locked_ratio):
+                event = status_event(
+                    1,
+                    event_type="resource_change",
+                    aggregate=True,
+                    hook_path="runtime.set_cur_hp",
+                    resource="hp",
+                    resource_operation="loss",
+                    requested_delta=value_after - 140,
+                    effective_delta=value_after - 140,
+                    value_before=140,
+                    value_after=value_after,
+                    max_before=140,
+                    max_after=140,
+                    blocked=False,
+                    overflow=0,
+                    source_token="set_cur_hp",
+                    parent_operation_id=None,
+                    nesting_depth=0,
+                )
+                event.pop("status")
+                self.validator.validate(event)
+
+                inbox = CombatInbox()
+                aggregator = CombatAggregator()
+                pump = CombatEventPump(inbox, self.validator, aggregator)
+                inbox.publish_event(status_event())
+                inbox.publish_event(event)
+                report = pump.drain()
+                self.assertIsNone(report.fault_code)
+                self.assertEqual(aggregator.snapshot().connection_state, "live")
+                self.assertEqual(
+                    aggregator.snapshot().hp_loss_other,
+                    140 - value_after,
+                )
+
+        invalid = dict(event)
+        invalid["resource_operation"] = "drain"
+        with self.assertRaisesRegex(CombatSchemaError, "/resource_operation:enum"):
+            self.validator.validate(invalid)
+
+    def test_hp_state_transitions_cover_max_hp_curse_cleanse_and_potions(self) -> None:
+        cases = (
+            # Champion belt: maximum HP itself falls from 100 to 60.
+            ("champion_belt_apply", "loss", 100, 60, 100, 60, -40),
+            # Cleansing/removing a curse may restore the cap without healing current HP.
+            ("champion_belt_cleanse", "set", 60, 60, 60, 100, 0),
+            # Generic room potion/treasure maximum-HP increase without a current-HP heal.
+            ("potion_max_hp_up", "set", 60, 60, 100, 140, 0),
+            # Direct HP costs and ordinary recovery use the same bounded contract.
+            ("direct_hp_cost", "loss", 60, 45, 60, 60, -15),
+            ("potion_heal", "gain", 45, 55, 60, 60, 10),
+        )
+        for name, operation, before, after, max_before, max_after, delta in cases:
+            with self.subTest(name=name):
+                event = status_event(
+                    1,
+                    event_type="resource_change",
+                    aggregate=True,
+                    hook_path=f"qa.{name}",
+                    resource="hp",
+                    resource_operation=operation,
+                    requested_delta=delta,
+                    effective_delta=delta,
+                    value_before=before,
+                    value_after=after,
+                    max_before=max_before,
+                    max_after=max_after,
+                    blocked=False,
+                    overflow=0,
+                    source_token=name,
+                    parent_operation_id=None,
+                    nesting_depth=0,
+                )
+                event.pop("status")
+                self.validator.validate(event)
+                inbox = CombatInbox()
+                aggregator = CombatAggregator()
+                pump = CombatEventPump(inbox, self.validator, aggregator)
+                inbox.publish_event(status_event())
+                inbox.publish_event(event)
+                report = pump.drain()
+                self.assertIsNone(report.fault_code)
+                self.assertEqual(aggregator.snapshot().connection_state, "live")
+
     def test_schema_error_reports_only_path_and_keyword(self) -> None:
         event = status_event(session_id="private-account-token" * 20)
         with self.assertRaises(CombatSchemaError) as caught:
