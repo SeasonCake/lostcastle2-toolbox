@@ -10,16 +10,16 @@
 
 | 项目 | 当前记录 |
 | --- | --- |
-| 记录日期 | 2026-08-30（Asia/Shanghai） |
+| 记录日期 | 2026-08-31（Asia/Shanghai） |
 | Steam app / build | `2445690` / `24795992`；已从本机 manifest 复核 |
 | Unity / IL2CPP metadata | `6000.3.16f1` / `39` |
 | `GameAssembly.dll` | `747E8BECB7B97B014D7F282C1EB60A7A4754A8A1DF01CEB943C03967F6E6F1C5` |
 | `global-metadata.dat` | `D42663B5ED61E9D5D30FCEF878969507C4B04951595DD61D63B5E0BD7017984A` |
 | `LC2.Core.dll` interop | `0267065BFB4CF8E4B7BD369C2240212901294C85B931DD6259FFAF02E5AFEFAF` |
 | BepInEx | `6.0.0-be.785`，commit `6abdba47eeebe08552282e7a58ef0f4a9ab60b62` |
-| 当前项目源码 | Bridge `0.4.8`；15 个 Hook。新增 `PlayerManager.OnGameRoundEndPreLoadCamp` 在游戏的回营预加载生命周期提前关闭活动窗口，并记录有界 HP source token；不改官方承伤121/实际HP变化119双口径。缺血短局回营已 `R-PASS` |
-| 当前游戏目录 | Bridge `0.4.8` 测试部署，49,152 B / SHA-256 `7740BA3E30CD8C8B73F8BFDF221C3384CB2D64F940699A6974556E989896CE55`；0.4.7 exact rollback 为 `A917E813…18CA7` |
-| 桌面端 | 1.6.1 exact package 为 1,760 文件、`166,606,890` B、config0；EXE `6,463,717` B / `46525496A85F75C066AB3829D3CE7A2E38FA2962C9A8F034EC137E3902246C8D`；r11 的 MIN100 海克斯、A200 紫色、A150 四人主面板与 A200 四人 HUD 均 `VERIFIED` |
+| 当前项目源码 | 工具箱 `1.6.2` / Bridge `0.4.12` 候选；15 个 Hook 不变。0.4.10 真实完整四人局暴露快照整表清空与 owner 误归属；0.4.11/0.4.12 分别改为最旧淘汰与收窄 owner 链，并把全链扩到 16 人 |
+| 当前游戏目录 | Bridge `0.4.12` 已部署，52,736 B / SHA-256 `3229359A7D901CEBCD523109261A034704CA06B0E3EAD0829ADC5B19ED976D8D`；0.4.10 exact rollback 为 `B27FC892…7CB0FA` |
+| 桌面端 | 1.6.2 r2 exact candidate 为 1,761 文件、`166,635,553` B、config0；EXE 6,470,904 B / `EBFF9584…3F0025`；A200个人占比bar裁切已修，13臂绑定r2 EXE，真实0.4.12尚未运行 |
 
 证据标签：
 
@@ -64,6 +64,8 @@
 | 来源显示“未知” | `assets/combat_sources.json` | 游戏更新的新 token，或 Bridge 自己发出的 token 未登记 | 当前已知缺口：`enemy.damage`；`set_cur_hp` 已登记为“直接生命变化” |
 | 护盾、自伤、诅咒长期为 0 | Bridge 是否真正发出 `effect_stack/resource_change` | 协议和聚合字段存在不代表游戏入口已接通 | `U`。当前属于协议/测试预留，不能标成已完成功能 |
 | 重连后统计被清空或错 session | `session_id`、`sequence`、显式 `session_started` | 断线重连被误当新局；异 session 事件无显式边界 | `T/S`。结束态重连保持 `session_ended`；仍需实机断线正控 |
+| 多人顶部伤害高于个人结算、队友编号跳号或大量未归属 | 全局 `total_damage`、本机 token、`mAtkerInHierarchy/OwnerEntity/Master` 归属链、active roster | v1.6.1 顶部直接显示队伍全量；旧 owner 会漏技能/召唤物；0.4.9 的 StandMaster/EntityID 根又可能把远端量错归本机 | `R-FAIL`：0.4.10 完整局本机比官方多267,006，而队伍合计仍少143,460。0.4.12只接受 Player/native、OwnerEntity hierarchy与Creature.Master；真实客机/召唤物待复测 |
+| 多人长局中途变“异常”或出现事件跳过 | Bridge fault code、damage snapshot 数、queue overflow | 0.4.9 任一局部故障冻结；0.4.10虽可恢复，但旧8192上限执行整表Clear，会让一次overflow连锁missing | `R-FAIL→S/T`：真实0.4.10先`damage_snapshot_overflow`再`missing`；0.4.11最旧未消费淘汰避免整表清空，0.4.12保持queue致命。真实0.4.12待复测 |
 
 ## 3. 用户指标端到端主表
 
@@ -388,6 +390,42 @@
 - 当前 IL2CPP 元数据提供独立 `StageFlowEvent.GameRoundEndBackPreLoadCamp`，且 `PlayerManager.OnGameRoundEndPreLoadCamp()` 是对应的无参生命周期回调；其语义与签名比请求值特判稳定。0.4.8 在该方法 prefix 关闭 `_inActiveMap`，仍保留既有 RoundStart prefix 作为末端兜底，并把既有 HP Hook 已接收的 `changeSourceStr` 以 128 字符有界 token 写入诊断。
 - 0.4.8 源码聚焦 12 项 PASS；隔离 SDK 6.0.428 Release 构建 0 warning/0 error；Mono.Cecil 回读版本 `0.4.8`、15 个 Harmony target、预加载 prefix 与 HP source 诊断均存在。候选 DLL 49,152 B / `7740BA3E30CD8C8B73F8BFDF221C3384CB2D64F940699A6974556E989896CE55`。
 - 缺血短局实测中，48 个局内正向 HP 事件合计 `68.9060974`，截图/结算显示 `69`；两次官方承伤 `46+46=92` 与游戏结算一致。日志先触发 `round_end_preload_camp`，随后游戏回城补血 `31.8978786→123.0346680`、有效 `91.1367874`、`in_map=False`，最后才是 `round_start is_camp=True`。补满未进入回复，判 `SETTLEMENT REFILL EXCLUSION R-PASS`。
+
+## 19. 首次真实多人反例与 0.4.9 / 1.6.2 候选
+
+- 三人联机中作者为 1P/房主，一名队友带召唤物。游戏个人结算 `576627/Boss 171274`；v1.6.1 顶部为 `819706/Boss 245900`。工具箱拆分 `自己235775 + 队友130746 + 队友5726 + 未归属447459 = 819706`，确定旧顶部显示队伍量却标成个人总量。
+- 个人官方与已归属自己的差 `340852`；未归属扣除此候选本地量后仍剩 `106607`。该余量支持远端玩家/召唤物 owner 缺失，但 0.4.8 没有逐击 owner 诊断，不能唯一分配。
+- 历史单机 probe 已证明技能/投射子实体常见 `OwnerPlayer=null`、`OwnerEntity=玩家`。0.4.8 只执行 `TryCreature(attacker)?.OwnerPlayerIncludeMaster`，遗漏已闭合的 OwnerEntity 路径；这是可证伪的代码缺口，不是倍率或道具问题。
+- 0.4.9 有界遍历 `mAtkerInHierarchy / OwnerEntityInHierarchy / OwnerEntity / StandMaster / Creature.Master` 并对 PlayerList 根实体兜底。Player token 改以 native Player 对象作为仅插件内部的 session key；本机标志严格比较 `LocalPlayer.Pointer`，不假设 1P/房主或槽位0。
+- 1.6.2 聚合器保留队伍 `total_damage` 供队伍占比，同时新增个人伤害/Boss/DPS和个人来源；未归属不猜给本机。活动队友编号不再受失活旧 token 影响。
+- 0.4.9 Release 构建 51,712 B / `18228F2E5EB91B22AFD6AE6F8F97B968F4734B99794E4BD45FEC8BFFB76E8161`，0 warning/0 error；全量 174 项 PASS。精确 1.6.2 包形运行时/MOD PASS；客机槽位2的主面板/HUD 图通过，但真实房主复测、非房主客机、远端召唤物和重连仍为 `NOT RUN`。
+- 用户提供的“模组前置 BepInEx”ZIP 是纯加载器，不是功能 MOD：228 文件、无 plugins；与工具箱运行时共有的 227 文件逐字节一致。工具箱是同构建的受管超集，额外含配置与 Unity 6000.3.16 库，不应把前置 ZIP按普通社区 MOD 安装。
+
+## 20. 0.4.9 长局冻结与 0.4.10 可恢复事件
+
+- 第一局一名队友中途退出后 HUD 变“异常”；重启同一 0.4.9 后恢复 live，排除安装损坏和跨进程持续故障。第二局四人全程不变仍在对局中途异常，排除离队必要性。
+- 第二局 HUD 冻结为个人 `389216/Boss66326`、队友 `197474/117269/94723`、MP `10735/10775`。游戏最终四人伤害为 `12791722/9504359/9248011/3541814`；旧 HUD 远低于最终卡是冻结后不再聚合，不是倍率结论。
+- HUD `10735` 精确对应日志第581次官方耗蓝 raw累计 `10735.009020805359`，位于硝石荒漠第7区；日志继续到第3315次/`75337.9491443634`，确认游戏与 Bridge诊断继续、桌面快照停止。
+- 0.4.9 没有把 `FailSession` detail、queue overflow 或桌面 fault 写入 BepInEx 日志，故证据不能唯一分辨 snapshot/conversion/stack 与 queue。MP日志总量大不等于瞬时 queue overflow。
+- 0.4.10 把 checkpoint、damage/resource/MP 的单事件 missing/conversion/stack/overflow 改为 `ReportRecoverableIssue`：每种 code 每局只发一次 live degraded 状态，日志明确 `Combat bridge event skipped: <code>`；HUD 使用黄色“实时·有事件跳过”，其余事件继续。真正 queue overflow 仍 error，并写 `Combat bridge session failed: queue_overflow`。
+- 0.4.10 为52,224 B / `B27FC892…7CB0FA`，C# 0 warning/0 error；全量178项、包形运行时/MOD、self-test和A200降级HUD均 PASS。已在双零门后部署，真实多人 `NOT RUN`。
+
+## 21. 0.4.10 完整四人局的快照连锁与 owner 双重反例
+
+- 第三个 Boss 后进入 CrystalMountain 第1区时，日志先出现 `Combat bridge event skipped: damage_snapshot_overflow`，下一行即 `damage_snapshot_missing`；随后房间仍继续累计并保持黄色 degraded。该时间早于作者记录截图，不把安全区截图时间误当故障起点。
+- 源码反查确认旧上限达到8,192时执行 `HpSnapshots.Clear()`；这一正控同时解释“一个overflow为什么立即产生missing”。离队不是必要条件，队列也没有致命 `queue_overflow` 证据。
+- 最终官方四人伤害 `1,464,111 + 1,249,080 + 1,715,052 + 486,425 = 4,914,668`；HUD 含离队成员为 `1,731,117 + 1,032,024 + 1,515,085 + 492,982 = 4,771,208`，少143,460。Boss官方1,620,539，HUD含离队1,572,139，少48,400。
+- 作者本机HUD对官方为`1,731,117 - 1,464,111 = +267,006`，Boss为`644,418 - 532,182 = +112,236`。因此队伍漏记与本机误归属同时存在，不能通过总量对齐把二者视为同一误差。
+- 证据：`artifacts/runtime-captures/2026-08-30-multiplayer-fullrun-personal-misattribution-0.4.10/`。这一局是0.4.10真实证据；0.4.12修复后未运行。
+
+## 22. Bridge 0.4.12、16人合同与工具箱1.6.2
+
+- 0.4.11把快照容器改为字典索引+最旧未消费FIFO；达到上限只淘汰一个最老项，消费、session重置和卸载同步清理。回归覆盖“淘汰最老但保留其余live set”。
+- 0.4.12 owner顺序固定为官方`mAtkerInHierarchy`→瞬时`mAtker`；只沿Player/native、OwnerEntityInHierarchy/OwnerEntity与Creature.Master，移除StandMaster和EntityID根推测。每次`change_room_end`记录local/remote/unattributed汇总，避免多人RoomEnd路径缺日志。
+- 协议数组、slot、Bridge roster、pipe、聚合器和UI均从8扩到16。负控拒绝17人/slot16；16人分批事件泵保持live且无静默丢事件。非房主合成样本用`is_local`绑定slot12，不依赖1P或slot0。
+- 主窗口最多16格并只在>4人时显示横向拖动条；HUD队友按列优先，每列3人，5/8/16人分别扩至2/3/5列。Mini HUD多人时在DPS卡空行显示“自己队伍占比”与bar，单人不显示。
+- 精确包182项、源码/包/桌面self-test与运行时/MOD包形PASS。初审发现旧A200多人HUD个人占比bar被裁切；r2保持外框尺寸并把底部空白分给recent卡，四个A200臂文字27/27px且bar可见。Bridge DLL 52,736 B / `3229359A…76D8D`，r2工具箱EXE 6,470,904 B / `EBFF9584…3F0025`。真实0.4.12多人、客机、远端召唤物、7–16人云端房间仍为`NOT RUN`。
+- 默认7人MOD只纳入15,872 B / `1247F19F…30F25`功能DLL；53个社区条目共54文件/3,391,437 B，共用唯一固定BepInEx运行时，不携带重复framework/cache/interop/cfg。体积证据见`artifacts/mod-analysis/2026-08-30-managed-payload-footprint/`。
 
 主要维护入口：
 

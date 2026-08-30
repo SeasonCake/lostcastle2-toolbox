@@ -65,6 +65,7 @@ internal sealed class CombatPipeServer : IDisposable
     private long _sequence;
     private RoomLocation _room;
     private readonly Dictionary<string, string> _playerTokens = new();
+    private readonly HashSet<string> _recoverableIssues = new(StringComparer.Ordinal);
     private int _nextPlayerToken;
     private List<PartyMemberSnapshot> _partyMembers = new();
     private string _partyFingerprint = string.Empty;
@@ -88,6 +89,7 @@ internal sealed class CombatPipeServer : IDisposable
             _room = null;
             _roundActive = true;
             _playerTokens.Clear();
+            _recoverableIssues.Clear();
             _nextPlayerToken = 0;
             _partyMembers = new List<PartyMemberSnapshot>();
             _partyFingerprint = string.Empty;
@@ -170,7 +172,7 @@ internal sealed class CombatPipeServer : IDisposable
             return;
         }
         var bounded = new List<PartyMemberSnapshot>();
-        for (var index = 0; index < members.Count && bounded.Count < 8; index += 1)
+        for (var index = 0; index < members.Count && bounded.Count < 16; index += 1)
         {
             var member = members[index];
             if (member is null || string.IsNullOrWhiteSpace(member.PlayerId))
@@ -180,7 +182,7 @@ internal sealed class CombatPipeServer : IDisposable
             bounded.Add(new PartyMemberSnapshot
             {
                 PlayerId = Bound(member.PlayerId, 128),
-                PlayerSlot = member.PlayerSlot is >= 0 and <= 7
+                PlayerSlot = member.PlayerSlot is >= 0 and <= 15
                     ? member.PlayerSlot
                     : null,
                 IsLocal = member.IsLocal,
@@ -251,7 +253,38 @@ internal sealed class CombatPipeServer : IDisposable
                     ["detail"] = Bound(detailCode, 96),
                 });
             _failed = true;
+            _log.LogWarning($"Combat bridge session failed: {Bound(detailCode, 96)}");
             _outbound.TryAdd(line);
+        }
+    }
+
+    public void ReportRecoverableIssue(string detailCode)
+    {
+        var detail = Bound(detailCode, 96);
+        if (string.IsNullOrWhiteSpace(detail))
+        {
+            return;
+        }
+        lock (_stateLock)
+        {
+            if (!_recoverableIssues.Add(detail))
+            {
+                return;
+            }
+            _log.LogWarning($"Combat bridge event skipped: {detail}");
+            if (!_connected || !_sessionActive || _failed)
+            {
+                return;
+            }
+            EnqueueLocked(CreateEventLocked(
+                "status",
+                aggregate: false,
+                "bridge.recoverable_issue",
+                new Dictionary<string, object>
+                {
+                    ["status"] = "live",
+                    ["detail"] = $"degraded:{detail}",
+                }));
         }
     }
 
@@ -412,6 +445,7 @@ internal sealed class CombatPipeServer : IDisposable
         _sessionId = Guid.NewGuid().ToString("N");
         _sequence = 0;
         _failed = false;
+        _recoverableIssues.Clear();
         _sessionActive = true;
         EnqueueLocked(CreateEventLocked(
             "status",
@@ -501,6 +535,7 @@ internal sealed class CombatPipeServer : IDisposable
                 ["detail"] = "queue_overflow",
             });
         _failed = true;
+        _log.LogWarning("Combat bridge session failed: queue_overflow");
         _outbound.TryAdd(errorLine);
     }
 

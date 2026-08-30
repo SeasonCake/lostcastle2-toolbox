@@ -13,8 +13,9 @@ class CombatBridgeSourceTests(unittest.TestCase):
             PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('public const string PluginVersion = "0.4.8";', source)
-        self.assertIn('aggregate: ShouldAggregateDamage(direction)', source)
+        self.assertIn('public const string PluginVersion = "0.4.12";', source)
+        self.assertIn("var aggregate = ShouldAggregateDamage(direction);", source)
+        self.assertIn('Bridge?.Emit(\n                "damage_resolution",\n                aggregate,', source)
         self.assertIn('StageMgr.Instance?.IsNonBattleRoom() is not true', source)
         self.assertNotIn('IndexOf("_Shop_", StringComparison.OrdinalIgnoreCase)', source)
         self.assertIn('["is_boss"] = isBoss', source)
@@ -176,14 +177,65 @@ class CombatBridgeSourceTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("RefreshPartyRoster(force: true);", plugin_source)
+        self.assertIn("result.Count < 16", plugin_source)
+        self.assertIn("bounded.Count < 16", pipe_source)
+        self.assertIn("member.PlayerSlot is >= 0 and <= 15", pipe_source)
         self.assertIn("OwnerPlayerIncludeMaster", plugin_source)
+        self.assertIn("OwnerPlayer(hit)", plugin_source)
+        self.assertIn("hit.mAtkerInHierarchy", plugin_source)
+        self.assertIn("OwnerEntityInHierarchy(candidate)", plugin_source)
+        self.assertIn("OwnerEntity(candidate)", plugin_source)
+        self.assertIn("CreatureMaster(candidate)", plugin_source)
+        self.assertIn("PlayerForRootCreature", plugin_source)
+        self.assertNotIn("StandMaster(candidate)", plugin_source)
+        self.assertNotIn("root.EntityID == entity.EntityID", plugin_source)
+        self.assertLess(
+            plugin_source.index("OwnerPlayer(hit.mAtkerInHierarchy)"),
+            plugin_source.index("OwnerPlayer(hit.mAtker);"),
+        )
         self.assertIn('["owner_player_id"] = PlayerToken(attackerPlayer)', plugin_source)
         self.assertIn('["player_id"] = PlayerToken(defenderPlayer)', plugin_source)
+        self.assertIn("local.Pointer == player.Pointer", plugin_source)
+        self.assertNotIn("player.Index == 0", plugin_source)
+        self.assertIn('var identity = player.Pointer != IntPtr.Zero', plugin_source)
+        self.assertIn("[LC2CB-OWNER] kind=summary", plugin_source)
         self.assertIn('var token = $"player-{++_nextPlayerToken}";', pipe_source)
         self.assertIn('["status"] = "party_updated"', pipe_source)
         self.assertIn('["party_members"] = payload', pipe_source)
         self.assertNotIn("NickName", plugin_source)
         self.assertNotIn("PlatformUniqueID", plugin_source)
+
+    def test_single_event_failures_degrade_without_freezing_the_session(self) -> None:
+        plugin_source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+        pipe_source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "CombatPipeServer.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("Bridge?.FailSession(", plugin_source)
+        self.assertGreaterEqual(plugin_source.count("ReportRecoverableIssue("), 10)
+        self.assertIn('"bridge.recoverable_issue"', pipe_source)
+        self.assertIn('["status"] = "live"', pipe_source)
+        self.assertIn('$"degraded:{detail}"', pipe_source)
+        self.assertIn("Combat bridge event skipped:", pipe_source)
+        self.assertIn("Combat bridge session failed: queue_overflow", pipe_source)
+
+    def test_damage_snapshots_evict_oldest_without_clearing_the_live_set(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Dictionary<int, LinkedListNode<int>> HpSnapshotNodes", source)
+        self.assertIn("LinkedList<int> HpSnapshotOrder", source)
+        self.assertIn(
+            "while (HpSnapshots.Count >= MaxHpSnapshots && "
+            "HpSnapshotOrder.First is not null)",
+            source,
+        )
+        self.assertIn("TryTakeHitSnapshotLocked(hit.ID, out snapshot);", source)
+        self.assertIn("ResetHitSnapshots();", source)
+        self.assertNotIn('ReportRecoverableIssue("damage_snapshot_overflow")', source)
 
 
 if __name__ == "__main__":

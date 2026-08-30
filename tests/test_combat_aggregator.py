@@ -97,6 +97,9 @@ class CombatAggregatorTests(unittest.TestCase):
         snapshot = self.aggregator.snapshot(monotonic_ms=4_000)
         self.assertEqual(snapshot.total_damage, 125)
         self.assertEqual(snapshot.boss_damage, 125)
+        self.assertEqual(snapshot.personal_damage, 125)
+        self.assertEqual(snapshot.personal_boss_damage, 125)
+        self.assertEqual(snapshot.personal_recent_dps, 12.5)
         self.assertEqual(snapshot.taken_settlement_damage, 65)
         self.assertEqual(snapshot.hp_damage_taken, 44)
         self.assertEqual(snapshot.mitigated_damage, 21)
@@ -142,6 +145,9 @@ class CombatAggregatorTests(unittest.TestCase):
         snapshot = self.aggregator.snapshot()
         self.assertEqual(snapshot.detected_player_count, 2)
         self.assertEqual(snapshot.total_damage, 220)
+        self.assertEqual(snapshot.personal_damage, 120)
+        self.assertEqual(snapshot.personal_boss_damage, 0)
+        self.assertEqual(snapshot.personal_recent_dps, 12.0)
         self.assertEqual(snapshot.unattributed_damage, 20)
         self.assertEqual(snapshot.unattributed_boss_damage, 0)
         self.assertEqual(snapshot.player_breakdown["opaque-local"]["label"], "自己")
@@ -152,6 +158,10 @@ class CombatAggregatorTests(unittest.TestCase):
         )
         self.assertEqual(snapshot.player_breakdown["opaque-peer"]["label"], "队友 1")
         self.assertEqual(snapshot.player_breakdown["opaque-peer"]["boss_damage"], 80)
+        self.assertEqual(
+            snapshot.personal_source_breakdown["combat.player.normal"]["damage_dealt"],
+            120,
+        )
         self.assertNotIn("nickname", str(snapshot.to_dict()).lower())
 
         self.aggregator.ingest(
@@ -170,6 +180,76 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertFalse(snapshot.player_breakdown["opaque-peer"]["active"])
         self.assertEqual(snapshot.player_breakdown["opaque-peer"]["damage_dealt"], 80)
 
+    def test_non_host_local_player_is_bound_by_flag_not_slot_zero(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "remote-host", "player_slot": 0, "is_local": False},
+                    {"player_id": "local-client", "player_slot": 2, "is_local": True},
+                ],
+            )
+        )
+        for sequence, owner, damage, boss in (
+            (2, "remote-host", 90, True),
+            (3, "local-client", 140, False),
+            (4, None, 30, False),
+        ):
+            self.aggregator.ingest(
+                common_event(
+                    "damage_resolution",
+                    sequence,
+                    damage_direction="dealt",
+                    settlement_damage=damage,
+                    applied_hp_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    is_boss=boss,
+                    owner_player_id=owner,
+                    source_token="combat.player.normal",
+                )
+            )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 260)
+        self.assertEqual(snapshot.personal_damage, 140)
+        self.assertEqual(snapshot.personal_boss_damage, 0)
+        self.assertEqual(snapshot.player_breakdown["local-client"]["label"], "自己")
+        self.assertEqual(snapshot.player_breakdown["local-client"]["player_slot"], 2)
+        self.assertFalse(snapshot.player_breakdown["remote-host"]["is_local"])
+
+    def test_inactive_identity_does_not_create_a_teammate_number_gap(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "local", "player_slot": 2, "is_local": True},
+                    {"player_id": "peer-old", "player_slot": 0, "is_local": False},
+                ],
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                2,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "local", "player_slot": 2, "is_local": True},
+                    {"player_id": "peer-new", "player_slot": 0, "is_local": False},
+                ],
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.player_breakdown["peer-old"]["label"], "离队成员")
+        self.assertEqual(snapshot.player_breakdown["peer-new"]["label"], "队友 1")
+
     def test_party_update_rejects_duplicate_player_identity(self) -> None:
         with self.assertRaises(CombatEventError):
             self.aggregator.ingest(
@@ -185,8 +265,25 @@ class CombatAggregatorTests(unittest.TestCase):
                 )
             )
 
-    def test_two_to_four_player_rosters_keep_every_owner_distinct(self) -> None:
-        for party_size in range(2, 5):
+    def test_recoverable_bridge_issue_stays_live_and_visible(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="live",
+                detail="degraded:damage_snapshot_missing",
+                aggregate=False,
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.connection_state, "live")
+        self.assertEqual(
+            snapshot.diagnostic_warning,
+            "degraded:damage_snapshot_missing",
+        )
+
+    def test_two_to_sixteen_player_rosters_keep_every_owner_distinct(self) -> None:
+        for party_size in range(2, 17):
             with self.subTest(party_size=party_size):
                 registry = SourceRegistry.from_file(
                     PROJECT_ROOT / "assets" / "combat_sources.json"

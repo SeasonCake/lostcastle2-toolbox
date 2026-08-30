@@ -209,6 +209,7 @@ class PlayerTotals:
 class CombatSnapshot:
     session_id: str | None
     connection_state: str
+    diagnostic_warning: str | None
     current_room_id: str | None
     current_stage_level: int | None
     current_scenario_id: str | None
@@ -220,6 +221,9 @@ class CombatSnapshot:
     total_damage: int
     recent_dps: float
     boss_damage: int
+    personal_damage: int
+    personal_recent_dps: float
+    personal_boss_damage: int
     taken_settlement_damage: int
     hp_damage_taken: float
     mitigated_damage: float
@@ -237,6 +241,7 @@ class CombatSnapshot:
     checkpoint_totals: dict[str, float]
     unknown_sources: dict[str, int]
     source_breakdown: dict[str, dict[str, Any]]
+    personal_source_breakdown: dict[str, dict[str, Any]]
     detected_player_count: int
     player_breakdown: dict[str, dict[str, Any]]
     unattributed_damage: int
@@ -278,14 +283,18 @@ class CombatAggregator:
 
     def _clear_session_metrics(self) -> None:
         self.current_room_id: str | None = None
+        self.diagnostic_warning: str | None = None
         self.current_stage_level: int | None = None
         self.current_scenario_id: str | None = None
         self.current_scenario_label: str | None = None
         self.current_room_index: int | None = None
         self.current_map_file_name: str | None = None
-        self._recent_damage: deque[tuple[int, int]] = deque()
+        self._recent_damage: deque[tuple[int, int, str | None]] = deque()
         self._source_totals: defaultdict[str, SourceTotals] = defaultdict(SourceTotals)
         self._player_totals: defaultdict[str, PlayerTotals] = defaultdict(PlayerTotals)
+        self._player_source_totals: defaultdict[
+            str, defaultdict[str, SourceTotals]
+        ] = defaultdict(lambda: defaultdict(SourceTotals))
         self._party_roster_seen = False
         self._unknown_sources: Counter[str] = Counter()
         self.effect_stacks: dict[str, float] = {}
@@ -378,8 +387,37 @@ class CombatAggregator:
         if now is None:
             now = 0
         self._prune_recent_damage(now)
-        recent_damage = sum(value for _, value in self._recent_damage)
+        local_player_ids = {
+            player_id
+            for player_id, totals in self._player_totals.items()
+            if totals.is_local
+        }
+        has_remote_player_history = any(
+            not totals.is_local for totals in self._player_totals.values()
+        )
+        use_personal_scope = bool(local_player_ids) and has_remote_player_history
+        recent_damage = sum(value for _, value, _owner in self._recent_damage)
         recent_dps = recent_damage / (self.dps_window_ms / 1000.0)
+        personal_damage = (
+            sum(self._player_totals[player_id].damage_dealt for player_id in local_player_ids)
+            if use_personal_scope
+            else self.total_damage
+        )
+        personal_boss_damage = (
+            sum(self._player_totals[player_id].boss_damage for player_id in local_player_ids)
+            if use_personal_scope
+            else self.boss_damage
+        )
+        personal_recent_damage = (
+            sum(
+                value
+                for _, value, owner_player_id in self._recent_damage
+                if owner_player_id in local_player_ids
+            )
+            if use_personal_scope
+            else recent_damage
+        )
+        personal_recent_dps = personal_recent_damage / (self.dps_window_ms / 1000.0)
 
         breakdown: dict[str, dict[str, Any]] = {}
         for token, totals in sorted(self._source_totals.items()):
@@ -389,6 +427,39 @@ class CombatAggregator:
                 "category": info.category,
                 "known": info.known,
                 **asdict(totals),
+            }
+
+        personal_breakdown: dict[str, dict[str, Any]] = {}
+        for token, totals in sorted(self._source_totals.items()):
+            info = self.registry.resolve(None if token == "<none>" else token)
+            personal_damage_for_source = (
+                sum(
+                    self._player_source_totals[player_id][token].damage_dealt
+                    for player_id in local_player_ids
+                )
+                if use_personal_scope
+                else totals.damage_dealt
+            )
+            personal_boss_for_source = (
+                sum(
+                    self._player_source_totals[player_id][token].boss_damage
+                    for player_id in local_player_ids
+                )
+                if use_personal_scope
+                else totals.boss_damage
+            )
+            values = {
+                **asdict(totals),
+                "damage_dealt": personal_damage_for_source,
+                "boss_damage": personal_boss_for_source,
+            }
+            if not any(float(value) for value in values.values()):
+                continue
+            personal_breakdown[token] = {
+                "label": info.label,
+                "category": info.category,
+                "known": info.known,
+                **values,
             }
 
         player_breakdown: dict[str, dict[str, Any]] = {}
@@ -405,9 +476,11 @@ class CombatAggregator:
         for player_id, totals in ordered_players:
             if totals.is_local:
                 label = "自己"
-            else:
+            elif totals.active:
                 teammate_number += 1
                 label = f"队友 {teammate_number}"
+            else:
+                label = "离队成员"
             player_breakdown[player_id] = {
                 "label": label,
                 "player_slot": totals.player_slot,
@@ -430,6 +503,7 @@ class CombatAggregator:
         return CombatSnapshot(
             session_id=self.session_id,
             connection_state=self.connection_state,
+            diagnostic_warning=self.diagnostic_warning,
             current_room_id=self.current_room_id,
             current_stage_level=self.current_stage_level,
             current_scenario_id=self.current_scenario_id,
@@ -441,6 +515,9 @@ class CombatAggregator:
             total_damage=self.total_damage,
             recent_dps=recent_dps,
             boss_damage=self.boss_damage,
+            personal_damage=personal_damage,
+            personal_recent_dps=personal_recent_dps,
+            personal_boss_damage=personal_boss_damage,
             taken_settlement_damage=self.taken_settlement_damage,
             hp_damage_taken=self.hp_damage_taken,
             mitigated_damage=self.mitigated_damage,
@@ -458,6 +535,7 @@ class CombatAggregator:
             checkpoint_totals=dict(sorted(self.checkpoint_totals.items())),
             unknown_sources=dict(sorted(self._unknown_sources.items())),
             source_breakdown=breakdown,
+            personal_source_breakdown=personal_breakdown,
             detected_player_count=detected_player_count,
             player_breakdown=player_breakdown,
             unattributed_damage=self.unattributed_damage,
@@ -513,8 +591,8 @@ class CombatAggregator:
     @staticmethod
     def _validate_party_updated(event: Mapping[str, Any]) -> None:
         members = event.get("party_members")
-        if not isinstance(members, list) or not 1 <= len(members) <= 8:
-            raise CombatEventError("party_updated requires 1 to 8 party members.")
+        if not isinstance(members, list) or not 1 <= len(members) <= 16:
+            raise CombatEventError("party_updated requires 1 to 16 party members.")
         player_ids: set[str] = set()
         for member in members:
             if not isinstance(member, Mapping):
@@ -527,7 +605,7 @@ class CombatAggregator:
             if player_id in player_ids:
                 raise CombatEventError("party_updated contains a duplicate player_id.")
             if player_slot is not None and (
-                type(player_slot) is not int or not 0 <= player_slot <= 7
+                type(player_slot) is not int or not 0 <= player_slot <= 15
             ):
                 raise CombatEventError("party member has an invalid player_slot.")
             if not isinstance(is_local, bool):
@@ -557,6 +635,8 @@ class CombatAggregator:
             if isinstance(owner_player_id, str) and owner_player_id:
                 player_totals = self._player_totals[owner_player_id]
                 player_totals.damage_dealt += settlement
+                player_source_totals = self._player_source_totals[owner_player_id][source]
+                player_source_totals.damage_dealt += settlement
             else:
                 player_totals = None
                 self.unattributed_damage += settlement
@@ -565,9 +645,18 @@ class CombatAggregator:
                 totals.boss_damage += settlement
                 if player_totals is not None:
                     player_totals.boss_damage += settlement
+                    player_source_totals.boss_damage += settlement
                 else:
                     self.unattributed_boss_damage += settlement
-            self._recent_damage.append((int(event["monotonic_ms"]), settlement))
+            self._recent_damage.append(
+                (
+                    int(event["monotonic_ms"]),
+                    settlement,
+                    owner_player_id
+                    if isinstance(owner_player_id, str) and owner_player_id
+                    else None,
+                )
+            )
         elif direction == "taken":
             self.taken_settlement_damage += settlement
             self.hp_damage_taken += applied
@@ -646,6 +735,15 @@ class CombatAggregator:
                 self._ended_at_clock_ms = self.clock_ms()
         elif status in {"connecting", "disconnected", "stale", "error"}:
             self.connection_state = status
+        detail = event.get("detail")
+        if status == "session_started":
+            self.diagnostic_warning = None
+        elif (
+            status == "live"
+            and isinstance(detail, str)
+            and detail.startswith("degraded:")
+        ):
+            self.diagnostic_warning = detail
         if status == "room_started":
             self.current_room_id = str(event["room_id"])
             self.current_stage_level = int(event["stage_level"])

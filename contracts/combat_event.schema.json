@@ -131,7 +131,7 @@
     "detail": { "type": ["string", "null"], "maxLength": 512 },
     "party_members": {
       "type": ["array", "null"],
-      "maxItems": 8,
+      "maxItems": 16,
       "uniqueItems": true,
       "items": {
         "type": "object",
@@ -139,7 +139,7 @@
         "required": ["player_id", "player_slot", "is_local"],
         "properties": {
           "player_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-          "player_slot": { "type": ["integer", "null"], "minimum": 0, "maximum": 7 },
+          "player_slot": { "type": ["integer", "null"], "minimum": 0, "maximum": 15 },
           "is_local": { "type": "boolean" }
         }
       }
@@ -233,7 +233,7 @@
       "then": {
         "required": ["party_members"],
         "properties": {
-          "party_members": { "type": "array", "minItems": 1, "maxItems": 8 }
+          "party_members": { "type": "array", "minItems": 1, "maxItems": 16 }
         }
       }
     }

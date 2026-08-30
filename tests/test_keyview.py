@@ -192,6 +192,25 @@ class KeyViewTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             keyview.parse_args(["--qa-ui-receipt", "receipt.json"])
 
+    def test_demo_local_player_slot_can_model_a_non_host_client(self) -> None:
+        args = keyview.parse_args(
+            ["--demo-party-size", "4", "--demo-local-player-slot", "2"]
+        )
+        self.assertEqual(args.demo_party_size, 4)
+        self.assertEqual(args.demo_local_player_slot, 2)
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            keyview.parse_args(
+                ["--demo-party-size", "2", "--demo-local-player-slot", "2"]
+            )
+        sixteen = keyview.parse_args(
+            ["--demo-party-size", "16", "--demo-local-player-slot", "15"]
+        )
+        self.assertEqual(sixteen.demo_party_size, 16)
+        self.assertEqual(sixteen.demo_local_player_slot, 15)
+        self.assertEqual(keyview.parse_args(["--qa-team-scroll", "1"]).qa_team_scroll, 1.0)
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            keyview.parse_args(["--qa-team-scroll", "1.1"])
+
     def test_png_dimensions_reads_the_capture_header(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             capture = Path(temporary_directory) / "capture.png"

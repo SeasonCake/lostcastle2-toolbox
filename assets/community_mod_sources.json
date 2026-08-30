@@ -155,6 +155,19 @@
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
+      "id": "max-players-16",
+      "sort_priority": 155,
+      "source": "LostCastle2MaxPlayers16.dll",
+      "primary": "LostCastle2MaxPlayers16.dll",
+      "name": "多人房间扩容（默认 7 人）",
+      "version": "1.3.0",
+      "author": "梦羽",
+      "summary": "创建多人房间时把默认人数上限改为 7，并可在配置中调整到 16",
+      "usage_hint": "偏房主创建房间用途；首次运行会生成配置，MaxPlayers 建议设为 1–16。加入别人创建的房间前请先卸载，否则可能显示房间已满。无快捷键和游戏内面板。",
+      "hotkeys": [],
+      "author_source": "DLL 内嵌 BepInEx 插件名、作者常量、配置署名与发布地址"
+    },
+    {
       "id": "multi-resonance",
       "source": "允许同时激活塑能法弹、法力护盾、以太飘浮.zip",
       "primary": "LC2MultiResonance.dll",

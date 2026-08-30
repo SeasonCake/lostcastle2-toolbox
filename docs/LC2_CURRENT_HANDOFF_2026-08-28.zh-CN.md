@@ -1,30 +1,31 @@
-# LC2 当前检查点（2026-08-30，Asia/Shanghai）
+# LC2 当前检查点（2026-08-31，Asia/Shanghai）
 
 ## 角色、目标与阶段
 
-- 当前角色：LC2 工具箱下一候选 Bridge/MOD/UI 收口负责人。
-- 当前目标：修复回营补满误计，保持官方承伤121/实际HP变化119双口径；静态纳管新增 MOD，实机通过后冻结 exact package/UI，执行单席 different-owner 综合审计，再打包、显式提交、push 与 Release。
-- 当前阶段：`BRIDGE 0.4.8 R-PASS / MOD 52+53 PASS / EXACT PACKAGE+UI FROZEN / UNIQUE DIFFERENT-OWNER AUDIT NEXT`。
-- 当前授权边界：用户已要求完整收尾后显式提交、push 与 Release。Bridge 0.4.8 已实机通过；第三方 MOD 仍只做静态读取和隔离安装回归，不执行其游戏逻辑。真实 2P–4P 不可由合成验证冒充，Release 必须标注 `NOT RUN`。
+- 当前角色：LC2 工具箱 v1.6.2 / Bridge 0.4.12 收口、审计与发布负责人。
+- 当前目标：闭合多人快照溢出、owner 误归属、非 1P 本机绑定、离队保留、16 人协议/UI 与主界面滚动；统一社区 MOD 单一 BepInEx/最小载荷；冻结可分享包。
+- 当前阶段：`IMPLEMENTATION + PACKAGE + UI + ONE DIFFERENT-OWNER AUDIT VERIFIED / ZIP, COMMIT, PUSH, RELEASE NEXT`。
+- 当前授权边界：用户已要求全部完成后显式提交、push 与 Release；执行顺序固定为先完成一个 different-owner 综合只读审计，若有问题由当前实现 owner 修复并交同一审计 owner 复核，PASS 后再打 ZIP/提交/push/Release。游戏或工具箱运行时不得部署。
 
 ## 仓库与运行身份
 
 | 项目 | 当前值 |
 | --- | --- |
 | 仓库 | `C:\xiangmuyunxing\biancheng\2026\lostcastle2-keyview` |
-| 产品 source / remote | `3d6767794be7b88da3e08e7ef62b444b1658a5ee` 与 `origin/main` 对齐并标记 `v1.6.0`；Release 为 `https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.6.0` |
-| 工作树 | 26 个 tracked 文件修改及 13 个未跟踪记录入口，均归属本轮 Bridge 0.4.6–0.4.8、社区 MOD、多人/UI/打包测试与文档；日志、截图、DLL/PDB 和 package 按 ignore 合同留在本机，尚未 stage/commit/push |
-| 游戏/盒子进程 | 2026-08-30 16:59 再核：exact `LostCastle2.exe` 与 `失落城堡2工具箱.exe` 均为 0；四个精确包 UI 验收进程也已自行退出 |
-| 精确工具箱候选 | `package/失落城堡2工具箱1.6.1-实时数值监测+一键MOD安装`；1,760 文件、`166,606,890` B、0 配置文件；EXE `6,463,717` B / `46525496A85F75C066AB3829D3CE7A2E38FA2962C9A8F034EC137E3902246C8D` / 版本 1.6.1 |
-| 分享 ZIP | 尚未生成；唯一 different-owner 审计 PASS 后才从上方 exact package 创建并做 7-Zip、UTF-8 顶层、唯一 EXE、config0 与哈希回读 |
-| 游戏目录 Bridge | 已精确部署并回读 `0.4.8`；0.4.7 exact rollback 已冻结 |
-| 运行 DLL SHA-256 | `7740BA3E30CD8C8B73F8BFDF221C3384CB2D64F940699A6974556E989896CE55` |
-| `Plugin.cs` SHA-256 | `C0EF0AB6BEAF5F991A58F6BC512F747678308F371D907A750C025177DB117261` |
-| Harmony Patch 数 | 0.4.8 为 `15`，新增 `PlayerManager.OnGameRoundEndPreLoadCamp` |
+| 产品 source / remote | `ed7da670d207be3b0cae605d0264b5b7edbe330f` 与 `origin/main` 对齐并标记 `v1.6.1`；正式 Release 为 `https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.6.1` |
+| 工作树 | v1.6.1 后的 1.6.2/0.4.12 多人、16 人 UI、MOD 与文档修改；第三方二进制、日志、截图、package 仍按 ignore 合同留在本机，未 stage/commit/push |
+| 游戏/盒子进程 | 2026-08-31 精确包/桌面 self-test 与 UI 截图后复核：exact `LostCastle2.exe` 与 `失落城堡2工具箱.exe` 均为 0 |
+| 精确工具箱候选 | `package/失落城堡2工具箱1.6.2-实时数值监测+一键MOD安装`；1,761 文件、166 目录、`166,635,553` B、0 配置文件；EXE `6,470,904` B / `EBFF9584…3F0025` / 版本 1.6.2 |
+| 桌面候选 | `C:\Users\shenc\Desktop\失落城堡2工具箱1.6.2-预备正式版`；与项目包 1,761 文件逐项零差异、self-test exit 0 |
+| 分享 ZIP | `C:\Users\shenc\Desktop\失落城堡2工具箱1.6.2-实时数值监测+一键MOD安装.zip`；137,107,216 B / `B244610C…772431`；7-Zip与.NET UTF-8/文件数/config0回读PASS |
+| 游戏目录 Bridge | 已精确部署并回读 `0.4.12`；0.4.10 exact rollback 已冻结 |
+| 运行 DLL SHA-256 | `3229359A7D901CEBCD523109261A034704CA06B0E3EAD0829ADC5B19ED976D8D` |
+| `Plugin.cs` SHA-256 | `A0EB5E9A5520CC0624492C4E2BEA78154EE777C3607E3906AAF4E3856D44849D` |
+| Harmony Patch 数 | 0.4.8–0.4.12 均为 `15`；快照/owner/16 人修复未增加 Hook |
 
 本文所有 `artifacts/runtime-deploy/...` 定位都指向本机被 `.gitignore` 排除的二进制/回滚证据，fresh clone 不包含，故只作本机恢复定位，不声称是仓库链接。
 
-0.4.8 候选、0.4.7 exact rollback 与部署回执位于本机 `artifacts/runtime-deploy/2026-08-30-bridge-0.4.8/`；当前游戏目录 DLL 已回读为 49,152 B / `7740BA3E…6CE55`。
+0.4.12 候选、0.4.10 exact rollback 与部署回执位于本机 `artifacts/runtime-deploy/2026-08-30-bridge-0.4.12-snapshot-owner-16p/`；当前游戏目录 DLL 已回读为 52,736 B / `3229359A…76D8D`。
 
 0.3.6 候选、PDB、回滚和完整运行 receipt 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.6/`。
 
@@ -356,3 +357,45 @@
 - 多人新增 2/3/4 人各 250 轮 distinct owner 精确累计，以及四人 2,000 事件分 10 批活性测试；重复身份/事件、foreign session、schema error、queue overflow、stale heartbeat 均显式拒绝或报错，不静默漏算。真实 2P–4P 主客机仍为 `NOT RUN`。
 - r11 精确包 UI 回执覆盖 100% 最小海克斯、200% 紫色、150% 四人主面板、200% 四人 HUD；四臂均绑定 EXE `46525496…46C8D` 并按时退出。正式像素证据使用回执哈希一致的 `window-internal.png`，不使用被其他前景程序遮挡的环境实屏。
 - 实现 owner 判定为 `IMPLEMENTATION GREEN / AUDIT PENDING`。下一步只派一个 different-owner 对冻结源码、精确包、Bridge 实战、多人与 UI 做综合只读审计；审计 PASS 后才创建 ZIP、提交、push 与 v1.6.1 Release。
+
+## 2026-08-30 v1.6.1 首次真实多人反例与 1.6.2 候选
+
+- 真实三人局作者为 1P/房主，一名队友有召唤物。游戏个人结算 `576627/Boss171274`；v1.6.1 顶部 `819706/Boss245900`。拆分精确为自己 `235775`、队友 `130746+5726`、未归属 `447459`，证明旧顶部是队伍全量且 owner 大量缺失。
+- 冻结日志 920,380 B / `29CB5319…E94E6`；截图与公式见 `artifacts/runtime-captures/2026-08-30-real-multiplayer-owner-gap-0.4.8/README.zh-CN.md`。
+- Bridge 0.4.9 不增加 Hook；通用遍历 attacker hierarchy/OwnerEntity/Master 并用 PlayerList 根实体兜底。内部 token 绑定 native Player；本机标志比较 LocalPlayer 对象，不依赖 1P/槽位0。新增 local/remote/unattributed 汇总诊断。
+- 工具箱 1.6.2 顶部/HUD改显示个人伤害/Boss/DPS，队伍合计和未归属单列，个人来源表独立；失活 token 不再制造活动队友编号跳号。
+- 全量 174 项、C# 0 warning/0 error、package runtime/MOD 均 PASS。exact package 1,760 文件、`166,612,000` B、config0；EXE `BCCDDE6C…5E27`；Bridge `18228F2E…E8161`。客机槽位2的 A150 主面板和 A200 HUD 候选图通过；真实 0.4.9 仍 `NOT RUN`。
+- 用户 BepInEx 前置 ZIP 34,335,572 B / `2A7CBF74…D9B7F` 是纯加载器；228 文件、无 plugins。与工具箱运行时共有227文件全部一致，工具箱另带 config 与 Unity 6000.3.16 库；不作为普通 MOD纳管。
+
+## 2026-08-30 0.4.9 两次长局冻结与 0.4.10 部署
+
+- 第一局队友退出后异常，第二局四人全程不变仍异常；离队被排除为必要条件。第二局工具箱冻结在硝石荒漠7区 MP `10735/10775`，游戏继续完整通关，最终四人卡已冻结。
+- 0.4.9 owner拆分本身为真实正控：两局冻结前各玩家都有独立量，未归属为0，个人主卡未再混入队伍。异常是单事件/传输 fault 将整局 fail-closed 的独立问题。
+- 由于0.4.9不记录具体 fault，根因仍不能唯一归为 snapshot、conversion、stack 或 queue。0.4.10 将局部事件问题改为黄色 live degraded 并继续；queue仍红色 error且写明 code。
+- 0.4.10 `B27FC892…7CB0FA` 已在22:09:25/22:09:36双零后部署；0.4.9回滚冻结。新桌面 `失落城堡2工具箱1.6.2-多人稳定性测试版` 为1,760文件、`166,613,214` B、config0，EXE `D81E9B1D…505C8`；178项、package runtime/MOD、self-test、A200降级HUD均PASS。
+- 当时尚未授权1.6.2 commit/push/tag/Release；该阶段只要求自然多人观察是否持续累计。当前发布授权与顺序以本文顶部及2026-08-31收口段为准。
+
+## 已纳管：梦羽多人联机补丁 1.3.0
+
+- 两个来源 ZIP 逐字节相同：40,237,762 B / `F2DFFD09…1BDB2`；每包311文件，绝大多数是重复的 BepInEx/CoreCLR/Unity库。
+- 最小功能载荷仅 `LostCastle2MaxPlayers16.dll`：15,872 B / `1247F19F…30F25`，内嵌作者梦羽、版本1.3.0、GUID `mod.lostcastle2.maxplayers16`；无快捷键。配置文件由运行时生成，不随包覆盖。
+- 默认建7人房，可配置1–16；静态IL确认修改创建房间 DTO MaxPlayers，并把本地 RoomData 显示值压回4但保留云端容量。插件明确要求加入别人房间前卸载，否则可能显示房间已满。
+- 当前只把 15,872 B DLL 作为 `max-players-16` 纳入 catalog/package；原包框架、cache 与生成 cfg 不进入最终载荷，DLL 未执行。
+- Bridge/schema/聚合/pipe 已扩至16；主窗口超过4人显示横向滚动条，HUD按每列3名队友扩至15名队友。以上是静态/合成容量 PASS，真实7–16人建房、云端容量、客机和退出仍为 `NOT RUN`。
+
+## 2026-08-31 0.4.10 完整四人反例与 Bridge 0.4.12
+
+- 完整四人局在 CrystalMountain 第 1 区先记录 `damage_snapshot_overflow`，紧接 `damage_snapshot_missing`；后续继续黄色“实时·有事件跳过”而非红色冻结。旧 8,192 上限执行整表 `Clear()`，已把连锁 missing 根因闭合。
+- 游戏最终四人总伤害为 4,914,668；HUD 含离队成员合计 4,771,208，仍少 143,460。作者本机 HUD 1,731,117 对官方 1,464,111，多 267,006；这证明快照漏记与 owner 误归属是两个独立问题，禁止用总量互抵或按角色/召唤物/数值特判。
+- 0.4.11 使用字典 + 最旧未消费 FIFO 淘汰，消费/新局/卸载同步移除，不再整表清空。0.4.12 优先 `mAtkerInHierarchy`、再用 `mAtker`，只沿 Player/native、OwnerEntity hierarchy 与 `Creature.Master` 归属，移除 StandMaster/EntityID 根猜测；每次 `change_room_end` 输出 owner 汇总。
+- roster/schema/pipe/聚合/UI 全链扩到16。非1P本机合成回归绑定 `is_local` 而非槽位0；16人分批高负载保持 live，主界面首尾滚动与HUD五列×三行通过精确包截图。
+- 0.4.12 DLL 52,736 B / `3229359A…76D8D`，隔离 SDK 6.0.428 Release 0 warning/0 error，15 Hook不变。部署后未再运行真实游戏，因此0.4.12多人、客机、远端召唤物和7–16人仍不标 R-PASS。
+
+## 2026-08-31 工具箱 1.6.2 精确候选与 MOD 单一运行时
+
+- r2最终包/桌面均为1,761文件、`166,635,553` B、config0，逐文件零差异；EXE `EBFF9584…3F0025`。182项全量、源码/包/桌面 self-test、清洁运行时、不同核心写前阻断、53项逐个安装卸载和RAR导入均 PASS。
+- 53个社区条目只携带54个功能文件、3,391,437 B；生成社区目录和包内均无Doorstop、coreclr、BepInEx路径、cache、interop或生成cfg。唯一共享运行时为40,402,401 B的固定BepInEx压缩包加52,736 B Bridge。
+- 本地34–40 MB整包均未直接进入社区载荷：两个默认7人整包缩为15,872 B DLL，两个前置仅作运行时来源，旧增强计划完整包不选；72,428,059 B灵魂石修改器是独立EXE，不是重复框架。
+- 初审 `HUD-SELF-SHARE-BAR-01` 判定旧A200多人HUD文字被压到14px且bar消失，综合门一度为Release Hold。r2保持外框尺寸，用底部原空白扩展recent卡；四个A200 arm文字均27/27px且bar可见，P16-MIN100保持17/17px。
+- r2精确包 UI 13臂全部绑定`EBFF9584…3F0025`；主界面、MOD像素不变，HUD skill checker和像素审阅已绿。同一different-owner窄复核关闭`HUD-SELF-SHARE-BAR-01`，其余ledger未重开，最终结论`VERIFIED / RELEASE PASS`。证据在 `artifacts/ui-acceptance/2026-08-31-toolbox-1.6.2-final-r2-0.4.12/`。下一步按用户授权生成ZIP、显式提交、push并发布v1.6.2。
+- 分享ZIP为137,107,216 B / `B244610C…772431`；7-Zip完整性PASS，.NET回读唯一UTF-8顶层目录、1,761文件、唯一EXE、config0及解压总字节一致。当前下一步为显式提交、push与v1.6.2 Release。

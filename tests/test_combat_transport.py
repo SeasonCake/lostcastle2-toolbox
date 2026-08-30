@@ -272,6 +272,34 @@ class CombatTransportContractTests(unittest.TestCase):
         self.assertIn("/session_id:maxLength", message)
         self.assertNotIn("private-account-token", message)
 
+    def test_schema_accepts_sixteen_players_and_rejects_seventeen(self) -> None:
+        members = [
+            {
+                "player_id": f"opaque-player-{index}",
+                "player_slot": index,
+                "is_local": index == 15,
+            }
+            for index in range(16)
+        ]
+        self.validator.validate(
+            status_event(1, status="party_updated", party_members=members)
+        )
+        with self.assertRaises(CombatSchemaError):
+            self.validator.validate(
+                status_event(
+                    2,
+                    status="party_updated",
+                    party_members=[
+                        *members,
+                        {
+                            "player_id": "opaque-player-16",
+                            "player_slot": None,
+                            "is_local": False,
+                        },
+                    ],
+                )
+            )
+
     def test_bounded_inbox_surfaces_overflow_instead_of_dropping_silently(self) -> None:
         inbox = CombatInbox(max_items=2)
         self.assertTrue(inbox.publish_event(status_event()))
@@ -283,7 +311,7 @@ class CombatTransportContractTests(unittest.TestCase):
             [TransportNotice("error", "queue_overflow")],
         )
 
-    def test_four_player_batched_event_pump_stays_live_under_load(self) -> None:
+    def test_sixteen_player_batched_event_pump_stays_live_under_load(self) -> None:
         inbox = CombatInbox()
         aggregator = CombatAggregator()
         pump = CombatEventPump(inbox, self.validator, aggregator)
@@ -291,9 +319,11 @@ class CombatTransportContractTests(unittest.TestCase):
             {
                 "player_id": f"opaque-player-{index}",
                 "player_slot": index,
-                "is_local": index == 0,
+                # Exercise a client: slot 0 is the remote host and the local
+                # player occupies slot 12.
+                "is_local": index == 12,
             }
-            for index in range(4)
+            for index in range(16)
         ]
         self.assertTrue(inbox.publish_event(status_event()))
         self.assertTrue(
@@ -313,8 +343,8 @@ class CombatTransportContractTests(unittest.TestCase):
         expected = {str(member["player_id"]): 0 for member in members}
         started = time.perf_counter()
         for _batch in range(10):
-            for _event_index in range(200):
-                player_index = sequence % 4
+            for _event_index in range(320):
+                player_index = sequence % 16
                 player_id = f"opaque-player-{player_index}"
                 damage = player_index + 1
                 expected[player_id] += damage
@@ -341,15 +371,16 @@ class CombatTransportContractTests(unittest.TestCase):
                 self.assertTrue(inbox.publish_event(event))
                 sequence += 1
             report = pump.drain()
-            self.assertEqual(report.processed_events, 200)
+            self.assertEqual(report.processed_events, 320)
             self.assertIsNone(report.fault_code)
 
         elapsed = time.perf_counter() - started
         snapshot = aggregator.snapshot(monotonic_ms=sequence * 100)
         self.assertLess(elapsed, 5.0)
         self.assertEqual(snapshot.connection_state, "live")
-        self.assertEqual(snapshot.detected_player_count, 4)
+        self.assertEqual(snapshot.detected_player_count, 16)
         self.assertEqual(snapshot.total_damage, sum(expected.values()))
+        self.assertEqual(snapshot.personal_damage, expected["opaque-player-12"])
         self.assertEqual(snapshot.unattributed_damage, 0)
         for player_id, damage in expected.items():
             self.assertEqual(snapshot.player_breakdown[player_id]["damage_dealt"], damage)

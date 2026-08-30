@@ -46,7 +46,7 @@ from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, se
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.6.1"
+APP_VERSION = "1.6.2"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -2814,10 +2814,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--demo-party-size",
         type=int,
         default=1,
-        choices=range(1, 5),
-        metavar="1..4",
+        choices=range(1, 17),
+        metavar="1..16",
         help="开发验证：战斗演示显示的玩家数量",
     )
+    parser.add_argument(
+        "--demo-local-player-slot",
+        type=int,
+        default=0,
+        choices=range(0, 16),
+        metavar="0..15",
+        help="开发验证：把指定槽位标为本机玩家，用于客机 UI 验证",
+    )
+    parser.add_argument("--demo-degraded", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--qa-team-scroll", type=float, help=argparse.SUPPRESS)
     parser.add_argument(
         "--window-size",
         type=parse_window_size,
@@ -2846,6 +2856,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     args = parser.parse_args(argv)
     if bool(args.qa_ui_receipt) != bool(args.qa_ui_screenshot):
         parser.error("--qa-ui-receipt and --qa-ui-screenshot must be used together")
+    if args.demo_local_player_slot >= args.demo_party_size:
+        parser.error("--demo-local-player-slot must be lower than --demo-party-size")
+    if args.qa_team_scroll is not None and not 0.0 <= args.qa_team_scroll <= 1.0:
+        parser.error("--qa-team-scroll must be between 0 and 1")
     return args
 
 
@@ -3024,6 +3038,10 @@ def main(argv: list[str] | None = None) -> int:
             scenario_id=args.demo_scenario,
             room_index=args.demo_room_index,
             party_size=args.demo_party_size,
+            local_player_slot=args.demo_local_player_slot,
+            diagnostic_warning=(
+                "damage_snapshot_missing" if args.demo_degraded else None
+            ),
         )
     else:
         combat_inbox = CombatInbox()
@@ -3091,6 +3109,12 @@ def main(argv: list[str] | None = None) -> int:
         root.geometry(f"{args.window_size[0]}x{args.window_size[1]}")
     root.deiconify()
     shell.show_page(args.show_page)
+    if args.qa_team_scroll is not None:
+        def scroll_qa_team_panel() -> None:
+            if shell.combat_team_canvas is not None:
+                shell.combat_team_canvas.xview_moveto(args.qa_team_scroll)
+
+        root.after(700, scroll_qa_team_panel)
     if args.qa_select_mod:
         def select_qa_mod() -> None:
             try:

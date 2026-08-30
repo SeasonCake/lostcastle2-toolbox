@@ -233,8 +233,12 @@ def main() -> int:
             {
                 "id": mod_id,
                 "source": source_name,
+                "source_size_bytes": source.stat().st_size if source.is_file() else None,
                 "source_sha256": file_sha256(source) if source.is_file() else None,
                 "primary": primary,
+                "selection_mode": (
+                    "explicit_include" if raw.get("include") is not None else "inspector_default"
+                ),
                 "payload_files": len(specs),
                 "payload_bytes": sum(int(spec["size_bytes"]) for spec in specs),
                 "warnings": list(getattr(draft, "warnings")),

@@ -23,8 +23,10 @@ from toolbox.app_shell import (
     combat_state_label,
     combat_teammate_rows,
     combat_team_rows,
+    combat_uses_personal_scope,
     combat_hud_size,
     combat_hud_initial_position,
+    combat_personal_share,
     combat_table_source_width,
     combat_table_numeric_width,
     format_location_label,
@@ -35,6 +37,7 @@ from toolbox.app_shell import (
     macro_rows,
     metric_font_size,
     hud_panel_height,
+    hud_recent_panel_height,
     hud_teammate_card_height,
     main_metric_card_height,
     main_team_panel_height,
@@ -186,6 +189,9 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(format_stage_location(snapshot), "第 2 阶段 · 泥鱼沼泽 · 第 4 区")
         self.assertEqual(snapshot.total_damage, 34_328)
         self.assertEqual(snapshot.boss_damage, 8_940)
+        self.assertEqual(snapshot.personal_damage, 34_328)
+        self.assertEqual(snapshot.personal_boss_damage, 8_940)
+        self.assertFalse(combat_uses_personal_scope(snapshot))
         self.assertEqual(snapshot.taken_settlement_damage, 264)
         self.assertEqual(snapshot.hp_damage_taken, 183)
         self.assertEqual(snapshot.hp_loss_other, 18)
@@ -206,12 +212,92 @@ class AppShellModelTests(unittest.TestCase):
         snapshot = aggregator.snapshot()
         rows = combat_team_rows(snapshot)
         self.assertEqual(snapshot.detected_player_count, 4)
+        self.assertTrue(combat_uses_personal_scope(snapshot))
+        self.assertEqual(snapshot.personal_damage, rows[0][1])
+        self.assertLess(snapshot.personal_damage, snapshot.total_damage)
+        self.assertAlmostEqual(
+            combat_personal_share(snapshot),
+            snapshot.personal_damage / snapshot.total_damage,
+        )
         self.assertEqual([row[0] for row in rows], ["自己", "队友 1", "队友 2", "队友 3"])
         self.assertEqual(sum(row[1] for row in rows), snapshot.total_damage)
         self.assertAlmostEqual(sum(row[3] for row in rows), 1.0)
         self.assertNotIn("demo-player", str(rows))
         teammates = combat_teammate_rows(snapshot)
         self.assertEqual([row[0] for row in teammates], ["队友 1", "队友 2", "队友 3"])
+
+    def test_demo_client_slot_is_still_rendered_as_self(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        aggregator = CombatAggregator(
+            registry=SourceRegistry.from_file(root / "assets" / "combat_sources.json"),
+            scenario_registry=ScenarioRegistry.from_file(
+                root / "assets" / "game_locations.json"
+            ),
+        )
+        seed_demo_combat(aggregator, party_size=4, local_player_slot=2)
+        snapshot = aggregator.snapshot()
+        rows = combat_team_rows(snapshot)
+        self.assertEqual(rows[0][0], "自己")
+        local_rows = [
+            values
+            for values in snapshot.player_breakdown.values()
+            if values["is_local"]
+        ]
+        self.assertEqual(len(local_rows), 1)
+        self.assertEqual(local_rows[0]["player_slot"], 2)
+        self.assertEqual(snapshot.personal_damage, local_rows[0]["damage_dealt"])
+
+    def test_demo_sixteen_player_hud_keeps_three_rows_per_column(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        aggregator = CombatAggregator(
+            registry=SourceRegistry.from_file(root / "assets" / "combat_sources.json"),
+            scenario_registry=ScenarioRegistry.from_file(
+                root / "assets" / "game_locations.json"
+            ),
+        )
+        seed_demo_combat(aggregator, party_size=16, local_player_slot=12)
+        snapshot = aggregator.snapshot()
+        teammates = combat_teammate_rows(snapshot)
+        main_rows = combat_team_rows(snapshot, maximum=16)
+        self.assertEqual(snapshot.detected_player_count, 16)
+        self.assertEqual(len(teammates), 15)
+        self.assertEqual(len(main_rows), 16)
+        self.assertEqual(main_rows[0][0], "自己")
+        self.assertEqual(
+            [row[0] for row in teammates],
+            [f"队友 {index}" for index in range(1, 16)],
+        )
+
+    def test_main_team_panel_scrolls_horizontally_after_four_players(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "toolbox" / "app_shell.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('orient="horizontal"', source)
+        self.assertIn("maximum=MAX_PARTY_MEMBERS", source)
+        self.assertIn("len(team_rows) > 4", source)
+        self.assertIn("self.combat_team_canvas.xview", source)
+        self.assertIn("content_width = cell_width * visible_count", source)
+
+    def test_demo_degraded_state_remains_live_and_explicit(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        aggregator = CombatAggregator(
+            registry=SourceRegistry.from_file(root / "assets" / "combat_sources.json"),
+            scenario_registry=ScenarioRegistry.from_file(
+                root / "assets" / "game_locations.json"
+            ),
+        )
+        seed_demo_combat(
+            aggregator,
+            party_size=4,
+            local_player_slot=2,
+            diagnostic_warning="damage_snapshot_missing",
+        )
+        snapshot = aggregator.snapshot()
+        self.assertEqual(snapshot.connection_state, "live")
+        self.assertEqual(
+            snapshot.diagnostic_warning,
+            "degraded:damage_snapshot_missing",
+        )
 
     def test_keyboard_preview_order_follows_geometry_not_selection_order(self) -> None:
         shuffled = (
@@ -287,9 +373,18 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(combat_hud_size(1.5, 1.25), (438, 592))
         self.assertEqual(combat_hud_size(1.5, player_count=2), (580, 474))
         self.assertEqual(combat_hud_size(2.0, player_count=4), (610, 554))
+        self.assertEqual(combat_hud_size(1.5, player_count=5), (810, 474))
+        self.assertEqual(combat_hud_size(1.5, player_count=8), (1040, 474))
+        self.assertEqual(combat_hud_size(1.5, player_count=11), (1270, 474))
+        self.assertEqual(combat_hud_size(1.5, player_count=16), (1500, 474))
+        self.assertEqual(combat_hud_size(2.0, player_count=16), (1570, 554))
         self.assertEqual(hud_panel_height(112, 1.5), 112)
         self.assertEqual(hud_panel_height(112, 2.0), 118)
         self.assertEqual(hud_panel_height(88, 2.0, high_dpi_gain=24), 100)
+        self.assertEqual(hud_recent_panel_height(1.5, multiplayer=False), 114)
+        self.assertEqual(hud_recent_panel_height(1.5, multiplayer=True), 114)
+        self.assertEqual(hud_recent_panel_height(2.0, multiplayer=False), 131)
+        self.assertEqual(hud_recent_panel_height(2.0, multiplayer=True), 160)
 
     def test_damage_panel_reserves_structural_space_above_composition_bar(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "toolbox" / "app_shell.py").read_text(
@@ -421,7 +516,7 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(hud_teammate_card_height(1.5), 150)
         self.assertEqual(hud_teammate_card_height(2.0), 178)
         for tk_scaling in (1.5, 2.0, 2.5):
-            _width, hud_height = combat_hud_size(tk_scaling, player_count=4)
+            _width, hud_height = combat_hud_size(tk_scaling, player_count=16)
             self.assertGreaterEqual(
                 hud_height,
                 3 * hud_teammate_card_height(tk_scaling) + 15,

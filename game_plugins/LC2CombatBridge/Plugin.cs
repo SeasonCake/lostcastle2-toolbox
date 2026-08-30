@@ -18,11 +18,13 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.4.8";
+    public const string PluginVersion = "0.4.12";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
     private static readonly Dictionary<int, HitHpSnapshot> HpSnapshots = new();
+    private static readonly Dictionary<int, LinkedListNode<int>> HpSnapshotNodes = new();
+    private static readonly LinkedList<int> HpSnapshotOrder = new();
     [ThreadStatic]
     private static Stack<int> HpStack;
     [ThreadStatic]
@@ -47,6 +49,15 @@ public sealed class Plugin : BasePlugin
     private static double _diagnosticManaGained;
     private static int _diagnosticManaSpendEvents;
     private static int _diagnosticManaGainEvents;
+    private static long _diagnosticLocalDamage;
+    private static long _diagnosticRemoteDamage;
+    private static long _diagnosticUnattributedDamage;
+    private static long _diagnosticLocalBossDamage;
+    private static long _diagnosticRemoteBossDamage;
+    private static long _diagnosticUnattributedBossDamage;
+    private static int _diagnosticLocalDamageEvents;
+    private static int _diagnosticRemoteDamageEvents;
+    private static int _diagnosticUnattributedDamageEvents;
     private static long _nextPartyRosterProbeMs;
 
     private Harmony _harmony;
@@ -100,6 +111,7 @@ public sealed class Plugin : BasePlugin
         UnregisterRecoverManaCallback();
         _harmony?.UnpatchSelf();
         Bridge?.Dispose();
+        ResetHitSnapshots();
         Bridge = null;
         RuntimeLog = null;
         return true;
@@ -139,6 +151,7 @@ public sealed class Plugin : BasePlugin
     internal static void EndRound()
     {
         LogManaSummary("round_end");
+        LogDamageOwnerSummary("round_end");
         LogRoomDiagnostic("round_end");
         _awaitingMapEntry = true;
         _inActiveMap = false;
@@ -154,6 +167,7 @@ public sealed class Plugin : BasePlugin
     {
         EnsureRecoverManaCallback();
         var room = CaptureActiveMapLocation();
+        LogDamageOwnerSummary("change_room_end");
         LogRoomDiagnostic("change_room_end", room);
         if (room is null)
         {
@@ -186,8 +200,11 @@ public sealed class Plugin : BasePlugin
             ResetOfficialManaRecoveryCoverage();
             ResetOfficialManaSpendCoverage();
             SyncPlayerMpObservation();
+            ResetHitSnapshots();
             ResetDiagnosticManaTotals();
+            ResetDiagnosticDamageOwnerTotals();
             LogManaSummary("session_start");
+            LogDamageOwnerSummary("session_start");
             Bridge?.BeginGameSession();
         }
         _inActiveMap = true;
@@ -256,6 +273,7 @@ public sealed class Plugin : BasePlugin
     internal static void EndRoom(SettlementDataMgr settlement)
     {
         LogManaSummary("room_end");
+        LogDamageOwnerSummary("room_end");
         LogRoomDiagnostic("room_end");
         try
         {
@@ -272,7 +290,7 @@ public sealed class Plugin : BasePlugin
         }
         catch
         {
-            Bridge?.FailSession("checkpoint_unavailable");
+            Bridge?.ReportRecoverableIssue("checkpoint_unavailable");
             return;
         }
         Bridge?.PublishRoomEnded();
@@ -288,11 +306,7 @@ public sealed class Plugin : BasePlugin
         var stack = HpStack ??= new Stack<int>();
         lock (HpSnapshotLock)
         {
-            if (!HpSnapshots.TryGetValue(hit.ID, out var snapshot))
-            {
-                snapshot = new HitHpSnapshot();
-                HpSnapshots[hit.ID] = snapshot;
-            }
+            var snapshot = GetOrCreateHitSnapshotLocked(hit.ID);
             snapshot.ParentHitId = stack.Count > 0 ? stack.Peek() : null;
             snapshot.Depth = stack.Count;
         }
@@ -317,7 +331,7 @@ public sealed class Plugin : BasePlugin
                 else
                 {
                     stack.Clear();
-                    Bridge?.FailSession("damage_stack_mismatch");
+                    Bridge?.ReportRecoverableIssue("damage_stack_mismatch");
                 }
             }
         }
@@ -327,14 +341,13 @@ public sealed class Plugin : BasePlugin
     {
         if (hit is null)
         {
-            Bridge?.FailSession("damage_event_missing");
+            Bridge?.ReportRecoverableIssue("damage_event_missing");
             return;
         }
         HitHpSnapshot snapshot;
         lock (HpSnapshotLock)
         {
-            HpSnapshots.TryGetValue(hit.ID, out snapshot);
-            HpSnapshots.Remove(hit.ID);
+            TryTakeHitSnapshotLocked(hit.ID, out snapshot);
         }
         var defender = hit.mBeAtker;
         if (direction == "taken" && !IsLocalPlayerRootCreature(TryCreature(defender)))
@@ -343,7 +356,7 @@ public sealed class Plugin : BasePlugin
         }
         if (snapshot?.Before is null)
         {
-            Bridge?.FailSession("damage_snapshot_missing");
+            Bridge?.ReportRecoverableIssue("damage_snapshot_missing");
             return;
         }
         try
@@ -363,8 +376,13 @@ public sealed class Plugin : BasePlugin
             var attributes = DamageAttributes(hit);
             var isBoss = BossFlag(defender);
             var attacker = hit.mAtker;
-            var attackerPlayer = OwnerPlayer(attacker);
+            var attackerPlayer = OwnerPlayer(hit);
             var defenderPlayer = OwnerPlayer(defender);
+            var aggregate = ShouldAggregateDamage(direction);
+            if (direction == "dealt" && aggregate)
+            {
+                RecordDamageOwner(attackerPlayer, settlementDamage, isBoss is true);
+            }
             if (direction == "taken")
             {
                 RuntimeLog?.LogInfo(
@@ -406,13 +424,13 @@ public sealed class Plugin : BasePlugin
             };
             Bridge?.Emit(
                 "damage_resolution",
-                aggregate: ShouldAggregateDamage(direction),
+                aggregate,
                 hookPath,
                 fields);
         }
         catch
         {
-            Bridge?.FailSession("damage_conversion_failed");
+            Bridge?.ReportRecoverableIssue("damage_conversion_failed");
         }
     }
 
@@ -569,7 +587,7 @@ public sealed class Plugin : BasePlugin
         }
         catch
         {
-            Bridge?.FailSession("resource_conversion_failed");
+            Bridge?.ReportRecoverableIssue("resource_conversion_failed");
         }
         finally
         {
@@ -583,7 +601,7 @@ public sealed class Plugin : BasePlugin
         if (stack is null || stack.Count == 0 || stack.Peek() != state.OperationId)
         {
             stack?.Clear();
-            Bridge?.FailSession("resource_stack_mismatch");
+            Bridge?.ReportRecoverableIssue("resource_stack_mismatch");
             return;
         }
         stack.Pop();
@@ -716,7 +734,7 @@ public sealed class Plugin : BasePlugin
         }
         catch
         {
-            Bridge?.FailSession("mp_resource_conversion_failed");
+            Bridge?.ReportRecoverableIssue("mp_resource_conversion_failed");
         }
         finally
         {
@@ -726,7 +744,7 @@ public sealed class Plugin : BasePlugin
                 stack?.Clear();
                 ResetOfficialManaRecoveryCoverage();
                 ResetOfficialManaSpendCoverage();
-                Bridge?.FailSession("mp_resource_stack_mismatch");
+                Bridge?.ReportRecoverableIssue("mp_resource_stack_mismatch");
             }
             else
             {
@@ -800,7 +818,7 @@ public sealed class Plugin : BasePlugin
         }
         catch
         {
-            Bridge?.FailSession("mp_spend_conversion_failed");
+            Bridge?.ReportRecoverableIssue("mp_spend_conversion_failed");
         }
     }
 
@@ -880,7 +898,7 @@ public sealed class Plugin : BasePlugin
         }
         catch
         {
-            Bridge?.FailSession("mp_recovery_conversion_failed");
+            Bridge?.ReportRecoverableIssue("mp_recovery_conversion_failed");
         }
     }
 
@@ -926,6 +944,72 @@ public sealed class Plugin : BasePlugin
         _diagnosticManaSpendEvents = 0;
         _diagnosticManaGainEvents = 0;
     }
+
+    private static void ResetDiagnosticDamageOwnerTotals()
+    {
+        _diagnosticLocalDamage = 0;
+        _diagnosticRemoteDamage = 0;
+        _diagnosticUnattributedDamage = 0;
+        _diagnosticLocalBossDamage = 0;
+        _diagnosticRemoteBossDamage = 0;
+        _diagnosticUnattributedBossDamage = 0;
+        _diagnosticLocalDamageEvents = 0;
+        _diagnosticRemoteDamageEvents = 0;
+        _diagnosticUnattributedDamageEvents = 0;
+    }
+
+    private static void RecordDamageOwner(Player owner, int damage, bool isBoss)
+    {
+        var boundedDamage = Math.Max(0, damage);
+        if (owner is null)
+        {
+            _diagnosticUnattributedDamage += boundedDamage;
+            _diagnosticUnattributedDamageEvents += 1;
+            if (isBoss)
+            {
+                _diagnosticUnattributedBossDamage += boundedDamage;
+            }
+            return;
+        }
+        var isLocal = false;
+        try
+        {
+            var local = PlayerManager.Instance?.LocalPlayer;
+            isLocal = local is not null && local.Pointer == owner.Pointer;
+        }
+        catch
+        {
+        }
+        if (isLocal)
+        {
+            _diagnosticLocalDamage += boundedDamage;
+            _diagnosticLocalDamageEvents += 1;
+            if (isBoss)
+            {
+                _diagnosticLocalBossDamage += boundedDamage;
+            }
+        }
+        else
+        {
+            _diagnosticRemoteDamage += boundedDamage;
+            _diagnosticRemoteDamageEvents += 1;
+            if (isBoss)
+            {
+                _diagnosticRemoteBossDamage += boundedDamage;
+            }
+        }
+    }
+
+    private static void LogDamageOwnerSummary(string point) =>
+        RuntimeLog?.LogInfo(
+            $"[LC2CB-OWNER] kind=summary point={point} " +
+            $"local_events={_diagnosticLocalDamageEvents} local_damage={_diagnosticLocalDamage} " +
+            $"local_boss={_diagnosticLocalBossDamage} " +
+            $"remote_events={_diagnosticRemoteDamageEvents} remote_damage={_diagnosticRemoteDamage} " +
+            $"remote_boss={_diagnosticRemoteBossDamage} " +
+            $"unattributed_events={_diagnosticUnattributedDamageEvents} " +
+            $"unattributed_damage={_diagnosticUnattributedDamage} " +
+            $"unattributed_boss={_diagnosticUnattributedBossDamage}");
 
     internal static double ReconcileOfficialManaRecovery(
         double beforeRaw,
@@ -1097,17 +1181,7 @@ public sealed class Plugin : BasePlugin
             var (currentHp, maxHp) = ReadHp(instance);
             lock (HpSnapshotLock)
             {
-                if (HpSnapshots.Count >= MaxHpSnapshots && !HpSnapshots.ContainsKey(hit.ID))
-                {
-                    HpSnapshots.Clear();
-                    Bridge?.FailSession("damage_snapshot_overflow");
-                    return;
-                }
-                if (!HpSnapshots.TryGetValue(hit.ID, out var snapshot))
-                {
-                    snapshot = new HitHpSnapshot();
-                    HpSnapshots[hit.ID] = snapshot;
-                }
+                var snapshot = GetOrCreateHitSnapshotLocked(hit.ID);
                 if (before)
                 {
                     snapshot.Before = currentHp;
@@ -1122,7 +1196,47 @@ public sealed class Plugin : BasePlugin
         }
         catch
         {
-            Bridge?.FailSession("damage_snapshot_failed");
+            Bridge?.ReportRecoverableIssue("damage_snapshot_failed");
+        }
+    }
+
+    private static HitHpSnapshot GetOrCreateHitSnapshotLocked(int hitId)
+    {
+        if (HpSnapshots.TryGetValue(hitId, out var existing))
+        {
+            return existing;
+        }
+        while (HpSnapshots.Count >= MaxHpSnapshots && HpSnapshotOrder.First is not null)
+        {
+            var oldest = HpSnapshotOrder.First;
+            HpSnapshotOrder.RemoveFirst();
+            HpSnapshotNodes.Remove(oldest.Value);
+            HpSnapshots.Remove(oldest.Value);
+        }
+        var snapshot = new HitHpSnapshot();
+        HpSnapshots[hitId] = snapshot;
+        HpSnapshotNodes[hitId] = HpSnapshotOrder.AddLast(hitId);
+        return snapshot;
+    }
+
+    private static bool TryTakeHitSnapshotLocked(int hitId, out HitHpSnapshot snapshot)
+    {
+        var found = HpSnapshots.TryGetValue(hitId, out snapshot);
+        HpSnapshots.Remove(hitId);
+        if (HpSnapshotNodes.Remove(hitId, out var node))
+        {
+            HpSnapshotOrder.Remove(node);
+        }
+        return found;
+    }
+
+    private static void ResetHitSnapshots()
+    {
+        lock (HpSnapshotLock)
+        {
+            HpSnapshots.Clear();
+            HpSnapshotNodes.Clear();
+            HpSnapshotOrder.Clear();
         }
     }
 
@@ -1234,7 +1348,7 @@ public sealed class Plugin : BasePlugin
             if (players is not null)
             {
                 var seen = new HashSet<string>(StringComparer.Ordinal);
-                for (var index = 0; index < players.Count && result.Count < 8; index += 1)
+                for (var index = 0; index < players.Count && result.Count < 16; index += 1)
                 {
                     var player = players[index];
                     var token = PlayerToken(player);
@@ -1246,7 +1360,7 @@ public sealed class Plugin : BasePlugin
                     result.Add(new PartyMemberSnapshot
                     {
                         PlayerId = token,
-                        PlayerSlot = playerIndex is >= 0 and <= 7 ? playerIndex : null,
+                        PlayerSlot = playerIndex is >= 0 and <= 15 ? playerIndex : null,
                         IsLocal = local is not null && local.Pointer == player.Pointer,
                     });
                 }
@@ -1260,7 +1374,7 @@ public sealed class Plugin : BasePlugin
                     result.Add(new PartyMemberSnapshot
                     {
                         PlayerId = token,
-                        PlayerSlot = playerIndex is >= 0 and <= 7 ? playerIndex : null,
+                        PlayerSlot = playerIndex is >= 0 and <= 15 ? playerIndex : null,
                         IsLocal = true,
                     });
                 }
@@ -1274,7 +1388,59 @@ public sealed class Plugin : BasePlugin
         return result;
     }
 
+    private static Player OwnerPlayer(DisposeHitInfo hit)
+    {
+        if (hit is null)
+        {
+            return null;
+        }
+        try
+        {
+            // The hit already exposes the gameplay attacker resolved in its
+            // hierarchy. Prefer it over creation/transport ownership on a
+            // transient projectile entity.
+            return OwnerPlayer(hit.mAtkerInHierarchy) ?? OwnerPlayer(hit.mAtker);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static Player OwnerPlayer(Entity entity)
+    {
+        if (entity is null)
+        {
+            return null;
+        }
+        var pending = new Queue<Entity>();
+        var seen = new HashSet<IntPtr>();
+        pending.Enqueue(entity);
+        for (var visited = 0; visited < 8 && pending.Count > 0; visited += 1)
+        {
+            var candidate = pending.Dequeue();
+            if (candidate is null || !seen.Add(candidate.Pointer))
+            {
+                continue;
+            }
+            var owner = DirectOwnerPlayer(candidate);
+            if (owner is not null)
+            {
+                return owner;
+            }
+            var player = PlayerForRootCreature(candidate);
+            if (player is not null)
+            {
+                return player;
+            }
+            EnqueueOwnerCandidate(pending, OwnerEntityInHierarchy(candidate), seen);
+            EnqueueOwnerCandidate(pending, OwnerEntity(candidate), seen);
+            EnqueueOwnerCandidate(pending, CreatureMaster(candidate), seen);
+        }
+        return null;
+    }
+
+    private static Player DirectOwnerPlayer(Entity entity)
     {
         try
         {
@@ -1286,6 +1452,78 @@ public sealed class Plugin : BasePlugin
         }
     }
 
+    private static Entity OwnerEntityInHierarchy(Entity entity)
+    {
+        try
+        {
+            return entity?.OwnerEntityInHierarchy;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static Entity OwnerEntity(Entity entity)
+    {
+        try
+        {
+            return entity?.OwnerEntity;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static Entity CreatureMaster(Entity entity)
+    {
+        try
+        {
+            return TryCreature(entity)?.Master;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void EnqueueOwnerCandidate(
+        Queue<Entity> pending,
+        Entity candidate,
+        HashSet<IntPtr> seen)
+    {
+        if (candidate is not null && !seen.Contains(candidate.Pointer))
+        {
+            pending.Enqueue(candidate);
+        }
+    }
+
+    private static Player PlayerForRootCreature(Entity entity)
+    {
+        try
+        {
+            var players = PlayerManager.Instance?.PlayerList;
+            if (players is null)
+            {
+                return null;
+            }
+            for (var index = 0; index < players.Count; index += 1)
+            {
+                var player = players[index];
+                var root = player?.OwnerCreature;
+                if (root is not null && root.Pointer == entity.Pointer)
+                {
+                    return player;
+                }
+            }
+        }
+        catch
+        {
+        }
+        return null;
+    }
+
     private static string PlayerToken(Player player)
     {
         if (player is null)
@@ -1294,13 +1532,13 @@ public sealed class Plugin : BasePlugin
         }
         try
         {
-            var identity = player.ID != 0
-                ? $"id:{player.ID.ToString(CultureInfo.InvariantCulture)}"
-                : player.ClientID != 0
-                    ? $"client:{player.ClientID.ToString(CultureInfo.InvariantCulture)}"
-                    : player.TransportID != 0
-                        ? $"transport:{player.TransportID.ToString(CultureInfo.InvariantCulture)}"
-                        : $"slot:{player.Index.ToString(CultureInfo.InvariantCulture)}";
+            // The local native Player object is stable within a game session,
+            // while ID/ClientID/TransportID can populate or change during a
+            // real network join.  The pointer is used only as an internal map
+            // key and is never sent to the desktop client.
+            var identity = player.Pointer != IntPtr.Zero
+                ? $"native:{player.Pointer.ToInt64().ToString("X", CultureInfo.InvariantCulture)}"
+                : $"slot:{player.Index.ToString(CultureInfo.InvariantCulture)}";
             return Bridge?.GetPlayerToken(identity);
         }
         catch

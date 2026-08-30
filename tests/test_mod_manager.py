@@ -339,7 +339,7 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 52)
+        self.assertEqual(len(catalog.entries), 53)
         bundled_root = PROJECT_ROOT / "third_party"
         for descriptor in catalog.entries:
             self.assertTrue(descriptor.operation.files)
@@ -470,6 +470,22 @@ class ModManagerTests(unittest.TestCase):
             "5863D6A9346304C418C731F73AF0E0413AAAE1FEBD569065697B9CBDC035EECB",
         )
 
+        max_players = catalog.get("max-players-16")
+        self.assertEqual(max_players.display.version, "1.3.0")
+        self.assertEqual(max_players.display.author, "梦羽")
+        self.assertEqual(
+            max_players.operation.expected_filename,
+            "LostCastle2MaxPlayers16.dll",
+        )
+        self.assertEqual(max_players.operation.hotkeys, ())
+        self.assertIsNone(max_players.operation.panel_hotkey)
+        self.assertIn("加入别人创建的房间前请先卸载", max_players.display.usage_hint)
+        self.assertIn("1–16", max_players.display.usage_hint)
+        self.assertEqual(
+            max_players.integrity_policy.sha256,
+            "1247F19FC0C0447B18E38FABC0AE08EF13967282A116D58C2CFF9FBD3A630F25",
+        )
+
     def test_community_catalog_prioritizes_practical_mods_over_cosmetics(self) -> None:
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
@@ -481,6 +497,8 @@ class ModManagerTests(unittest.TestCase):
             ["player-live-stats", "enhancement-plan", "resource-transfer-f1"],
         )
         self.assertLess(ids.index("enhancement-plan"), ids.index("resource-transfer-f1"))
+        self.assertLess(ids.index("multiplayer-room-fix"), ids.index("max-players-16"))
+        self.assertLess(ids.index("max-players-16"), ids.index("dynamic-hp"))
         self.assertLess(ids.index("hex-augment"), ids.index("item-ban-freenix"))
         self.assertLess(ids.index("item-ban-freenix"), ids.index("armor-transmog"))
         self.assertLess(ids.index("dynamic-hp"), ids.index("staff-skin-swap"))

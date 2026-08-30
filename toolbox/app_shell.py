@@ -42,6 +42,9 @@ TOOLBOX_AUTHOR = "加菲_barista"
 TOOLBOX_REPOSITORY_URL = "https://github.com/SeasonCake/lostcastle2-toolbox"
 TOOLBOX_BILIBILI_URL = "https://space.bilibili.com/88048665?"
 HUD_LEFT_MOD_CLEARANCE = 500
+MAX_PARTY_MEMBERS = 16
+HUD_TEAMMATES_PER_COLUMN = 3
+MAX_HUD_TEAMMATES = MAX_PARTY_MEMBERS - 1
 SUPPORT_LABEL = "投喂"
 SUPPORT_TITLE = "一起为热爱投喂猫罐头"
 SUPPORT_NOTE = (
@@ -346,12 +349,15 @@ def combat_hud_size(
 
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
     scale = min(1.25, max(0.85, float(ui_scale)))
-    teammate_column_width = 0
-    if int(player_count) >= 2:
-        teammate_column_width = round((230 + 20 * high_dpi) * scale)
+    remote_players = max(0, min(MAX_HUD_TEAMMATES, int(player_count) - 1))
+    teammate_columns = (
+        (remote_players + HUD_TEAMMATES_PER_COLUMN - 1) // HUD_TEAMMATES_PER_COLUMN
+    )
+    teammate_column_width = round((230 + 20 * high_dpi) * scale)
     height_gain = 160 if int(player_count) >= 2 else 84
     return (
-        round((350 + 40 * high_dpi) * scale) + teammate_column_width,
+        round((350 + 40 * high_dpi) * scale)
+        + teammate_columns * teammate_column_width,
         round((474 + height_gain * high_dpi) * scale),
     )
 
@@ -366,6 +372,16 @@ def hud_panel_height(
 
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
     return int(base_height) + round(high_dpi_gain * high_dpi)
+
+
+def hud_recent_panel_height(tk_scaling: float, *, multiplayer: bool) -> int:
+    """Reserve the multiplayer share label and bar at high DPI."""
+
+    return hud_panel_height(
+        114,
+        tk_scaling,
+        high_dpi_gain=92 if multiplayer else 34,
+    )
 
 
 def main_window_min_size(tk_scaling: float) -> tuple[int, int]:
@@ -499,6 +515,22 @@ def combat_team_rows(
     return rows
 
 
+def combat_uses_personal_scope(snapshot: CombatSnapshot) -> bool:
+    """Return whether a real remote participant exists in this session."""
+
+    values = tuple(snapshot.player_breakdown.values())
+    return any(bool(item.get("is_local")) for item in values) and any(
+        not bool(item.get("is_local")) for item in values
+    )
+
+
+def combat_personal_share(snapshot: CombatSnapshot) -> float:
+    total = float(snapshot.total_damage)
+    if total <= 0:
+        return 0.0
+    return max(0.0, min(1.0, float(snapshot.personal_damage) / total))
+
+
 def combat_teammate_rows(
     snapshot: CombatSnapshot,
 ) -> list[tuple[str, int, int, float]]:
@@ -516,7 +548,7 @@ def combat_teammate_rows(
                 max(0.0, min(1.0, float(values.get("damage_share") or 0.0))),
             )
         )
-        if len(rows) >= 3:
+        if len(rows) >= MAX_HUD_TEAMMATES:
             break
     return rows
 
@@ -528,6 +560,8 @@ def seed_demo_combat(
     scenario_id: str = "MudSwamp",
     room_index: int = 4,
     party_size: int = 1,
+    local_player_slot: int = 0,
+    diagnostic_warning: str | None = None,
 ) -> None:
     """Load deterministic synthetic data for visual QA; never used in normal mode."""
 
@@ -537,8 +571,10 @@ def seed_demo_combat(
         raise ValueError("scenario_id must not be empty")
     if not 0 <= room_index <= 101:
         raise ValueError("room_index must be between 0 and 101")
-    if not 1 <= party_size <= 4:
-        raise ValueError("party_size must be between 1 and 4")
+    if not 1 <= party_size <= MAX_PARTY_MEMBERS:
+        raise ValueError(f"party_size must be between 1 and {MAX_PARTY_MEMBERS}")
+    if not 0 <= local_player_slot < party_size:
+        raise ValueError("local_player_slot must identify a player in the party")
 
     scenario = aggregator.scenario_registry.resolve(scenario_id)
     stage_level = scenario.stage_level if scenario.stage_level is not None else 0
@@ -580,7 +616,7 @@ def seed_demo_combat(
             {
                 "player_id": f"demo-player-{index + 1}",
                 "player_slot": index,
-                "is_local": index == 0,
+                "is_local": index == local_player_slot,
             }
             for index in range(party_size)
         ],
@@ -602,6 +638,20 @@ def seed_demo_combat(
             is_boss=is_boss,
             source_token=source,
             owner_player_id=f"demo-player-{damage_index % party_size + 1}",
+        )
+    for player_index in range(4, party_size):
+        damage = (player_index + 1) * 137 * scale
+        ingest(
+            "damage_resolution",
+            damage_direction="dealt",
+            settlement_damage=damage,
+            applied_hp_damage=damage,
+            mitigated_damage=0,
+            overkill_damage=0,
+            damage_outcome="applied",
+            is_boss=False,
+            source_token="combat.player.normal",
+            owner_player_id=f"demo-player-{player_index + 1}",
         )
     ingest(
         "damage_resolution",
@@ -628,6 +678,13 @@ def seed_demo_combat(
             blocked=False,
             overflow=overflow,
             source_token=source,
+        )
+    if diagnostic_warning:
+        ingest(
+            "status",
+            status="live",
+            detail=f"degraded:{diagnostic_warning}",
+            aggregate=False,
         )
 
 
@@ -757,14 +814,20 @@ class CombatHudWindow:
         self.boss_share_bar: tk.Canvas | None = None
         self.panels: dict[str, RoundedPanel] = {}
         self.team_side_host: tk.Frame | None = None
+        self.teammate_columns: list[tk.Frame] = []
+        self._teammate_column_width = 0
         self.teammate_panels: list[RoundedPanel] = []
         self.teammate_labels: list[
             tuple[tk.Label, tk.Label, tk.Label, tk.Label]
         ] = []
         self.teammate_bars: list[tk.Canvas] = []
-        self._teammate_shares = [0.0, 0.0, 0.0]
+        self._teammate_shares = [0.0] * MAX_HUD_TEAMMATES
+        self.self_share_host: tk.Frame | None = None
+        self.self_share_bar: tk.Canvas | None = None
+        self._self_share = 0.0
         self._team_visible = False
         self._last_player_count = 1
+        self._self_share = 0.0
         self._tk_scaling = 1.5
         self.ui_scale = min(1.25, max(0.85, float(ui_scale)))
 
@@ -831,6 +894,7 @@ class CombatHudWindow:
             pass
 
         self.panels.clear()
+        self.teammate_columns.clear()
         self.teammate_panels.clear()
         self.teammate_labels.clear()
         self.teammate_bars.clear()
@@ -979,14 +1043,15 @@ class CombatHudWindow:
         columns.grid_columnconfigure(1, weight=1, uniform="damage")
         total = tk.Frame(columns, bg="#FCFAF6")
         total.grid(row=0, column=0, sticky="nsew", padx=(0, self._px(6)))
-        tk.Label(
+        self.labels["damage_scope"] = tk.Label(
             total,
             text="总伤害",
             bg="#FCFAF6",
             fg=MUTED,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 9),
-        ).pack(fill="x")
+        )
+        self.labels["damage_scope"].pack(fill="x")
         self.labels["damage"] = tk.Label(
             total,
             text="—",
@@ -1027,18 +1092,31 @@ class CombatHudWindow:
             self.ui_scale,
             player_count=1,
         )
+        self._teammate_column_width = max(self._px(210), full_width - base_width)
         host = tk.Frame(
             parent,
             bg=HUD_TRANSPARENT,
-            width=max(self._px(210), full_width - base_width),
-            padx=self._px(8),
+            width=self._teammate_column_width,
         )
         host.pack_propagate(False)
         self.team_side_host = host
         card_height = self._px(hud_teammate_card_height(self._tk_scaling))
-        for index in range(3):
-            panel = RoundedPanel(
+        for column_index in range(
+            (MAX_HUD_TEAMMATES + HUD_TEAMMATES_PER_COLUMN - 1)
+            // HUD_TEAMMATES_PER_COLUMN
+        ):
+            column = tk.Frame(
                 host,
+                bg=HUD_TRANSPARENT,
+                width=self._teammate_column_width,
+                padx=self._px(8),
+            )
+            column.pack_propagate(False)
+            self.teammate_columns.append(column)
+        for index in range(MAX_HUD_TEAMMATES):
+            column = self.teammate_columns[index // HUD_TEAMMATES_PER_COLUMN]
+            panel = RoundedPanel(
+                column,
                 fill="#FCFAF6",
                 outline="#E9DED0",
                 radius=self._px(14),
@@ -1281,31 +1359,58 @@ class CombatHudWindow:
             sticky="e",
             padx=(self._px(8), 0),
         )
+        self.self_share_host = tk.Frame(cell, bg="#FCFAF6")
+        self.labels["self_share"] = tk.Label(
+            self.self_share_host,
+            text="自己队伍占比 0%",
+            bg="#FCFAF6",
+            fg=MUTED,
+            anchor="w",
+            font=self._font("Microsoft YaHei UI", 8),
+        )
+        self.labels["self_share"].pack(fill="x")
+        self.self_share_bar = tk.Canvas(
+            self.self_share_host,
+            bg="#FCFAF6",
+            height=self._px(7),
+            highlightthickness=0,
+            bd=0,
+        )
+        self.self_share_bar.pack(fill="x", pady=(self._px(1), 0))
+        self.self_share_bar.bind("<Configure>", self._draw_self_share)
 
     def refresh(self) -> None:
         if self.window is None:
             return
         try:
             snapshot = self.aggregator.snapshot()
+            degraded = bool(snapshot.diagnostic_warning)
             self.labels["hud_status"].configure(
-                text=combat_state_label(snapshot.connection_state, compact=True),
-                fg=combat_state_color(snapshot.connection_state),
+                text=(
+                    "● 实时 · 有事件跳过"
+                    if snapshot.connection_state == "live" and degraded
+                    else combat_state_label(snapshot.connection_state, compact=True)
+                ),
+                fg=GOLD if degraded else combat_state_color(snapshot.connection_state),
             )
             _set_metric_label(
                 self.labels["damage"],
-                format_metric(snapshot.total_damage),
+                format_metric(snapshot.personal_damage),
                 base_size=max(8, round(19 * self.ui_scale)),
                 characters_at_base=7,
             )
+            self.labels["damage_scope"].configure(
+                text="个人伤害" if combat_uses_personal_scope(snapshot) else "总伤害"
+            )
             _set_metric_label(
                 self.labels["boss"],
-                format_metric(snapshot.boss_damage),
+                format_metric(snapshot.personal_boss_damage),
                 base_size=max(8, round(16 * self.ui_scale)),
                 characters_at_base=6,
             )
             self._boss_share = boss_damage_share(
-                snapshot.total_damage,
-                snapshot.boss_damage,
+                snapshot.personal_damage,
+                snapshot.personal_boss_damage,
             )
             self._draw_boss_share()
             _set_metric_label(
@@ -1328,7 +1433,7 @@ class CombatHudWindow:
             )
             _set_metric_label(
                 self.labels["dps"],
-                format_metric(snapshot.recent_dps),
+                format_metric(snapshot.personal_recent_dps),
                 base_size=max(8, round(16 * self.ui_scale)),
                 characters_at_base=9,
             )
@@ -1346,17 +1451,51 @@ class CombatHudWindow:
         rows = combat_teammate_rows(snapshot)
         player_count = 1 + len(rows)
         visible = bool(rows)
-        if visible != self._team_visible:
-            self._team_visible = visible
-            self._last_player_count = player_count if visible else 1
-            if self.team_side_host is not None:
-                if visible:
+        previous_visible = self._team_visible
+        previous_player_count = self._last_player_count
+        self._team_visible = visible
+        self._last_player_count = player_count if visible else 1
+        recent_panel = self.panels.get("recent")
+        if recent_panel is not None:
+            recent_panel.configure(
+                height=self._px(
+                    hud_recent_panel_height(
+                        self._tk_scaling,
+                        multiplayer=visible,
+                    )
+                )
+            )
+        column_count = (
+            (len(rows) + HUD_TEAMMATES_PER_COLUMN - 1) // HUD_TEAMMATES_PER_COLUMN
+            if visible
+            else 0
+        )
+        if self.team_side_host is not None:
+            if visible:
+                self.team_side_host.configure(
+                    width=max(1, column_count) * self._teammate_column_width
+                )
+                if not self.team_side_host.winfo_manager():
                     self.team_side_host.pack(side="left", fill="y")
-                else:
-                    self.team_side_host.pack_forget()
-            self._resize_for_party()
-        elif visible:
-            self._last_player_count = player_count
+            elif self.team_side_host.winfo_manager():
+                self.team_side_host.pack_forget()
+        for index, column in enumerate(self.teammate_columns):
+            if visible and index < column_count:
+                if not column.winfo_manager():
+                    column.pack(side="left", fill="y")
+            elif column.winfo_manager():
+                column.pack_forget()
+        self._self_share = combat_personal_share(snapshot) if visible else 0.0
+        if self.self_share_host is not None:
+            if visible:
+                self.labels["self_share"].configure(
+                    text=f"自己队伍占比 {round(self._self_share * 100)}%"
+                )
+                if not self.self_share_host.winfo_manager():
+                    self.self_share_host.pack(side="bottom", fill="x", pady=(self._px(2), 0))
+                self._draw_self_share()
+            elif self.self_share_host.winfo_manager():
+                self.self_share_host.pack_forget()
 
         for index, panel in enumerate(self.teammate_panels):
             if visible and index < len(rows):
@@ -1378,6 +1517,38 @@ class CombatHudWindow:
             else:
                 self._teammate_shares[index] = 0.0
                 panel.pack_forget()
+        if previous_visible != visible or previous_player_count != self._last_player_count:
+            self._resize_for_party()
+
+    def _draw_self_share(self, _event: tk.Event[Any] | None = None) -> None:
+        bar = self.self_share_bar
+        if bar is None:
+            return
+        width = max(1, bar.winfo_width())
+        height = max(1, bar.winfo_height())
+        left, right = 4, max(4, width - 4)
+        y = height / 2
+        line_width = self._px(5)
+        bar.delete("all")
+        bar.create_line(
+            left,
+            y,
+            right,
+            y,
+            fill="#E4D8C7",
+            width=line_width,
+            capstyle=tk.ROUND,
+        )
+        if self._self_share > 0:
+            bar.create_line(
+                left,
+                y,
+                left + (right - left) * self._self_share,
+                y,
+                fill=GOLD,
+                width=line_width,
+                capstyle=tk.ROUND,
+            )
 
     def _resize_for_party(self) -> None:
         if self.window is None:
@@ -1489,11 +1660,16 @@ class ToolboxShell:
         self.mod_action_buttons: dict[str, tk.Button] = {}
         self.input_mode_buttons: dict[str, tk.Button] = {}
         self.combat_team_panel: RoundedPanel | None = None
+        self.combat_team_canvas: tk.Canvas | None = None
+        self.combat_team_grid: tk.Frame | None = None
+        self.combat_team_scrollbar: ttk.Scrollbar | None = None
+        self._combat_team_grid_window: int | None = None
+        self._combat_team_visible_count = 0
         self.combat_detail_panel: RoundedPanel | None = None
         self.combat_team_cells: list[tk.Frame] = []
         self.combat_team_labels: list[tuple[tk.Label, tk.Label, tk.Label]] = []
         self.combat_team_bars: list[tk.Canvas] = []
-        self._combat_team_shares = [0.0, 0.0, 0.0, 0.0]
+        self._combat_team_shares = [0.0] * MAX_PARTY_MEMBERS
         self._mod_busy = False
         self._mod_results: queue.Queue[tuple[bool, Exception | None]] = queue.Queue()
         self._mod_import_results: queue.Queue[
@@ -1992,17 +2168,43 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 7),
         )
         self.labels["combat_team_unattributed"].pack(side="right")
-        team_grid = tk.Frame(team, bg=SURFACE)
-        team_grid.pack(fill="both", expand=True)
-        for column in range(4):
+        team_scroll_host = tk.Frame(team, bg=SURFACE)
+        team_scroll_host.pack(fill="both", expand=True)
+        self.combat_team_canvas = tk.Canvas(
+            team_scroll_host,
+            bg=SURFACE,
+            highlightthickness=0,
+            bd=0,
+            height=max(48, round(66 * self.main_ui_scale)),
+        )
+        self.combat_team_canvas.pack(side="top", fill="both", expand=True)
+        self.combat_team_scrollbar = ttk.Scrollbar(
+            team_scroll_host,
+            orient="horizontal",
+            command=self.combat_team_canvas.xview,
+        )
+        self.combat_team_canvas.configure(
+            xscrollcommand=self.combat_team_scrollbar.set
+        )
+        team_grid = tk.Frame(self.combat_team_canvas, bg=SURFACE)
+        self.combat_team_grid = team_grid
+        self._combat_team_grid_window = self.combat_team_canvas.create_window(
+            0,
+            0,
+            anchor="nw",
+            window=team_grid,
+        )
+        team_grid.bind("<Configure>", self._resize_combat_team_grid)
+        self.combat_team_canvas.bind("<Configure>", self._resize_combat_team_grid)
+        for column in range(MAX_PARTY_MEMBERS):
             team_grid.grid_columnconfigure(column, weight=1, uniform="party")
-        for index in range(4):
+        for index in range(MAX_PARTY_MEMBERS):
             player = tk.Frame(team_grid, bg=SURFACE)
             player.grid(
                 row=0,
                 column=index,
                 sticky="nsew",
-                padx=(0 if index == 0 else 7, 7 if index < 3 else 0),
+                padx=(0 if index == 0 else 7, 7),
             )
             player_heading = tk.Frame(player, bg=SURFACE)
             player_heading.pack(fill="x")
@@ -2060,13 +2262,14 @@ class ToolboxShell:
         detail = detail_panel.content
         heading = tk.Frame(detail, bg=SURFACE)
         heading.pack(fill="x", pady=(0, 4))
-        tk.Label(
+        self.labels["combat_detail_title"] = tk.Label(
             heading,
             text="来源明细",
             bg=SURFACE,
             fg=TEXT,
             font=("Microsoft YaHei UI", 10, "bold"),
-        ).pack(side="left")
+        )
+        self.labels["combat_detail_title"].pack(side="left")
         self.labels["combat_detail_hint"] = tk.Label(
             heading,
             text="尚无事件；连接后按来源显示有效值",
@@ -3553,13 +3756,19 @@ class ToolboxShell:
             fg=GREEN if game_running else MUTED,
         )
         snapshot = self.combat_aggregator.snapshot()
+        degraded = bool(snapshot.diagnostic_warning)
         self.labels["combat_status"].configure(
-            text=combat_state_label(snapshot.connection_state),
-            fg=combat_state_color(snapshot.connection_state),
+            text=(
+                "● 实时（有事件跳过）"
+                if snapshot.connection_state == "live" and degraded
+                else combat_state_label(snapshot.connection_state)
+            ),
+            fg=GOLD if degraded else combat_state_color(snapshot.connection_state),
         )
         self.labels["combat_summary"].configure(
             text=(
-                f"总伤害 {format_metric(snapshot.total_damage)}\n"
+                f"{'个人伤害' if combat_uses_personal_scope(snapshot) else '总伤害'} "
+                f"{format_metric(snapshot.personal_damage)}\n"
                 f"{TAKEN_DAMAGE_LABEL} / 回复 "
                 f"{format_whole_metric(snapshot.taken_settlement_damage)} / "
                 f"{format_whole_metric(snapshot.effective_healing)}"
@@ -3623,21 +3832,25 @@ class ToolboxShell:
     def _refresh_combat(self) -> None:
         snapshot = self.combat_aggregator.snapshot()
         live = snapshot.connection_state == "live"
+        degraded = bool(snapshot.diagnostic_warning)
         self.labels["combat_connection"].configure(
             text=(
-                f"● 实时 · {format_stage_location(snapshot)}"
+                f"● 实时{'（有事件跳过）' if degraded else ''} · "
+                f"{format_stage_location(snapshot)}"
                 if live
                 else f"{combat_state_label(snapshot.connection_state)}；键盘和宏不受影响"
             ),
-            fg=combat_state_color(snapshot.connection_state),
+            fg=GOLD if degraded else combat_state_color(snapshot.connection_state),
         )
         _set_metric_label(
             self.labels["combat_damage"],
-            format_metric(snapshot.total_damage),
+            format_metric(snapshot.personal_damage),
             base_size=max(8, round(22 * self.main_ui_scale)),
             characters_at_base=10,
         )
-        self.labels["combat_boss"].configure(text=f"Boss {format_metric(snapshot.boss_damage)}")
+        self.labels["combat_boss"].configure(
+            text=f"Boss {format_metric(snapshot.personal_boss_damage)}"
+        )
         _set_metric_label(
             self.labels["combat_hp"],
             format_whole_metric(snapshot.taken_settlement_damage),
@@ -3656,7 +3869,8 @@ class ToolboxShell:
         self.labels["combat_mp_gain"].configure(
             text=f"恢复 +{format_whole_metric(snapshot.mp_gained)}"
         )
-        team_rows = combat_team_rows(snapshot)
+        team_rows = combat_team_rows(snapshot, maximum=MAX_PARTY_MEMBERS)
+        self._combat_team_visible_count = len(team_rows)
         team_visible = snapshot.detected_player_count >= 2 and len(team_rows) >= 2
         if self.combat_team_panel is not None:
             if team_visible and not self.combat_team_panel.winfo_manager():
@@ -3667,15 +3881,19 @@ class ToolboxShell:
                 )
             elif not team_visible and self.combat_team_panel.winfo_manager():
                 self.combat_team_panel.pack_forget()
+        if self.combat_team_scrollbar is not None:
+            if team_visible and len(team_rows) > 4:
+                if not self.combat_team_scrollbar.winfo_manager():
+                    self.combat_team_scrollbar.pack(side="bottom", fill="x")
+            elif self.combat_team_scrollbar.winfo_manager():
+                self.combat_team_scrollbar.pack_forget()
         self.labels["combat_team_heading"].configure(
             text=f"队伍伤害 · {max(1, snapshot.detected_player_count)} 人"
         )
         self.labels["combat_team_unattributed"].configure(
-            text=(
-                f"未归属 {format_metric(snapshot.unattributed_damage)}"
-                if snapshot.unattributed_damage > 0
-                else ""
-            )
+            text=(f"队伍合计 {format_metric(snapshot.total_damage)}" +
+                  (f" · 未归属 {format_metric(snapshot.unattributed_damage)}"
+                   if snapshot.unattributed_damage > 0 else ""))
         )
         for index, cell in enumerate(self.combat_team_cells):
             if team_visible and index < len(team_rows):
@@ -3692,10 +3910,21 @@ class ToolboxShell:
             else:
                 self._combat_team_shares[index] = 0.0
                 cell.grid_remove()
+        if self.combat_team_canvas is not None:
+            self.combat_team_canvas.after_idle(self._resize_combat_team_grid)
         for item_id in self.combat_tree.get_children():
             self.combat_tree.delete(item_id)
+        personal_scope = combat_uses_personal_scope(snapshot)
+        self.labels["combat_detail_title"].configure(
+            text="个人来源明细" if personal_scope else "来源明细"
+        )
+        source_breakdown = (
+            snapshot.personal_source_breakdown
+            if personal_scope
+            else snapshot.source_breakdown
+        )
         ranked = sorted(
-            snapshot.source_breakdown.items(),
+            source_breakdown.items(),
             key=lambda item: (
                 item[1].get("damage_dealt", 0)
                 + item[1].get("effective_healing", 0)
@@ -3726,6 +3955,33 @@ class ToolboxShell:
                 f"减伤 {format_whole_metric(snapshot.mitigated_damage)} · "
                 f"治疗溢出 {format_whole_metric(snapshot.resource_overflow)}"
             )
+        )
+
+    def _resize_combat_team_grid(self, _event: tk.Event[Any] | None = None) -> None:
+        canvas = self.combat_team_canvas
+        grid = self.combat_team_grid
+        window_id = self._combat_team_grid_window
+        if canvas is None or grid is None or window_id is None:
+            return
+        viewport_width = max(1, canvas.winfo_width())
+        visible_count = max(4, min(MAX_PARTY_MEMBERS, self._combat_team_visible_count))
+        cell_width = max(
+            round(150 * self.main_ui_scale),
+            viewport_width // 4,
+        )
+        content_width = cell_width * visible_count
+        for column in range(MAX_PARTY_MEMBERS):
+            grid.grid_columnconfigure(
+                column,
+                minsize=cell_width if column < visible_count else 0,
+            )
+        canvas.itemconfigure(
+            window_id,
+            width=content_width,
+            height=max(1, canvas.winfo_height()),
+        )
+        canvas.configure(
+            scrollregion=(0, 0, content_width, max(1, canvas.winfo_height()))
         )
 
     def _draw_combat_team_share(self, index: int) -> None:
