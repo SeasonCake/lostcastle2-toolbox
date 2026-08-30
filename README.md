@@ -25,8 +25,8 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 | Damage and HP semantics | Runtime-validated on the recorded game build |
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
-| Main toolbox and external combat HUD | Bridge 0.4.5 has live 65% HP-lock and ordinary between-skill mana-regeneration validation; anonymous multiplayer ownership still needs live testing |
-| MOD management | Two existing tools plus 49 latest usable community MODs bundled; local auto-import and one-click in-game panel opening supported |
+| Main toolbox and external combat HUD | Bridge 0.4.8 has live mana recovery, official-vs-actual HP accounting, and settlement-refill exclusion validation; anonymous multiplayer ownership still needs live testing |
+| MOD management | v1.6.1 manages two existing tools plus 52 curated community MODs; local auto-import and one-click in-game panel opening are supported |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
@@ -66,7 +66,7 @@ The pinned 7-Zip runtime and its license are included so source-mode archive ins
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 49 deduplicated latest-usable community MOD entries. Practical combat and resource tools are listed before cosmetic entries. Each entry carries an author label, purpose, usage guidance, hash-bound payload, one-click installation, game launch, and exact uninstall. MODs with an explicitly declared settings panel can be opened from the toolbox after load-order checks; direct-action hotkeys are never inferred as panels. Files or folders placed in the package's `用户MOD` inbox can be statically inspected and added through an editable preview; the Chinese `lc2-mod.json` guide documents the optional `interaction.panel_hotkey` contract and an AI prompt. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The v1.6.1 MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 52 curated community MOD entries. This release adds Ice Pillar enhancement 1.16.0, the explicitly labeled Not Drug God 1.0.0 test build, and the cosmetic Purple Critical Damage 1.0.0. The supplied Hex Augment DLL was byte-identical to the existing managed 2.7.6 payload, so it was ranked higher instead of duplicated. Practical combat and resource tools are listed before cosmetic entries, with F1 conflicts stated in usage guidance. Each entry carries an author label, purpose, usage guidance, hash-bound payload, one-click installation, game launch, and exact uninstall. MODs with an explicitly declared settings panel can be opened from the toolbox after load-order checks; direct-action hotkeys are never inferred as panels. Files or folders placed in the package's `用户MOD` inbox can be statically inspected and added through an editable preview; the Chinese `lc2-mod.json` guide documents the optional `interaction.panel_hotkey` contract and an AI prompt. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 The bottom-left footer links to GitHub and the maintainer's [Bilibili space](https://space.bilibili.com/88048665?), followed by a `投喂` entry that shows the WeChat code by default and opens the local WeChat, Alipay, and explanation folder for friends who enjoy *Lost Castle 2* and want to support the maintainer or nudge an update.
 

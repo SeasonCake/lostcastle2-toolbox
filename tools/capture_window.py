@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageGrab
 import win32gui
+import win32process
 import win32ui
 
 
@@ -51,6 +52,18 @@ def main() -> int:
         action="store_true",
         help="Capture screen pixels instead of PrintWindow target content.",
     )
+    parser.add_argument(
+        "--pid",
+        type=int,
+        help="Match a visible top-level window by exact process id instead of title.",
+    )
+    parser.add_argument(
+        "--smallest",
+        action="store_true",
+        help="When a process owns multiple visible windows, capture the smallest one.",
+    )
+    parser.add_argument("--min-width", type=int, default=1)
+    parser.add_argument("--min-height", type=int, default=1)
     args = parser.parse_args()
 
     user32 = ctypes.windll.user32
@@ -67,13 +80,35 @@ def main() -> int:
             return True
         buffer = ctypes.create_unicode_buffer(length + 1)
         user32.GetWindowTextW(hwnd, buffer, len(buffer))
-        if buffer.value == args.title and user32.IsWindowVisible(hwnd):
-            matches.append(hwnd)
+        process_matches = (
+            args.pid is not None
+            and win32process.GetWindowThreadProcessId(hwnd)[1] == args.pid
+        )
+        title_matches = args.pid is None and buffer.value == args.title
+        if (process_matches or title_matches) and user32.IsWindowVisible(hwnd):
+            candidate = wintypes.RECT()
+            if not user32.GetWindowRect(hwnd, ctypes.byref(candidate)):
+                return True
+            width = candidate.right - candidate.left
+            height = candidate.bottom - candidate.top
+            if width >= args.min_width and height >= args.min_height:
+                matches.append(hwnd)
         return True
 
     user32.EnumWindows(callback, 0)
     if not matches:
-        raise SystemExit(f"window not found: {args.title}")
+        target = f"pid={args.pid}" if args.pid is not None else args.title
+        raise SystemExit(f"window not found: {target}")
+    if args.smallest and len(matches) > 1:
+        def window_area(hwnd: int) -> int:
+            candidate = wintypes.RECT()
+            if not user32.GetWindowRect(hwnd, ctypes.byref(candidate)):
+                return 2**63 - 1
+            return max(0, candidate.right - candidate.left) * max(
+                0, candidate.bottom - candidate.top
+            )
+
+        matches.sort(key=window_area)
     rect = wintypes.RECT()
     if not user32.GetWindowRect(matches[0], ctypes.byref(rect)):
         raise SystemExit("GetWindowRect failed")

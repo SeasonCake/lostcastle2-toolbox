@@ -185,6 +185,78 @@ class CombatAggregatorTests(unittest.TestCase):
                 )
             )
 
+    def test_two_to_four_player_rosters_keep_every_owner_distinct(self) -> None:
+        for party_size in range(2, 5):
+            with self.subTest(party_size=party_size):
+                registry = SourceRegistry.from_file(
+                    PROJECT_ROOT / "assets" / "combat_sources.json"
+                )
+                scenarios = ScenarioRegistry.from_file(
+                    PROJECT_ROOT / "assets" / "game_locations.json"
+                )
+                aggregator = CombatAggregator(
+                    registry=registry,
+                    scenario_registry=scenarios,
+                )
+                aggregator.ingest(
+                    common_event("status", 0, monotonic_ms=0, status="session_started")
+                )
+                members = [
+                    {
+                        "player_id": f"opaque-player-{index}",
+                        "player_slot": index,
+                        "is_local": index == 0,
+                    }
+                    for index in range(party_size)
+                ]
+                aggregator.ingest(
+                    common_event(
+                        "status",
+                        1,
+                        status="party_updated",
+                        aggregate=False,
+                        party_members=members,
+                    )
+                )
+                sequence = 2
+                expected: dict[str, int] = {
+                    str(member["player_id"]): 0 for member in members
+                }
+                for round_index in range(250):
+                    for player_index, member in enumerate(members):
+                        damage = (player_index + 1) * 10 + round_index % 3
+                        player_id = str(member["player_id"])
+                        expected[player_id] += damage
+                        aggregator.ingest(
+                            common_event(
+                                "damage_resolution",
+                                sequence,
+                                damage_direction="dealt",
+                                settlement_damage=damage,
+                                applied_hp_damage=damage,
+                                mitigated_damage=0,
+                                overkill_damage=0,
+                                is_boss=round_index % 10 == 0,
+                                owner_player_id=player_id,
+                                source_token="combat.player.normal",
+                            )
+                        )
+                        sequence += 1
+
+                snapshot = aggregator.snapshot(monotonic_ms=sequence * 1_000)
+                self.assertEqual(snapshot.detected_player_count, party_size)
+                self.assertEqual(snapshot.total_damage, sum(expected.values()))
+                self.assertEqual(snapshot.unattributed_damage, 0)
+                for player_index, member in enumerate(members):
+                    player_id = str(member["player_id"])
+                    row = snapshot.player_breakdown[player_id]
+                    self.assertTrue(row["active"])
+                    self.assertEqual(row["damage_dealt"], expected[player_id])
+                    self.assertEqual(
+                        row["label"],
+                        "自己" if player_index == 0 else f"队友 {player_index}",
+                    )
+
     def test_hp_mp_overflow_blocking_and_shield_layers_are_generic_events(self) -> None:
         events = (
             common_event(

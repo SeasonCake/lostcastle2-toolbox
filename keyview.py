@@ -46,7 +46,7 @@ from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, se
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.6.1"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -645,6 +645,16 @@ user32.SendMessageW.argtypes = (
     wintypes.LPARAM,
 )
 user32.SendMessageW.restype = wintypes.LPARAM
+user32.SendMessageTimeoutW.argtypes = (
+    wintypes.HWND,
+    wintypes.UINT,
+    wintypes.WPARAM,
+    wintypes.LPARAM,
+    wintypes.UINT,
+    wintypes.UINT,
+    ctypes.POINTER(ctypes.c_size_t),
+)
+user32.SendMessageTimeoutW.restype = wintypes.LPARAM
 _get_class_long_ptr = getattr(user32, "GetClassLongPtrW", user32.GetClassLongW)
 _get_class_long_ptr.argtypes = (wintypes.HWND, ctypes.c_int)
 _get_class_long_ptr.restype = ctypes.c_void_p
@@ -826,6 +836,27 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest().upper()
 
 
+def _send_window_message_bounded(
+    hwnd: int,
+    message: int,
+    wparam: int,
+    lparam: int = 0,
+    *,
+    timeout_ms: int = 250,
+) -> int:
+    result = ctypes.c_size_t()
+    completed = user32.SendMessageTimeoutW(
+        hwnd,
+        message,
+        wparam,
+        lparam,
+        0x0002,  # SMTO_ABORTIFHUNG
+        max(1, timeout_ms),
+        ctypes.byref(result),
+    )
+    return int(result.value) if completed else 0
+
+
 def _png_dimensions(path: Path) -> tuple[int, int]:
     header = path.read_bytes()[:24]
     if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
@@ -938,9 +969,9 @@ def write_qa_ui_receipt(
             "width": window_width,
             "height": window_height,
             "icon_handles": {
-                "small": int(user32.SendMessageW(hwnd, 0x007F, 0, 0)),
-                "big": int(user32.SendMessageW(hwnd, 0x007F, 1, 0)),
-                "small2": int(user32.SendMessageW(hwnd, 0x007F, 2, 0)),
+                "small": _send_window_message_bounded(hwnd, 0x007F, 0),
+                "big": _send_window_message_bounded(hwnd, 0x007F, 1),
+                "small2": _send_window_message_bounded(hwnd, 0x007F, 2),
                 "class_big": int(_get_class_long_ptr(hwnd, -14) or 0),
                 "class_small": int(_get_class_long_ptr(hwnd, -34) or 0),
             },

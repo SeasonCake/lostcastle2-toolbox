@@ -1,30 +1,30 @@
-# LC2 当前检查点（2026-08-29，Asia/Shanghai）
+# LC2 当前检查点（2026-08-30，Asia/Shanghai）
 
 ## 角色、目标与阶段
 
-- 当前角色：LC2 工具箱 1.6.0、Bridge 0.4.5、MOD 面板一键打开与最终发布收口负责人。
-- 当前目标：以已通过普通太刀回蓝实测的 0.4.5 为战斗基线，升级玩家实时属性 MOD 到 2.0，保留最新诅咒硬币 1.5.0，闭合用户 MOD 格式、任务栏图标、全新包、独立审计与 Release。
-- 当前阶段：`1.6.0 POST-AUDIT FIX REBUILT / PACKAGE + UI VERIFIED / SAME-AUDITOR NARROW RECHECK PENDING / REAL MULTIPLAYER NOT RUN`；v1.5.12 预发布仍标注暂缓下载，旧 tag 不改写。
-- 当前授权边界：作者已明确授权 1.6 本地实现、测试、构建、审计、commit、push、ZIP 与 GitHub Release；第三方 MOD 只做静态检查、受管随包和隔离安装回归，未执行其游戏逻辑。
+- 当前角色：LC2 工具箱下一候选 Bridge/MOD/UI 收口负责人。
+- 当前目标：修复回营补满误计，保持官方承伤121/实际HP变化119双口径；静态纳管新增 MOD，实机通过后冻结 exact package/UI，执行单席 different-owner 综合审计，再打包、显式提交、push 与 Release。
+- 当前阶段：`BRIDGE 0.4.8 R-PASS / MOD 52+53 PASS / EXACT PACKAGE+UI FROZEN / UNIQUE DIFFERENT-OWNER AUDIT NEXT`。
+- 当前授权边界：用户已要求完整收尾后显式提交、push 与 Release。Bridge 0.4.8 已实机通过；第三方 MOD 仍只做静态读取和隔离安装回归，不执行其游戏逻辑。真实 2P–4P 不可由合成验证冒充，Release 必须标注 `NOT RUN`。
 
 ## 仓库与运行身份
 
 | 项目 | 当前值 |
 | --- | --- |
 | 仓库 | `C:\xiangmuyunxing\biancheng\2026\lostcastle2-keyview` |
-| 产品 source / remote | `65ecfe2aee8a5058900474bed6ab7c10e071309c` 与 `origin/main` 对齐并标记 `v1.5.12`；1.6.0/0.4.5 为未提交工作树候选 |
-| 工作树 | 35 个 tracked 修改与 7 个 prospective untracked 文件均归属 0.4.5/1.6.0/MOD/UI/文档/测试；index 尚为空，本地日志、包、DLL 与 UI 回执按既有 ignore 合同保留 |
-| 游戏进程 | 作者完成 0.4.5 实测并关闭；2026-08-29 22:01 exact name + `ExecutablePath` 连续两次均为 0，未知字段为 0 |
-| 工具箱 | package/桌面均为 1,757 文件、`166,453,914` B、0 配置文件、逐文件零差异；EXE `6,463,370` B / SHA-256 `33D57E63945B7424124A11F2158E272BDAD54C40E6ED1E2DABFBEEEE39678F74` / 版本 1.6.0 |
-| 分享 ZIP | `C:\Users\shenc\Desktop\失落城堡2工具箱1.6.0-实时数值监测+一键MOD安装.zip`，`136,933,435` B / SHA-256 `3352565A2F9A7AA136DEE522F04D5CD466694DCCDC5399A11EF29238EB1290E0`；7-Zip 与 .NET UTF-8 顶层/唯一 EXE/config0 均 PASS |
-| 游戏目录 Bridge | 已精确部署并回读 `0.4.5`；0.4.4 exact rollback 已冻结 |
-| 运行 DLL SHA-256 | `A6484B75E3369B1B0AA774F4A7DCB53E0107CE381F104D33A9388FC5EF25A801` |
-| `Plugin.cs` SHA-256 | 提交前在最终源码冻结后回读 |
-| Harmony Patch 数 | `14`；0.3.4 的 `ResetDataBy` 探针已删除 |
+| 产品 source / remote | `3d6767794be7b88da3e08e7ef62b444b1658a5ee` 与 `origin/main` 对齐并标记 `v1.6.0`；Release 为 `https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.6.0` |
+| 工作树 | 26 个 tracked 文件修改及 13 个未跟踪记录入口，均归属本轮 Bridge 0.4.6–0.4.8、社区 MOD、多人/UI/打包测试与文档；日志、截图、DLL/PDB 和 package 按 ignore 合同留在本机，尚未 stage/commit/push |
+| 游戏/盒子进程 | 2026-08-30 16:59 再核：exact `LostCastle2.exe` 与 `失落城堡2工具箱.exe` 均为 0；四个精确包 UI 验收进程也已自行退出 |
+| 精确工具箱候选 | `package/失落城堡2工具箱1.6.1-实时数值监测+一键MOD安装`；1,760 文件、`166,606,890` B、0 配置文件；EXE `6,463,717` B / `46525496A85F75C066AB3829D3CE7A2E38FA2962C9A8F034EC137E3902246C8D` / 版本 1.6.1 |
+| 分享 ZIP | 尚未生成；唯一 different-owner 审计 PASS 后才从上方 exact package 创建并做 7-Zip、UTF-8 顶层、唯一 EXE、config0 与哈希回读 |
+| 游戏目录 Bridge | 已精确部署并回读 `0.4.8`；0.4.7 exact rollback 已冻结 |
+| 运行 DLL SHA-256 | `7740BA3E30CD8C8B73F8BFDF221C3384CB2D64F940699A6974556E989896CE55` |
+| `Plugin.cs` SHA-256 | `C0EF0AB6BEAF5F991A58F6BC512F747678308F371D907A750C025177DB117261` |
+| Harmony Patch 数 | 0.4.8 为 `15`，新增 `PlayerManager.OnGameRoundEndPreLoadCamp` |
 
 本文所有 `artifacts/runtime-deploy/...` 定位都指向本机被 `.gitignore` 排除的二进制/回滚证据，fresh clone 不包含，故只作本机恢复定位，不声称是仓库链接。
 
-0.4.5 的 0.4.4 exact rollback、候选和可提交摘要位于本机 `artifacts/runtime-deploy/2026-08-29-bridge-0.4.5/`。当前游戏目录已逐字节核验为 0.4.5。
+0.4.8 候选、0.4.7 exact rollback 与部署回执位于本机 `artifacts/runtime-deploy/2026-08-30-bridge-0.4.8/`；当前游戏目录 DLL 已回读为 49,152 B / `7740BA3E…6CE55`。
 
 0.3.6 候选、PDB、回滚和完整运行 receipt 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.6/`。
 
@@ -312,4 +312,47 @@
 - 1.6.0 将“玩家实时属性与队友面板”从 1.3 升到 2.0（作者懒虫桑，DLL `26,624` B / `ED2183DD...10194`），操作改为点击玩家名字并修复房主偶发缺失。新下载的诅咒银币独立包内仍声明 v1.5.0，且早于当前整合包同版本构建，按“同功能族只保留最新”继续使用现有 `16,896` B / `0ECEF204...72AAC`，文案明确每局首个诅咒房保底与配置开关，不新增重复条目。
 - 新增显式 `panel_hotkey`：只为打开设置/UI 的 MOD 提供“打开 MOD 面板”；未安装、游戏未运行、安装晚于当前游戏启动、正常已加载分别进入提示安装、启动游戏、提示重启、聚焦游戏并代按快捷键。直接丢钱等动作键不登记。用户 `lc2-mod.json` 可选 `interaction.panel_hotkey`，已有格式说明和导入→登记→隔离安装→卸载回归。
 - 任务栏图标新增原生 `20/40/96` 像素层，与既有 `16/24/32/48/64/128/256` 合并，避免 Windows DPI 临时缩放。最终 exact H2/H3/H4 五臂覆盖 MIN100、125%、150%、175%、200% 与四按钮状态，几何和像素均 `VERIFIED`。
-- 唯一 different-owner 初审曾判 `RELEASE HOLD`：重复 modifier 可登记但运行拒绝、manifest 绕过 64 文件/128 MiB 门、Bridge notice 旧版本、3 个 README EOF、fresh-clone 前置条件和 inventory 旧版本。现已共用运行时快捷键解析器、把载荷门移到共同出口、增加三类负控并修正文档；重建后全量 `164 PASS`，package runtime/MOD 与原始 2.0 RAR 导入 PASS。待同一审计席位做窄复核后再 stage/commit/push/Release。
+- 唯一 different-owner 初审曾判 `RELEASE HOLD`：重复 modifier 可登记但运行拒绝、manifest 绕过 64 文件/128 MiB 门、Bridge notice 旧版本、3 个 README EOF、fresh-clone 前置条件和 inventory 旧版本。随后已共用运行时快捷键解析器、把载荷门移到共同出口、增加三类负控并修正文档；重建后全量 `164 PASS`，package runtime/MOD 与原始 2.0 RAR 导入 PASS，同一审计席位窄复核最终为 `VERIFIED / RELEASE PASS`。
+
+## 2026-08-30 v1.6.0 发布与发布后第 50 个 MOD
+
+- 同一独立审计席位最终签发 `VERIFIED / RELEASE PASS`；提交 `3d67677` 已推送，tag `v1.6.0` 与 `origin/main` 指向同一提交。正式 Release 资产 136,933,435 B，远端 digest 与本地 ZIP SHA-256 `3352565A…90E0` 一致。
+- `失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll` 是纯 DLL，59,392 B / `91576442…A11`。项目只静态参考其多人身份、官方锚点、逐 hit 兜底与重连分段，不复制其累计、倍率、状态文件或游戏内 UI；自有 HUD 单人口径仍来自官方事件、结算和作者多轮实战校准，真实 2P–4P 仍未校准。
+- 新来源 `纵冰之杖加强，大幅增加冰锥数量.zip` 为 20,355 B / `9E3BF2D0…D79C`；唯一载荷 `IcePillarCrash.dll` 为 47,104 B / `F4C53E57…D6253D`，内嵌插件版本 1.16.0。静态字符串明确冰锥 6→12、冷却 3→1 秒，无设置面板或快捷键；DLL 未见作者署名，按 QQ 上传截图暂显示“大萝卜鸡”。
+- 本地源码目录现为 52 条目、53 载荷、3,375,565 B；“我不是药神（测试版）1.0.0”与“暴击字体改紫色 1.0.0”进入下一包候选。新收到的 `LC2HexAugment.dll` 与既有 2.7.6 载荷均为 40,960 B / `50CEB677…E04ECC`，不重复收录，只提升实战排序并补齐它与三项现有 MOD 共用 F1 的说明；紫色暴击 DLL 为 13,824 B / `5863D6A9…35EECB`，无快捷键、纯视觉。第三方 DLL 均未执行，真实游戏效果 `NOT RUN`。已发布 v1.6.0 仍保持 49 条目，不回写。
+- “LC2 增强计划”因群友使用较多，社区排序从优先级 180 提升到 110，位于玩家实时属性之后、一键丢钱之前；原有灵魂石/金币工具位置不变。
+- 下一版 MOD 表格将“作者”表头与每行作者值统一居中；版本、状态、列宽、详情卡及动作不变。该调整只进入发布后源码候选，不修改 v1.6.0 资产。
+
+## 2026-08-30 Bridge 0.4.6 通用回蓝/HP 诊断候选
+
+- 作者实机取得“被诅咒的怀表”后，游戏周期回满但 HUD 在消耗 `336` 时恢复仍为 `0`。冻结 0.4.5 日志 164,635 B / `961FE437…FEF7`：耗蓝序列明确从 `current=4` 的基线跳到下一次 `last_observed=100`，中间没有 recovery/runtime_gain。
+- 作者随后无怀表新开一局，HUD 消耗 `144`、恢复 `0` 时游戏为 `88/110`。新快照 313,008 B / `A8BCD946…40AB6`：第二次耗蓝前基线已经从 57 恢复到 `81.35785675`，后续多次耗蓝前回到 110，recovery/runtime_gain 仍为 0；确认是通用零变化观察缺陷，不是怀表分支。
+- 根因已由源码证伪：零变化观察已经计算 fallback，却被只看 `requested/effective` 的提前返回丢弃并更新满蓝基线。0.4.6 最窄候选让 fallback 非零时继续发事件，不增加 Hook 或怀表特判。
+- HP 误计假设已撤回：作者确认“自愈”刻印在低于 35% 时逐次正常 `+1`，完整局还死亡/复活一次；官方/工具箱承伤均 `308`、回复 `398`，回复不与承伤守恒。最大生命变化只是一度相关线索，不足以授权改变 HP 算法。
+- 0.4.6 保持 0.4.5 的 HP `effective=after-before` 聚合，仅增加 `[LC2CB-HP]` requested/before/after/max 日志。同类装备、刻印、药剂与复活的真实正向 HP 继续累计。
+- 收窄后的 0.4.6 Release 构建为 47,616 B / `7DFF3253…C98B4`，隔离 SDK 6.0.428 为 `0 warning / 0 error`，Hook 数仍为 14。MP 合同覆盖 fallback 非零零变化、全零和普通消耗；Python 全量 165 项 PASS。
+- 0.4.6 已在双零进程门后部署并回读，0.4.5 回滚为 47,104 B / `A6484B75…25A801`。另建桌面 `失落城堡2工具箱 1.6.0-Bridge0.4.6测试版`，相对正式盒子只改运行时清单与内置 Bridge 两文件，self-test 退出码 0。下一实机以普通无怀表新局的法力恢复非零/不双计为主；HP 只采诊断，不作为修复宣称。
+- 实机已得到普通回蓝与容量变化正控：截图 HUD `461/550`、游戏 `189/189`；日志精确拆分普通恢复461与容量正向变化80+9，`100+550-461=189`。分解魔晶石后最大法力回到105且没有新增 runtime_gain。该部分判 `R-PASS`，本局仍在继续。
+- 同局 Boss 房出现官方/HUD承伤 `33`、局内恢复 `39`。0.4.6 HP 日志将 19 个正向事件精确闭合为 `38.5444756`，所以恢复显示本身正确且不是小数约分造成差额；最后已观测 `56.7000046` 到后续恢复起点 `18.1555290` 也相差同值。由于当前 BepInEx 日志没有逐 hit 的 `ori/real/applied`，也不记录 DamageProcess 内负向 HP，约 `5.54` 的具体来源仍不可唯一归因，禁止先称官方 Bug。
+- 回营后恢复从 `39` 跳到 `141` 已单独闭合：游戏先执行 `55.3000031→158`（有效 `102.6999969`），下一行才触发 `round_start is_camp=True`。这是 0.4.6 会话边界过滤 `R-FAIL`，与 Boss 房承伤差额独立；下一候选只按生命周期排除营地补满，不得吞战斗内回复/复活。
+- 对应冻结记录：`artifacts/runtime-captures/2026-08-30-hp-official-vs-actual-0.4.6/README.zh-CN.md`。
+- 0.4.7 最窄候选已构建并部署到游戏目录及同一桌面测试盒子：48,640 B / `A917E813…18CA7`，0.4.6 独立回滚为 47,616 B / `7DFF3253…C98B4`。RoundStart 同一目标用 prefix 在游戏内部回营补满前关闭活动窗口，postfix 保持原初始化；taken 记录 `original/real/hp_before/applied/settlement`，HP 记录非零负向及 `in_map/inside_damage`。Hook 目标仍14，聚焦11、全量167、Release构建与盒子self-test均 PASS；真实回营/单击 `NOT RUN`。
+- 测试盒子目录名暂保持 `失落城堡2工具箱 1.6.0-Bridge0.4.6测试版`，内部 manifest 已明确为 `LC2CombatBridge 0.4.7-test` 且内置 DLL 与游戏目录/候选哈希一致，避免另建相似目录。部署回执见 `artifacts/runtime-deploy/2026-08-30-bridge-0.4.7/README.zh-CN.md`。
+
+## 2026-08-30 Bridge 0.4.7 实战反例与 0.4.8 最窄候选
+
+- 0.4.7 三次受击的官方逐击向上取整为 `37+47+37=121`；处理后实际 HP 变化与局内有效回复均精确为 `119.1097946`，UI 显示 `119`。该双口径已闭合，不再调整承伤或恢复聚合公式。
+- 回营补满仍发生在 RoundStart prefix 之前：日志先记录 `54.6000023→156`、有效 `101.3999939`、`in_map=True`，下一行才是 `round_start is_camp=True`。0.4.7 判 `SETTLEMENT REFILL R-FAIL`。
+- IL2CPP 当前元数据确认独立 `StageFlowEvent.GameRoundEndBackPreLoadCamp` 与无参 `PlayerManager.OnGameRoundEndPreLoadCamp()` 回调。0.4.8 在该回调 prefix 关闭旧活动窗口，保留 RoundStart 末端兜底；既有 HP Hook 同时记录有界 `changeSourceStr`，不按满血数值、Boss、装备或道具特判。
+- 0.4.8 聚焦 12 项 PASS；隔离 SDK 6.0.428 Release 构建 0 warning/0 error；Mono.Cecil 回读版本/15 target/预加载 prefix/source token PASS。候选 49,152 B / `7740BA3E…6CE55`。游戏与测试盒仍运行，未部署、未执行测试盒 self-test；下一实测只需一次缺血短局退出。
+- 社区目录现为 52 条目、53 载荷、3,375,565 B。新紫色暴击 1.0.0 为纯视觉、无快捷键；新收到的海克斯 2.7.6 DLL 与既有载荷逐字节相同，不重复收录，只提升排序并明确它与三项现有 MOD 共用 F1。MOD manager 20 项 PASS；第三方真实游戏逻辑 `NOT RUN`。
+- 0.4.8 缺血短局已闭合：局内 48 个正向 HP 事件合计 `68.9060974`，HUD/结算显示 `69`；两次官方承伤 `46+46=92` 与游戏一致。日志顺序为 `round_end_preload_camp`→回城补血 `91.1367874/in_map=False`→`round_start is_camp=True`，补满未进入统计。判 `SETTLEMENT REFILL EXCLUSION R-PASS`，回执位于 `artifacts/runtime-captures/2026-08-30-settlement-refill-excluded-0.4.8/README.zh-CN.md`。
+
+## 2026-08-30 工具箱 1.6.1 精确候选冻结
+
+- exact package 为 `package/失落城堡2工具箱1.6.1-实时数值监测+一键MOD安装`：1,760 文件、`166,606,890` B、config0；EXE 6,463,717 B / `46525496…46C8D`，固定/字符串版本均为 1.6.1。
+- 随包 Bridge 为 0.4.8 / 49,152 B / `7740BA3E…6CE55`；社区目录为 52 条目、53 载荷，海克斯 `50CEB677…E04ECC` 只收一份，紫色暴击 `5863D6A9…35EECB` 位于视觉类排序。
+- 最终构建内全量 171 项与 source self-test PASS；精确包清洁运行时首次/重复安装、console false、不同核心写前阻断 PASS；52 项逐个安装/卸载、无关插件保留与原始 RAR 导入登记 PASS。
+- 多人新增 2/3/4 人各 250 轮 distinct owner 精确累计，以及四人 2,000 事件分 10 批活性测试；重复身份/事件、foreign session、schema error、queue overflow、stale heartbeat 均显式拒绝或报错，不静默漏算。真实 2P–4P 主客机仍为 `NOT RUN`。
+- r11 精确包 UI 回执覆盖 100% 最小海克斯、200% 紫色、150% 四人主面板、200% 四人 HUD；四臂均绑定 EXE `46525496…46C8D` 并按时退出。正式像素证据使用回执哈希一致的 `window-internal.png`，不使用被其他前景程序遮挡的环境实屏。
+- 实现 owner 判定为 `IMPLEMENTATION GREEN / AUDIT PENDING`。下一步只派一个 different-owner 对冻结源码、精确包、Bridge 实战、多人与 UI 做综合只读审计；审计 PASS 后才创建 ZIP、提交、push 与 v1.6.1 Release。

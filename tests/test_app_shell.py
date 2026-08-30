@@ -323,6 +323,15 @@ class AppShellModelTests(unittest.TestCase):
         self.assertGreater(spacious["name"], compact["name"])
         self.assertGreater(spacious["author"], compact["author"])
 
+        source = (
+            Path(__file__).resolve().parents[1] / "toolbox" / "app_shell.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('tree.heading("author", text="作者", anchor="center")', source)
+        author_column = source.split('tree.column(\n            "author",', 1)[1].split(
+            "        )", 1
+        )[0]
+        self.assertIn('anchor="center"', author_column)
+
     def test_mod_detail_panel_uses_content_driven_height(self) -> None:
         source = (
             Path(__file__).resolve().parents[1] / "toolbox" / "app_shell.py"

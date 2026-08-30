@@ -283,6 +283,77 @@ class CombatTransportContractTests(unittest.TestCase):
             [TransportNotice("error", "queue_overflow")],
         )
 
+    def test_four_player_batched_event_pump_stays_live_under_load(self) -> None:
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        pump = CombatEventPump(inbox, self.validator, aggregator)
+        members = [
+            {
+                "player_id": f"opaque-player-{index}",
+                "player_slot": index,
+                "is_local": index == 0,
+            }
+            for index in range(4)
+        ]
+        self.assertTrue(inbox.publish_event(status_event()))
+        self.assertTrue(
+            inbox.publish_event(
+                status_event(
+                    1,
+                    status="party_updated",
+                    party_members=members,
+                )
+            )
+        )
+        first_report = pump.drain()
+        self.assertEqual(first_report.processed_events, 2)
+        self.assertIsNone(first_report.fault_code)
+
+        sequence = 2
+        expected = {str(member["player_id"]): 0 for member in members}
+        started = time.perf_counter()
+        for _batch in range(10):
+            for _event_index in range(200):
+                player_index = sequence % 4
+                player_id = f"opaque-player-{player_index}"
+                damage = player_index + 1
+                expected[player_id] += damage
+                event = status_event(
+                    sequence,
+                    event_type="damage_resolution",
+                    aggregate=True,
+                    hook_path="settlement.official_attacker",
+                    damage_direction="dealt",
+                    hit_id=sequence,
+                    target_id=f"target-{sequence}",
+                    pre_mitigation_damage=damage,
+                    post_mitigation_damage=damage,
+                    applied_hp_damage=damage,
+                    settlement_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    damage_outcome="applied",
+                    is_boss=sequence % 25 == 0,
+                    owner_player_id=player_id,
+                    source_token="combat.player.normal",
+                )
+                event.pop("status")
+                self.assertTrue(inbox.publish_event(event))
+                sequence += 1
+            report = pump.drain()
+            self.assertEqual(report.processed_events, 200)
+            self.assertIsNone(report.fault_code)
+
+        elapsed = time.perf_counter() - started
+        snapshot = aggregator.snapshot(monotonic_ms=sequence * 100)
+        self.assertLess(elapsed, 5.0)
+        self.assertEqual(snapshot.connection_state, "live")
+        self.assertEqual(snapshot.detected_player_count, 4)
+        self.assertEqual(snapshot.total_damage, sum(expected.values()))
+        self.assertEqual(snapshot.unattributed_damage, 0)
+        for player_id, damage in expected.items():
+            self.assertEqual(snapshot.player_breakdown[player_id]["damage_dealt"], damage)
+
     def test_pump_applies_notices_and_events_only_when_drained(self) -> None:
         inbox = CombatInbox()
         aggregator = CombatAggregator()

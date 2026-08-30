@@ -339,7 +339,7 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 49)
+        self.assertEqual(len(catalog.entries), 52)
         bundled_root = PROJECT_ROOT / "third_party"
         for descriptor in catalog.entries:
             self.assertTrue(descriptor.operation.files)
@@ -416,6 +416,60 @@ class ModManagerTests(unittest.TestCase):
             "334A4C3B48E91E74AC6F25576B05CDC4798478DA1DE81A66569D570554B1A099",
         )
 
+        ice_pillar = catalog.get("ice-pillar-enhancement")
+        self.assertEqual(ice_pillar.display.version, "1.16.0")
+        self.assertEqual(ice_pillar.display.author, "大萝卜鸡")
+        self.assertEqual(ice_pillar.operation.expected_filename, "IcePillarCrash.dll")
+        self.assertEqual(ice_pillar.operation.hotkeys, ())
+        self.assertIsNone(ice_pillar.operation.panel_hotkey)
+        self.assertIn("6 增至 12", ice_pillar.display.summary)
+        self.assertIn("没有独立设置面板", ice_pillar.display.usage_hint)
+        self.assertEqual(
+            ice_pillar.integrity_policy.sha256,
+            "F4C53E57A87F1F3484E8562B01F43FB72EE92C69BA8BA80C55C77617E7D6253D",
+        )
+
+        drug_god = catalog.get("not-drug-god")
+        self.assertEqual(drug_god.display.name, "我不是药神（测试版）")
+        self.assertEqual(drug_god.display.version, "1.0.0")
+        self.assertEqual(drug_god.display.author, "木亦")
+        self.assertEqual(drug_god.operation.expected_filename, "LC2NotDrugGod.dll")
+        self.assertEqual(drug_god.operation.hotkeys, ("F1",))
+        self.assertEqual(drug_god.operation.panel_hotkey, "F1")
+        self.assertIn("DIY 药水池", drug_god.display.usage_hint)
+        self.assertIn("建议不要同时启用", drug_god.display.usage_hint)
+        self.assertEqual(
+            drug_god.integrity_policy.sha256,
+            "B4D6DF015CCED212B47CF281C74E6EDF416B24E3570C16C4BCA8468277AC8B37",
+        )
+
+        hex_augment = catalog.get("hex-augment")
+        self.assertEqual(hex_augment.display.version, "2.7.6")
+        self.assertEqual(hex_augment.operation.expected_filename, "LC2HexAugment.dll")
+        self.assertEqual(hex_augment.operation.hotkeys, ("F1",))
+        self.assertEqual(hex_augment.operation.panel_hotkey, "F1")
+        self.assertIn("建议不要同时启用", hex_augment.display.usage_hint)
+        self.assertEqual(
+            hex_augment.integrity_policy.sha256,
+            "50CEB677DE7AB88D8E4E4FD8059CEA5FBC440D709DAA7E4A215B059938E04ECC",
+        )
+
+        purple_damage = catalog.get("purple-critical-damage")
+        self.assertEqual(purple_damage.display.version, "1.0.0")
+        self.assertEqual(purple_damage.display.author, "兔子王お")
+        self.assertEqual(
+            purple_damage.operation.expected_filename,
+            "LC2PurpleDamage暴击字体红色改紫色.dll",
+        )
+        self.assertEqual(purple_damage.operation.hotkeys, ())
+        self.assertIsNone(purple_damage.operation.panel_hotkey)
+        self.assertIn("物理暴击", purple_damage.display.summary)
+        self.assertIn("无快捷键", purple_damage.display.usage_hint)
+        self.assertEqual(
+            purple_damage.integrity_policy.sha256,
+            "5863D6A9346304C418C731F73AF0E0413AAAE1FEBD569065697B9CBDC035EECB",
+        )
+
     def test_community_catalog_prioritizes_practical_mods_over_cosmetics(self) -> None:
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
@@ -424,12 +478,17 @@ class ModManagerTests(unittest.TestCase):
 
         self.assertEqual(
             ids[:3],
-            ["player-live-stats", "resource-transfer-f1", "inscription-soulstone-manager"],
+            ["player-live-stats", "enhancement-plan", "resource-transfer-f1"],
         )
+        self.assertLess(ids.index("enhancement-plan"), ids.index("resource-transfer-f1"))
+        self.assertLess(ids.index("hex-augment"), ids.index("item-ban-freenix"))
         self.assertLess(ids.index("item-ban-freenix"), ids.index("armor-transmog"))
         self.assertLess(ids.index("dynamic-hp"), ids.index("staff-skin-swap"))
         self.assertLess(ids.index("evilstone-power-duration"), ids.index("damage-meter"))
+        self.assertLess(ids.index("ice-pillar-enhancement"), ids.index("damage-meter"))
         self.assertLess(ids.index("damage-meter"), ids.index("welcome-message"))
+        self.assertLess(ids.index("hide-weapon-fx"), ids.index("purple-critical-damage"))
+        self.assertLess(ids.index("purple-critical-damage"), ids.index("armor-transmog"))
 
     def test_all_community_mods_install_and_uninstall_in_isolated_game(self) -> None:
         catalog = ModCatalog.from_file(

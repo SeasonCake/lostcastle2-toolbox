@@ -13,7 +13,7 @@ class CombatBridgeSourceTests(unittest.TestCase):
             PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('public const string PluginVersion = "0.4.5";', source)
+        self.assertIn('public const string PluginVersion = "0.4.8";', source)
         self.assertIn('aggregate: ShouldAggregateDamage(direction)', source)
         self.assertIn('StageMgr.Instance?.IsNonBattleRoom() is not true', source)
         self.assertNotIn('IndexOf("_Shop_", StringComparison.OrdinalIgnoreCase)', source)
@@ -81,6 +81,7 @@ class CombatBridgeSourceTests(unittest.TestCase):
         self.assertIn("TrackOfficialManaRecovery(effectiveRaw);", source)
         self.assertIn("var rootOperationId = stack.Last();", source)
         self.assertIn("[LC2CB-MP] kind=runtime_gain", source)
+        self.assertIn("ShouldEmitMpObservation(requested, effective, fallbackGain)", source)
         self.assertIn('["source_token"] = sourceToken', source)
         self.assertNotIn('["observed_requested_delta"]', source)
         self.assertNotIn('["observed_effective_delta"]', source)
@@ -96,6 +97,59 @@ class CombatBridgeSourceTests(unittest.TestCase):
         self.assertIn('["resource_operation"] = "loss"', source)
         self.assertIn('["effective_delta"] = effective', source)
         self.assertIn('?? "resource.self_damage"', source)
+
+    def test_hp_diagnostics_preserve_existing_effective_recovery_semantics(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("[LC2CB-HP] kind=observation", source)
+        self.assertIn("effective_raw=", source)
+        self.assertIn('["effective_delta"] = effective', source)
+        self.assertNotIn("ReconcileHpRecovery(", source)
+        self.assertNotIn("NormalizeHpGain(", source)
+
+    def test_round_transition_excludes_camp_refill_before_preload(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("internal static void PrepareRoundTransition()", source)
+        self.assertIn("internal static void BeginCampPreload()", source)
+        self.assertIn(
+            "[HarmonyPatch(typeof(PlayerManager), "
+            "nameof(PlayerManager.OnGameRoundEndPreLoadCamp))]",
+            source,
+        )
+        self.assertIn("private static void Prefix() => Plugin.BeginCampPreload();", source)
+        self.assertIn('LogRoomDiagnostic("round_end_preload_camp");', source)
+        self.assertIn("private static void Prefix() => Plugin.PrepareRoundTransition();", source)
+        self.assertIn("private static void Postfix() => Plugin.BeginRound();", source)
+        self.assertIn("var inActiveMap = _inActiveMap;", source)
+        self.assertIn("if (!inActiveMap)", source)
+        self.assertIn("in_map={inActiveMap}", source)
+
+    def test_hp_diagnostics_include_bounded_source_token(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("source_token={DiagnosticToken(sourceToken)}", source)
+        self.assertIn("CombatPipeServer.Bound(value, 128)", source)
+        self.assertIn('.Replace("\\r", "\\\\r", StringComparison.Ordinal)', source)
+
+    def test_taken_diagnostics_expose_official_and_actual_damage_stages(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("[LC2CB-TAKEN] kind=damage", source)
+        self.assertIn("original_raw=", source)
+        self.assertIn("real_raw=", source)
+        self.assertIn("hp_before_raw=", source)
+        self.assertIn("applied_raw=", source)
+        self.assertIn("settlement_display=", source)
+        self.assertIn("Math.Abs(effective) > 0.0001", source)
 
     def test_local_resource_and_taken_paths_ignore_remote_player_state(self) -> None:
         source = (

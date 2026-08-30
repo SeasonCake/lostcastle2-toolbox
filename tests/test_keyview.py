@@ -9,6 +9,7 @@ from pathlib import Path
 import random
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -200,6 +201,19 @@ class KeyViewTests(unittest.TestCase):
                 b"\x00\x00\x01\x72\x00\x00\x02\x04"
             )
             self.assertEqual(keyview._png_dimensions(capture), (370, 516))
+
+    def test_bounded_window_message_returns_quickly_for_invalid_handle(self) -> None:
+        started = time.perf_counter()
+        self.assertEqual(
+            keyview._send_window_message_bounded(
+                0,
+                0x007F,
+                0,
+                timeout_ms=10,
+            ),
+            0,
+        )
+        self.assertLess(time.perf_counter() - started, 0.5)
 
     def test_combat_hud_opens_by_default_with_an_explicit_startup_opt_out(self) -> None:
         self.assertTrue(keyview.parse_args([]).show_combat_hud)

@@ -45,6 +45,49 @@
       }
     },
     {
+      "id": "enhancement-plan",
+      "display": {
+        "name": "LC2 增强计划",
+        "version": "4.8",
+        "author": "茶橘柚、空容、刺心",
+        "summary": "提供多项战斗、掉落与便利功能调节",
+        "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，首次启动会生成默认配置。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2EnhancementPlan_v4.8.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/enhancement-plan",
+        "files": [
+          {
+            "path": "LC2EnhancementPlan_v4.8.dll",
+            "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+            "size_bytes": 328192
+          }
+        ],
+        "provides": [
+          "lc2enhancementplan_v4.8.dll"
+        ],
+        "hotkeys": [
+          "INS"
+        ],
+        "panel_hotkey": "INS"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 4.8",
+        "author_source": "DLL 内嵌作者团队署名；QQ 上传者时间喝奶",
+        "author_channel": "local community package",
+        "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+        "size_bytes": 328192,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
       "id": "resource-transfer-f1",
       "display": {
         "name": "一键丢钱",
@@ -296,40 +339,83 @@
       }
     },
     {
-      "id": "enhancement-plan",
+      "id": "not-drug-god",
       "display": {
-        "name": "LC2 增强计划",
-        "version": "4.8",
-        "author": "茶橘柚、空容、刺心",
-        "summary": "提供多项战斗、掉落与便利功能调节",
-        "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，首次启动会生成默认配置。"
+        "name": "我不是药神（测试版）",
+        "version": "1.0.0",
+        "author": "木亦",
+        "summary": "让宝箱按配置额外掉落原生或 DIY 药水，并提供多种可叠加药水效果",
+        "usage_hint": "安装后重启游戏，按 F1 或在工具箱点击“打开 MOD 面板”；配置掉落概率、原生/DIY 药水池并保存。F1 与一键丢钱、区域类型重铸、海克斯强化药水冲突，建议不要同时启用。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "LC2EnhancementPlan_v4.8.dll",
+        "expected_filename": "LC2NotDrugGod.dll",
         "bundled": true,
-        "bundle_dir": "community_mods/enhancement-plan",
+        "bundle_dir": "community_mods/not-drug-god",
         "files": [
           {
-            "path": "LC2EnhancementPlan_v4.8.dll",
-            "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
-            "size_bytes": 328192
+            "path": "LC2NotDrugGod.dll",
+            "sha256": "B4D6DF015CCED212B47CF281C74E6EDF416B24E3570C16C4BCA8468277AC8B37",
+            "size_bytes": 84480
           }
         ],
         "provides": [
-          "lc2enhancementplan_v4.8.dll"
+          "lc2notdruggod.dll"
         ],
         "hotkeys": [
-          "INS"
+          "F1"
         ],
-        "panel_hotkey": "INS"
+        "panel_hotkey": "F1"
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 4.8",
-        "author_source": "DLL 内嵌作者团队署名；QQ 上传者时间喝奶",
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者木亦（2026-08-30）",
         "author_channel": "local community package",
-        "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
-        "size_bytes": 328192,
+        "sha256": "B4D6DF015CCED212B47CF281C74E6EDF416B24E3570C16C4BCA8468277AC8B37",
+        "size_bytes": 84480,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "hex-augment",
+      "display": {
+        "name": "海克斯强化药水",
+        "version": "2.7.6",
+        "author": "时间喝奶",
+        "summary": "在战斗房胜利后提供随机海克斯药水强化",
+        "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。F1 与一键丢钱、区域类型重铸、我不是药神（测试版）冲突，建议不要同时启用。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2HexAugment.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/hex-augment",
+        "files": [
+          {
+            "path": "LC2HexAugment.dll",
+            "sha256": "50CEB677DE7AB88D8E4E4FD8059CEA5FBC440D709DAA7E4A215B059938E04ECC",
+            "size_bytes": 40960
+          }
+        ],
+        "provides": [
+          "lc2hexaugment.dll"
+        ],
+        "hotkeys": [
+          "F1"
+        ],
+        "panel_hotkey": "F1"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 2.7.6",
+        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "author_channel": "local community package",
+        "sha256": "50CEB677DE7AB88D8E4E4FD8059CEA5FBC440D709DAA7E4A215B059938E04ECC",
+        "size_bytes": 40960,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -954,6 +1040,46 @@
       }
     },
     {
+      "id": "ice-pillar-enhancement",
+      "display": {
+        "name": "纵冰之杖加强",
+        "version": "1.16.0",
+        "author": "大萝卜鸡",
+        "summary": "将纵冰之杖冰锥数量由 6 增至 12，并将冷却由 3 秒缩短为 1 秒",
+        "usage_hint": "安装后重启游戏，使用纵冰之杖对应技能时自动生效；没有独立设置面板。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "IcePillarCrash.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/ice-pillar-enhancement",
+        "files": [
+          {
+            "path": "IcePillarCrash.dll",
+            "sha256": "F4C53E57A87F1F3484E8562B01F43FB72EE92C69BA8BA80C55C77617E7D6253D",
+            "size_bytes": 47104
+          }
+        ],
+        "provides": [
+          "icepillarcrash.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.16.0",
+        "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者大萝卜鸡（2026-08-30）",
+        "author_channel": "local community package",
+        "sha256": "F4C53E57A87F1F3484E8562B01F43FB72EE92C69BA8BA80C55C77617E7D6253D",
+        "size_bytes": 47104,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
       "id": "summon-balance",
       "display": {
         "name": "野猪与恶魔士兵平衡加强",
@@ -1185,49 +1311,6 @@
         "author_channel": "local community package",
         "sha256": "0FB7B7F2CF55A660B3CC6EFCD60C5C9E0BDD7236078F67724FBEFE803DA7DBFA",
         "size_bytes": 18432,
-        "signature_status": "not_assessed",
-        "risk_level": "high",
-        "capabilities": [
-          "gameplay modification"
-        ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
-      }
-    },
-    {
-      "id": "hex-augment",
-      "display": {
-        "name": "海克斯强化药水",
-        "version": "2.7.6",
-        "author": "时间喝奶",
-        "summary": "在战斗房胜利后提供随机海克斯药水强化",
-        "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。"
-      },
-      "operation": {
-        "kind": "bepinex_plugin",
-        "expected_filename": "LC2HexAugment.dll",
-        "bundled": true,
-        "bundle_dir": "community_mods/hex-augment",
-        "files": [
-          {
-            "path": "LC2HexAugment.dll",
-            "sha256": "50CEB677DE7AB88D8E4E4FD8059CEA5FBC440D709DAA7E4A215B059938E04ECC",
-            "size_bytes": 40960
-          }
-        ],
-        "provides": [
-          "lc2hexaugment.dll"
-        ],
-        "hotkeys": [
-          "F1"
-        ],
-        "panel_hotkey": "F1"
-      },
-      "integrity_policy": {
-        "version_note": "curated community bundle 2.7.6",
-        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
-        "author_channel": "local community package",
-        "sha256": "50CEB677DE7AB88D8E4E4FD8059CEA5FBC440D709DAA7E4A215B059938E04ECC",
-        "size_bytes": 40960,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1805,6 +1888,46 @@
         "author_channel": "local community package",
         "sha256": "7A0C082EFE54CFAF7977515A09668EFB01E3CE9C25E22845249FDF1C1291D3E5",
         "size_bytes": 11776,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    },
+    {
+      "id": "purple-critical-damage",
+      "display": {
+        "name": "暴击字体改紫色",
+        "version": "1.0.0",
+        "author": "兔子王お",
+        "summary": "将本地玩家及其召唤物的物理暴击改为游戏原生紫色特殊飘字",
+        "usage_hint": "安装后重启游戏自动生效，无快捷键；默认只改本地玩家及其召唤物的物理暴击字体，可在生成的配置文件中调整颜色、范围和召唤物开关。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2PurpleDamage暴击字体红色改紫色.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/purple-critical-damage",
+        "files": [
+          {
+            "path": "LC2PurpleDamage暴击字体红色改紫色.dll",
+            "sha256": "5863D6A9346304C418C731F73AF0E0413AAAE1FEBD569065697B9CBDC035EECB",
+            "size_bytes": 13824
+          }
+        ],
+        "provides": [
+          "lc2purpledamage暴击字体红色改紫色.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者兔子王お（2026-08-30）",
+        "author_channel": "local community package",
+        "sha256": "5863D6A9346304C418C731F73AF0E0413AAAE1FEBD569065697B9CBDC035EECB",
+        "size_bytes": 13824,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [

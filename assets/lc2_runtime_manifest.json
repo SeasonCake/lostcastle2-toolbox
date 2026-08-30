@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "runtime_version": "BepInEx 6.0.0-be.785 + LC2CombatBridge 0.4.5",
+  "runtime_version": "BepInEx 6.0.0-be.785 + LC2CombatBridge 0.4.8",
   "source_identity": {
     "kind": "validated_game_runtime",
     "file_count": 307,
@@ -1562,8 +1562,8 @@
   "bridge": {
     "filename": "LC2CombatBridge.dll",
     "target": "BepInEx/plugins/LC2CombatBridge/LC2CombatBridge.dll",
-    "size_bytes": 47104,
-    "sha256": "A6484B75E3369B1B0AA774F4A7DCB53E0107CE381F104D33A9388FC5EF25A801"
+    "size_bytes": 49152,
+    "sha256": "7740BA3E30CD8C8B73F8BFDF221C3384CB2D64F940699A6974556E989896CE55"
   },
   "excluded_source_prefixes": [
     "BepInEx/plugins/",

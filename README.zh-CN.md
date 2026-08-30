@@ -25,8 +25,8 @@
 | 造成伤害、承伤与生命恢复口径 | 已在记录的游戏版本完成运行时验证 |
 | 战斗事件 v2 与回放聚合 | 已实现并有行为测试 |
 | 法力与护盾观察桥 | 法力消耗/恢复已完成运行时验证；护盾仍待独立样本 |
-| 综合主窗口与外部战斗 HUD | Bridge 0.4.5 已完成 65% 生命锁定与普通太刀连续回蓝实测；匿名多人归属仍待联机实测 |
-| MOD 管理 | 2 个原有工具与 49 个最新可用社区 MOD 随包；支持本地自动识别、面板一键打开与添加 |
+| 综合主窗口与外部战斗 HUD | Bridge 0.4.8 已完成回蓝、官方/实际 HP 双口径与回营补满排除实测；匿名多人归属仍待联机实测 |
+| MOD 管理 | v1.6.1 纳管 2 个原有工具与 52 个社区 MOD；支持本地自动识别、面板一键打开与添加 |
 
 研究结论只适用于计划文档记录的游戏构建。游戏更新后，Hook 兼容性与数据口径都需要重新验证。
 
@@ -50,7 +50,7 @@
 
 ## MOD 管理
 
-- 当前收录“灵魂石修改器 1.2”（作者：恨你不见）、“金币编辑器 1.0”（作者：刺心）与 49 个按功能族去重的最新可用社区 MOD；实战/资源工具优先，外观类靠后。
+- v1.6.1 收录“灵魂石修改器 1.2”（作者：恨你不见）、“金币编辑器 1.0”（作者：刺心）与 52 个社区 MOD；实战/资源工具优先，外观类靠后。“纵冰之杖加强 1.16.0”“我不是药神 1.0.0 测试版”和纯视觉“暴击字体改紫色 1.0.0”已进入本版。新收到的海克斯 DLL 与既有 2.7.6 载荷逐字节一致，因此只提升实战排序并补充 F1 冲突说明，不重复收录。
 - 灵魂石修改器支持配置、启动和删除盒子副本；金币编辑器随包提供登记 DLL，可一键安装到独占 BepInEx 插件目录，并只卸载自身文件。
 - 金币编辑器安装完成后可从 MOD 卡片直接启动游戏；进入游戏后可点击“打开 MOD 面板”或按 `F5`，输入数量并保存，返回主菜单再进入游戏生效。作者与文件信息见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 - 社区目录剔除了旧版重复、测试、未完成、半成品和明确有 bug 的来源；每个条目显示作者、功能和使用方法，作者证据不足时明确标为“社区未署名”。
@@ -96,7 +96,7 @@ py -3 keyview.py --demo-large-values --show-page combat --show-combat-hud --demo
 
 仓库包含固定版本的 7-Zip 运行组件及其许可证，clone 后可直接使用源码模式的压缩包识别。其他第三方 EXE、DLL、压缩包及生成的 `third_party/community_mods` 载荷不会提交到 Git。打包前需在本机准备 `THIRD_PARTY_NOTICES.md` 和 `assets/community_mod_catalog.json` 登记的精确输入；`build.ps1` 会核对数量、大小和 SHA-256，缺失或不一致时直接停止。
 
-实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.3 已完成 `49/140` 的 65% 锁血正控；0.4.5 在不增加 Hook 的前提下同时使用根操作和连续观测基线，已闭合普通太刀两次技能之间自然回蓝仍显示 0 的反例。作者实测结算为法力消耗/恢复 `762/763`，与底层浮点累计后界面取整一致；2P–4P 仍需真实联机实测。
+实时桥接见 [`game_plugins/LC2CombatBridge/README.zh-CN.md`](game_plugins/LC2CombatBridge/README.zh-CN.md)；临时研究探针见 [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md)。Bridge 0.4.5 已闭合普通太刀自然回蓝，0.4.6 闭合零变化 fallback 与容量变化，0.4.7 确认官方承伤121/实际 HP 变化119为双口径，0.4.8 使用游戏自身回营预加载边界排除结算补满。最新短局中局内回复 `68.906097→69`，回城补满 `91.136787` 明确为 `in_map=False`；2P–4P 仍需真实联机实测。
 
 ## 数据与安全边界
 

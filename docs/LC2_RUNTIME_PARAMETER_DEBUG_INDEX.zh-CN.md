@@ -10,16 +10,16 @@
 
 | 项目 | 当前记录 |
 | --- | --- |
-| 记录日期 | 2026-08-29（Asia/Shanghai） |
+| 记录日期 | 2026-08-30（Asia/Shanghai） |
 | Steam app / build | `2445690` / `24795992`；已从本机 manifest 复核 |
 | Unity / IL2CPP metadata | `6000.3.16f1` / `39` |
 | `GameAssembly.dll` | `747E8BECB7B97B014D7F282C1EB60A7A4754A8A1DF01CEB943C03967F6E6F1C5` |
 | `global-metadata.dat` | `D42663B5ED61E9D5D30FCEF878969507C4B04951595DD61D63B5E0BD7017984A` |
 | `LC2.Core.dll` interop | `0267065BFB4CF8E4B7BD369C2240212901294C85B931DD6259FFAF02E5AFEFAF` |
 | BepInEx | `6.0.0-be.785`，commit `6abdba47eeebe08552282e7a58ef0f4a9ab60b62` |
-| 当前项目源码 | Bridge `0.4.5`；保留 14 个 Hook；0.4.3 的 65% 锁血与 0.4.5 普通太刀连续回蓝均已实测，2P–4P 归属仍待真实联机 |
-| 当前游戏目录 | Bridge `0.4.5`，SHA-256 `A6484B75E3369B1B0AA774F4A7DCB53E0107CE381F104D33A9388FC5EF25A801`；0.4.4 exact rollback 已保留。显示模式保持“窗口化全屏”（两份 `GameSettings.mFullScreenMode=2`） |
-| 桌面端 | 1.6.0 package/桌面均为 1,757 文件、`166,453,914` B、config0；EXE `6,463,370` B / `33D57E63945B7424124A11F2158E272BDAD54C40E6ED1E2DABFBEEEE39678F74`；审计修复后 H2/H3/H4 的 MIN100–200% 与四按钮状态均 `VERIFIED` |
+| 当前项目源码 | Bridge `0.4.8`；15 个 Hook。新增 `PlayerManager.OnGameRoundEndPreLoadCamp` 在游戏的回营预加载生命周期提前关闭活动窗口，并记录有界 HP source token；不改官方承伤121/实际HP变化119双口径。缺血短局回营已 `R-PASS` |
+| 当前游戏目录 | Bridge `0.4.8` 测试部署，49,152 B / SHA-256 `7740BA3E30CD8C8B73F8BFDF221C3384CB2D64F940699A6974556E989896CE55`；0.4.7 exact rollback 为 `A917E813…18CA7` |
+| 桌面端 | 1.6.1 exact package 为 1,760 文件、`166,606,890` B、config0；EXE `6,463,717` B / `46525496A85F75C066AB3829D3CE7A2E38FA2962C9A8F034EC137E3902246C8D`；r11 的 MIN100 海克斯、A200 紫色、A150 四人主面板与 A200 四人 HUD 均 `VERIFIED` |
 
 证据标签：
 
@@ -43,7 +43,7 @@
 | 启动耗时 | BepInEx/Il2CppInterop 启动阶段；再比较 `Plugin.Load()`、`Harmony.PatchAll` 增量 | 本机暖启动 B 组主菜单中位上界比 A 组约慢 `6.25 s`，C 组未慢于 B 组；作者确认总启动时长可接受 | `R/T/P2`。仅保留性能基线，不作为当前修复目标；详见[三臂实测结果](LC2_STARTUP_PERFORMANCE_2026-08-27.zh-CN.md) |
 | Bridge 加载即报 Harmony 参数错误 | Patch 方法参数名和目标签名 | Probe 0.2.0 首个候选把 `hitInfo` 写成 `hit`，主菜单加载失败 | `R-FAIL` 历史正控；任何新 patch 先做精确签名静态门 |
 | 法力消耗显示约一半 | `OnUseMana.useMana`、前后 `CurMP`、武器输入语义 | 长杖面板 `24` 是长按持续消耗参考；短按只触发最低段，实扣 `120→108`。另一武器面板 `48`，实扣 `120→72` | `R-PASS` 当前两武器样本；按真实结算累计，不把持续技能面板值强制当作单次成本 |
-| 法力恢复始终为 0、异常偏高或与消耗差少量整数 | `OnRecoverMana`、根操作入口/出口 MP、连续观测基线、同操作官方覆盖量、有效 session | 回调值可能是恢复后目标；回调也可能缺席。恢复既可能同操作净零，也可能发生在两次技能之间；只比较单根操作会漏后者 | `R-PASS`：0.4.3 魔晶石与 0.4.4 普通太刀先后复现恢复 0；0.4.5 同时使用 rooted/sequential recovery，作者实测消耗/恢复 `762/763`，HUD 保持实时 |
+| 法力恢复始终为 0、异常偏高或与消耗差少量整数 | `OnRecoverMana`、根操作入口/出口 MP、连续观测基线、同操作官方覆盖量、零变化观察的提前返回、有效 session | 回调值可能是恢复后目标；回调也可能缺席。恢复既可能同操作净零、发生在两次技能之间，也可能由周期效果直接写满后在下一次零变化观察中才被发现 | `R-PASS`：0.4.6 实机闭合零变化观察与容量变化，HUD 为消耗/恢复 `461/550`；日志拆分普通恢复 `461` 与容量正向变化 `80+9`，`100+550-461=189` 与游戏 `189/189` 一致。界面仍只在最终边界取整，不要求与逐次整数求和完全相等 |
 | 结算后立刻清零 | `StageMgr.OnGameRoundStart` 与 `SettlementDataMgr.OnChangeRoomStart` 的顺序 | 回营也可能触发 round-start，不能把它直接当作新地图 | `R-PASS` 回营保留/再次进入黑森林清零；完整打完结算的 `session_ended` 正控仍未执行 |
 | 结算 30 秒后清零 | `DEFAULT_ENDED_RETENTION_MS` | 旧默认 `30000` 会抹掉结果；结算动画本身可能提前消耗时间 | `T`。当前默认 `None`，保留到下一个 session |
 | 总伤害偏高 | `mRealHPDamage`、命中前 HP、过量伤害 | 直接汇总 `mRealHPDamage` 会包含过量部分；A 组高 `19.56%` | `R-PASS`。使用逐击 `ceil(min(real, hp_before))` |
@@ -51,9 +51,10 @@
 | 总伤害重复 | 多个官方/记录 path 或覆盖方法嵌套 | `official_defender` 与 `monster_record` 可观察同一事件；Hero/Base HP 回调一外一内 | `R-PASS`。伤害资格以唯一官方事件为门；HP 只聚合 `depth=0` |
 | 商店人偶使总伤害偏高 | `StageMgr.IsNonBattleRoom()`、事件 `aggregate` | 商店人偶会触发官方 attacker 回调，且内部 `IsBoss=true`，但游戏最终结算排除；0.3.8 的 `_Shop_` 文件名判断实机未命中 | `R-FAIL` 两局：差额 `12254`、`5600` 都与错误 Boss 值相同。0.3.9 改用游戏公开的非战斗房语义，待实机正负控 |
 | Boss 伤害不等于结算 | `MonsterRuntimeData.IsBoss` + `StageMgr.IsNonBattleRoom()` | 普通 Boss 必须用 `IsBoss`；但非战斗房木桩也是 `IsBoss=true`，必须先按房间业务语义排除聚合 | 旧 Boss 长局 `R-PASS 24271`；商店两次 `R-FAIL`；0.3.9 待实机 |
-| 承伤与恢复不相等 | HP damage 与所有正向 HP delta 是独立累计 | 清场、道具、被动和容量变化都可使恢复大于承伤，不存在守恒要求 | 本局官方/工具箱承伤均 `140`，恢复 `142`；`+2` 来源尚无逐事件 receipt，不判为计算错误 |
+| 承伤与恢复不相等 | 官方承伤与所有正向 HP delta 是独立累计 | 清场、刻印/装备被动、道具、复活和进入统计前已有缺血都可使恢复大于承伤，不存在守恒要求 | 0.4.6 新样本：局内 19 次正向 HP 精确合计 `38.5444756`、显示 `39`，官方承伤 `33`；已排除显示取整造成全部差额，但缺少本局逐 hit 字段，差额来源仍 `INCONCLUSIVE` |
+| 回营后恢复突然大幅增加 | HP 补满、`GameRoundEndBackPreLoadCamp` 与 `round_start is_camp` 的调用先后 | 0.4.7 实机仍先把 HP `54.600002→156`，随后才触发 RoundStart prefix；故该目标太晚。IL2CPP 当前元数据存在独立 `GameRoundEndBackPreLoadCamp` 事件及 `PlayerManager.OnGameRoundEndPreLoadCamp()` 回调 | 0.4.7 `R-FAIL`：误加 `101.399994`。0.4.8 实机顺序为预加载封窗→回城补血 `91.136787/in_map=False`→RoundStart；局内回复 `68.906097→69` 保留，判 `R-PASS` |
 | 自伤/诅咒掉血没有进入统计 | 玩家 HP 前后值、`ChangeCurrentHp`/`SetCurHP`、是否位于 `DamageProcess` | 0.3.8 只覆盖正向恢复；敌人伤害和直接负向 HP 不能混入同一指标 | `R-FAIL/S`：折断的妖刀样本复现。0.3.9 仅在官方 DamageProcess 外发负向资源事件，单列“自伤/其他”，待妖刀正控与敌人受击负控 |
-| 官方承伤与实际掉血不同 | `mOriFinalDamage` 对比 `mRealHPDamage`/HP 差 | 游戏承伤卡使用减伤前值；实际掉血是减伤后值 | `R-PASS`。UI 必须分列“官方承伤 / 实际战斗掉血” |
+| 官方承伤与实际掉血不同 | `mOriFinalDamage` 对比 `mRealHPDamage`/HP 差 | 游戏承伤卡使用逐击 `ceil(mOriFinalDamage)`；实际掉血来自后续伤害处理，另有直接 HP loss 路径 | `R-PASS` 双口径闭合：0.4.7 三击官方原始值 `36.1267204/46.9647331/36.1267204`，逐击向上取整为 `37+47+37=121`；实际 HP 变化/局内有效恢复为 `119.1097946→119`。0.4.8 只修回营生命周期，不改承伤或实际 HP 聚合公式 |
 | 治疗一直为 0 | 玩家根过滤、`HeroRuntimeData.ChangeCurrentHp` | 只 patch 基类会漏派生覆盖；`Creature.TryCast<Player>()` 是不成立的类型关系 | `R-PASS` 修正：比较玩家根实体 ID；仍需死亡/复活正控 |
 | 一次治疗被记两次 | `operation_id`、`parent_operation_id`、`depth` | `HeroRuntimeData.ChangeCurrentHp` 会嵌套进入基类方法 | `R-PASS`。外层 `depth=0` 聚合，内层仅诊断 |
 | 满血使用道具仍增加治疗 | `requested_delta` 对比 `effective_delta`、`overflow` | 请求量不等于有效量；满血时有效治疗为 0 | `R-PASS` 香蕉正控 |
@@ -369,6 +370,24 @@
 - 0.4.4 的普通太刀反例证明，回蓝不一定在“同一个根操作内”完成。第一次扣蓝后 MP 为 57，下一次扣蓝前已恢复到 95.513；若只计算第二次根操作自身入口/出口，即使全局基线已更新，恢复仍会被净负变化掩盖。
 - 0.4.5 在官方耗蓝回调后把权威扣蓝后值写入 `_lastObservedPlayerMp`。根操作结束时分别计算 rooted recovery 和 `after-observed_before` 的 sequential recovery，取有效较大者，再扣除本根已由官方恢复覆盖的量；仍保留顶层深度、本地玩家、有效 session 与有限诊断边界。
 - 六臂编译反射覆盖普通太刀两段自然恢复、魔晶石同操作回满、纯消耗、官方已覆盖与纯 runtime gain。作者实测最终 HUD 法力 `762/763`，关闭日志 `208,919` B / `76C3F50CD67213D1369E3A4386A46C81B77AA3B4DED9FCFC82F13E14359F0E62`；判 `R-PASS`，停止 MP Hook 迭代。
+
+## 17. 0.4.6 零变化观察通用回蓝与 HP 诊断候选
+
+- “被诅咒的怀表”每 20 秒回满法力并阻止其他恢复。0.4.5 实机中 HUD 消耗从 `240→288` 时，官方耗蓝前的连续基线已从 `4→100`，但日志没有 recovery/runtime_gain；同样模式在最大法力 105 时重复。
+- 无怀表的新局再次复现：HUD 消耗 `144`、恢复 `0` 时游戏为 `88/110`；日志第二次消耗前的基线已从 57 恢复到 `81.35785675`，之后多次在消耗前回到 110，仍没有 recovery/runtime_gain。该正控把根因从“怀表兼容”提升为通用零变化观察丢失。
+- 根因是直接回满发生在现有 Hook 外，下一次 `UpdateMp` 零变化观察已经算出 fallback，但旧代码在 `requested=0 && effective=0` 时仍提前返回；它随后把连续基线更新为满值，导致证据永久丢失。0.4.6 只在 fallback 也为 0 时返回，不增加 Harmony Hook 或怀表分支。
+- HP 假设已收窄：`49/140→62/177` 与回复差额只是同时出现，不能证明容量变化被误计。随后作者确认“自愈”刻印在 `64/183<35%` 时每秒正常 `+1`，完整局还发生过一次死亡/复活；官方/工具箱承伤均为 `308`、回复为 `398`。因此“回复高于承伤”不是错误判据。
+- 0.4.6 撤回未证实的 HP 容量归一化，不改变 `effective=after-before` 聚合；只增加 `[LC2CB-HP]` 的 requested/before/after/max 诊断，供未来真正无被动、无复活的反例使用。同类装备自动回血仍按实际 `+N` 通用累计，不按刻印或装备名特判。
+- 0.4.6 实机已闭合普通回蓝与容量变化：HUD `461/550`，日志原始和为普通恢复461、容量正向变化80+9；`100+550-461=189` 与游戏 `189/189` 精确相等。分解魔晶石后最大法力回到105且无新增 runtime_gain。
+- 当前阶段为 `MP R-PASS / CAPACITY ACCOUNTING R-PASS / RUN CONTINUES`。HP 只观察诊断，不作为本候选放行门；多人和完整结算仍不外推。
+
+## 18. 0.4.7 承伤双口径闭合与 0.4.8 回营预加载边界
+
+- 0.4.7 三次受击的官方原始值为 `36.1267204 / 46.9647331 / 36.1267204`，游戏按逐击向上取整显示 `37+47+37=121`；处理后实际 HP 变化合计 `119.1097946`，局内有效恢复也精确为 `119.1097946`，UI 显示 `119`。因此“承伤121 / 回复119”是官方逐击入整与真实 HP 浮点变化的双口径，已闭合，不改聚合公式。
+- 同局回营补满 `54.6000023→156` 被误加 `101.3999939`，其后才出现 `round_start is_camp=True`，证明 0.4.7 的 RoundStart prefix 仍太晚。不能按请求等于最大生命、固定数值、Boss、装备或道具名排除。
+- 当前 IL2CPP 元数据提供独立 `StageFlowEvent.GameRoundEndBackPreLoadCamp`，且 `PlayerManager.OnGameRoundEndPreLoadCamp()` 是对应的无参生命周期回调；其语义与签名比请求值特判稳定。0.4.8 在该方法 prefix 关闭 `_inActiveMap`，仍保留既有 RoundStart prefix 作为末端兜底，并把既有 HP Hook 已接收的 `changeSourceStr` 以 128 字符有界 token 写入诊断。
+- 0.4.8 源码聚焦 12 项 PASS；隔离 SDK 6.0.428 Release 构建 0 warning/0 error；Mono.Cecil 回读版本 `0.4.8`、15 个 Harmony target、预加载 prefix 与 HP source 诊断均存在。候选 DLL 49,152 B / `7740BA3E30CD8C8B73F8BFDF221C3384CB2D64F940699A6974556E989896CE55`。
+- 缺血短局实测中，48 个局内正向 HP 事件合计 `68.9060974`，截图/结算显示 `69`；两次官方承伤 `46+46=92` 与游戏结算一致。日志先触发 `round_end_preload_camp`，随后游戏回城补血 `31.8978786→123.0346680`、有效 `91.1367874`、`in_map=False`，最后才是 `round_start is_camp=True`。补满未进入回复，判 `SETTLEMENT REFILL EXCLUSION R-PASS`。
 
 主要维护入口：
 

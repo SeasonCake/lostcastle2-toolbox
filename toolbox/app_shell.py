@@ -2367,7 +2367,7 @@ class ToolboxShell:
         )
         tree.heading("name", text="MOD")
         tree.heading("version", text="版本")
-        tree.heading("author", text="作者")
+        tree.heading("author", text="作者", anchor="center")
         tree.heading("status", text="状态")
         initial_widths = mod_tree_column_widths(560)
         tree.column(
@@ -2385,7 +2385,7 @@ class ToolboxShell:
             width=initial_widths["author"],
             minwidth=118,
             stretch=False,
-            anchor="w",
+            anchor="center",
         )
         tree.column(
             "status",

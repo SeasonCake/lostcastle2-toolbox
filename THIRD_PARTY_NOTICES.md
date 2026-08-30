@@ -27,7 +27,7 @@ The toolbox verifies the bundled DLL, installs it into a dedicated BepInEx plugi
 
 ## Curated community MOD bundle
 
-- The local package contains 49 deduplicated, latest-usable community MOD entries selected by the maintainer through 2026-08-29.
+- The v1.6.1 bundle contains 52 maintainer-selected community MOD entries through 2026-08-30, including Ice Pillar enhancement 1.16.0, the explicitly labeled Not Drug God 1.0.0 test build, and Purple Critical Damage 1.0.0. The newly supplied Hex Augment DLL matched the existing managed 2.7.6 payload byte-for-byte and was not duplicated.
 - Exact payload paths, sizes, SHA-256 values, displayed authors, versions, purposes, and usage guidance are recorded in `assets/community_mod_catalog.json`; source-package selection and attribution evidence are maintained in `assets/community_mod_sources.json`.
 - Strong embedded or source-level author evidence takes priority. Where that is absent, maintainer-supplied QQ upload screenshots may provide a provisional uploader attribution; otherwise the entry displays `社区未署名`. The player/live teammate panel now uses only `实时数值v2.0.dll`; its in-game UI embeds `作者：懒虫桑`. Older duplicates, test builds, unfinished or half-finished sources, and sources explicitly marked as having a bug are not in the default bundle.
 - These MODs are not covered by this repository's MIT License. Local inclusion does not claim separate public redistribution permission; publication remains a separate maintainer decision.
@@ -45,7 +45,7 @@ The toolbox uses these components only to list and read user-selected ZIP, 7Z, a
 ## BepInEx 6 IL2CPP runtime
 
 - Project: <https://github.com/BepInEx/BepInEx>.
-- Bundled identity: `6.0.0-be.785+6abdba47eeebe08552282e7a58ef0f4a9ab60b62`, paired with LC2 Combat Bridge 0.4.5.
+- Bundled identity: `6.0.0-be.785+6abdba47eeebe08552282e7a58ef0f4a9ab60b62`, paired with LC2 Combat Bridge 0.4.8.
 - Prepared runtime archive: `bepinex-runtime.zip`, 40,402,401 bytes, SHA-256 `0B617BC439F53E39680444F1EFD84C2B31A96D144D3267EE06EBEA05B59738A8`.
 - The prepared archive contains 307 runtime/config files and explicitly excludes `BepInEx/plugins`, caches, generated interop, the source package's multiplayer plugin, and every research/debug probe. The toolbox installs only the separately pinned LC2 Combat Bridge into the plugin directory.
 - BepInEx is licensed under LGPL-2.1. The complete license is bundled as `运行环境/BepInEx-LICENSE.txt`; the matching source revision is linked in `运行环境/README.txt`.

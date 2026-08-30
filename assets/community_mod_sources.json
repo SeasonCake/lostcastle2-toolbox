@@ -86,7 +86,7 @@
     },
     {
       "id": "enhancement-plan",
-      "sort_priority": 180,
+      "sort_priority": 110,
       "source": "LC2增强计划4.8（微调）+海克斯药水_整合包.rar",
       "include": [
         {"source": "plugins/LC2EnhancementPlan_v4.8.dll", "target": "LC2EnhancementPlan_v4.8.dll"}
@@ -100,6 +100,21 @@
       "hotkeys": ["INS"],
       "panel_hotkey": "INS",
       "author_source": "DLL 内嵌作者团队署名；QQ 上传者时间喝奶"
+    },
+    {
+      "id": "not-drug-god",
+      "sort_priority": 175,
+      "source": "药神测试版.zip",
+      "include": ["LC2NotDrugGod.dll"],
+      "primary": "LC2NotDrugGod.dll",
+      "name": "我不是药神（测试版）",
+      "version": "1.0.0",
+      "author": "木亦",
+      "summary": "让宝箱按配置额外掉落原生或 DIY 药水，并提供多种可叠加药水效果",
+      "usage_hint": "安装后重启游戏，按 F1 或在工具箱点击“打开 MOD 面板”；配置掉落概率、原生/DIY 药水池并保存。F1 与一键丢钱、区域类型重铸、海克斯强化药水冲突，建议不要同时启用。",
+      "hotkeys": ["F1"],
+      "panel_hotkey": "F1",
+      "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者木亦（2026-08-30）"
     },
     {
       "id": "player-auto-reborn",
@@ -242,6 +257,19 @@
       "usage_hint": "安装后重启游戏，进入对应破防状态时自动生效。",
       "hotkeys": [],
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
+    },
+    {
+      "id": "ice-pillar-enhancement",
+      "source": "纵冰之杖加强，大幅增加冰锥数量.zip",
+      "include": ["IcePillarCrash.dll"],
+      "primary": "IcePillarCrash.dll",
+      "name": "纵冰之杖加强",
+      "version": "1.16.0",
+      "author": "大萝卜鸡",
+      "summary": "将纵冰之杖冰锥数量由 6 增至 12，并将冷却由 3 秒缩短为 1 秒",
+      "usage_hint": "安装后重启游戏，使用纵冰之杖对应技能时自动生效；没有独立设置面板。",
+      "hotkeys": [],
+      "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者大萝卜鸡（2026-08-30）"
     },
     {
       "id": "evilstone-power-duration",
@@ -473,14 +501,28 @@
       "author_source": "程序集版本与作者提供的 QQ 上传列表截图（2026-08-29）"
     },
     {
+      "id": "purple-critical-damage",
+      "sort_priority": 860,
+      "source": "LC2PurpleDamage暴击字体红色改紫色.dll",
+      "primary": "LC2PurpleDamage暴击字体红色改紫色.dll",
+      "name": "暴击字体改紫色",
+      "version": "1.0.0",
+      "author": "兔子王お",
+      "summary": "将本地玩家及其召唤物的物理暴击改为游戏原生紫色特殊飘字",
+      "usage_hint": "安装后重启游戏自动生效，无快捷键；默认只改本地玩家及其召唤物的物理暴击字体，可在生成的配置文件中调整颜色、范围和召唤物开关。",
+      "hotkeys": [],
+      "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者兔子王お（2026-08-30）"
+    },
+    {
       "id": "hex-augment",
+      "sort_priority": 180,
       "source": "海克斯强化药水_发布包(含源码）.rar",
       "primary": "LC2HexAugment.dll",
       "name": "海克斯强化药水",
       "version": "2.7.6",
       "author": "时间喝奶",
       "summary": "在战斗房胜利后提供随机海克斯药水强化",
-      "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。",
+      "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。F1 与一键丢钱、区域类型重铸、我不是药神（测试版）冲突，建议不要同时启用。",
       "hotkeys": ["F1"],
       "panel_hotkey": "F1",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"

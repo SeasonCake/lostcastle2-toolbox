@@ -18,7 +18,7 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "0.4.5";
+    public const string PluginVersion = "0.4.8";
     internal const int MaxHpSnapshots = 8192;
 
     private static readonly object HpSnapshotLock = new();
@@ -118,6 +118,22 @@ public sealed class Plugin : BasePlugin
         ResetOfficialManaSpendCoverage();
         SyncPlayerMpObservation();
         LogRoomDiagnostic("round_start");
+    }
+
+    internal static void PrepareRoundTransition()
+    {
+        // StageMgr.OnGameRoundStart is a final fallback for round transitions.
+        // The explicit camp-preload callback closes successful/failed runs before
+        // the game refills the player while returning to camp.
+        _awaitingMapEntry = true;
+        _inActiveMap = false;
+        _manaRecoveryArmed = false;
+    }
+
+    internal static void BeginCampPreload()
+    {
+        PrepareRoundTransition();
+        LogRoomDiagnostic("round_end_preload_camp");
     }
 
     internal static void EndRound()
@@ -349,6 +365,18 @@ public sealed class Plugin : BasePlugin
             var attacker = hit.mAtker;
             var attackerPlayer = OwnerPlayer(attacker);
             var defenderPlayer = OwnerPlayer(defender);
+            if (direction == "taken")
+            {
+                RuntimeLog?.LogInfo(
+                    $"[LC2CB-TAKEN] kind=damage hit_id={Math.Max(0, hit.ID)} " +
+                    $"original_raw={DiagnosticNumber(originalDamage)} " +
+                    $"real_raw={DiagnosticNumber(realDamage)} " +
+                    $"hp_before_raw={DiagnosticNumber(hpBefore)} " +
+                    $"applied_raw={DiagnosticNumber(appliedHpDamage)} " +
+                    $"settlement_display={settlementDamage} " +
+                    $"mitigated_raw={DiagnosticNumber(Math.Max(0.0, originalDamage - realDamage))} " +
+                    $"depth={snapshot.Depth}");
+            }
             var fields = new Dictionary<string, object>
             {
                 ["damage_direction"] = direction,
@@ -461,6 +489,25 @@ public sealed class Plugin : BasePlugin
             }
             var requested = Finite(requestedDelta);
             var effective = Finite(after.Value - state.Before);
+            var inActiveMap = _inActiveMap;
+            if (requested > 0
+                || Math.Abs(effective) > 0.0001
+                || Math.Abs(maxAfter.Value - state.MaxBefore) > 0.0001)
+            {
+                RuntimeLog?.LogInfo(
+                    $"[LC2CB-HP] kind=observation hook={hookPath} " +
+                    $"source_token={DiagnosticToken(sourceToken)} " +
+                    $"requested_raw={DiagnosticNumber(requested)} " +
+                    $"before_raw={DiagnosticNumber(state.Before)} after_raw={DiagnosticNumber(after)} " +
+                    $"effective_raw={DiagnosticNumber(effective)} " +
+                    $"max_before_raw={DiagnosticNumber(state.MaxBefore)} " +
+                    $"max_after_raw={DiagnosticNumber(maxAfter)} " +
+                    $"in_map={inActiveMap} inside_damage={state.InsideDamageResolution}");
+            }
+            if (!inActiveMap)
+            {
+                return;
+            }
             if (effective < -0.0001)
             {
                 if (state.InsideDamageResolution)
@@ -496,7 +543,9 @@ public sealed class Plugin : BasePlugin
             }
             var atCapacity = after.Value >= maxAfter.Value - 0.0001f;
             var blocked = effective <= 0.0001 && !atCapacity;
-            var overflow = atCapacity ? Math.Max(0.0, requested - Math.Max(0.0, effective)) : 0.0;
+            var overflow = atCapacity
+                ? Math.Max(0.0, requested - Math.Max(0.0, effective))
+                : 0.0;
             Bridge?.Emit(
                 "resource_change",
                 aggregate: true,
@@ -607,7 +656,7 @@ public sealed class Plugin : BasePlugin
             {
                 _lastObservedPlayerMp = after.Value;
             }
-            if (Math.Abs(requested) <= 0.0001 && Math.Abs(effective) <= 0.0001)
+            if (!ShouldEmitMpObservation(requested, effective, fallbackGain))
             {
                 return;
             }
@@ -892,6 +941,14 @@ public sealed class Plugin : BasePlugin
             : 0.0;
         return Math.Max(0.0, afterRaw - beforeRaw + pairedSpend);
     }
+
+    internal static bool ShouldEmitMpObservation(
+        double requestedRaw,
+        double effectiveRaw,
+        double fallbackGainRaw) =>
+        Math.Abs(requestedRaw) > 0.0001
+        || Math.Abs(effectiveRaw) > 0.0001
+        || fallbackGainRaw > 0.0001;
 
     internal static double ReconcileFallbackManaRecovery(
         double beforeRaw,
@@ -1258,6 +1315,18 @@ public sealed class Plugin : BasePlugin
         return string.IsNullOrWhiteSpace(bounded) ? null : bounded;
     }
 
+    private static string DiagnosticToken(string value)
+    {
+        var bounded = CombatPipeServer.Bound(value, 128);
+        return string.IsNullOrWhiteSpace(bounded)
+            ? "null"
+            : bounded
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal)
+                .Replace("\t", "\\t", StringComparison.Ordinal)
+                .Replace(" ", "_", StringComparison.Ordinal);
+    }
+
     private static Creature TryCreature(Entity entity)
     {
         if (entity is null)
@@ -1508,8 +1577,18 @@ internal static class OfficialDefenderDamagePatch
 [HarmonyPatch(typeof(StageMgr), nameof(StageMgr.OnGameRoundStart))]
 internal static class RoundStartPatch
 {
+    [HarmonyPrefix]
+    private static void Prefix() => Plugin.PrepareRoundTransition();
+
     [HarmonyPostfix]
     private static void Postfix() => Plugin.BeginRound();
+}
+
+[HarmonyPatch(typeof(PlayerManager), nameof(PlayerManager.OnGameRoundEndPreLoadCamp))]
+internal static class RoundEndPreLoadCampPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => Plugin.BeginCampPreload();
 }
 
 [HarmonyPatch(typeof(SettlementDataMgr), nameof(SettlementDataMgr.OnGameRoundEnd))]
