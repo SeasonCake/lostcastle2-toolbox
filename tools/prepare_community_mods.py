@@ -225,7 +225,7 @@ def main() -> int:
                     "signature_status": "not_assessed",
                     "risk_level": "high",
                     "capabilities": ["gameplay modification"],
-                    "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28",
+                    "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02",
                 },
             }
         )

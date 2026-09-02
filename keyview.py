@@ -46,7 +46,7 @@ from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, se
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.7"
+APP_VERSION = "1.7.1"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(

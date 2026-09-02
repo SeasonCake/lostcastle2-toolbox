@@ -8,6 +8,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class CombatBridgeSourceTests(unittest.TestCase):
+    def test_release_build_omits_machine_local_debug_paths(self) -> None:
+        project = (
+            PROJECT_ROOT
+            / "game_plugins"
+            / "LC2CombatBridge"
+            / "LC2CombatBridge.csproj"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Condition=\"'$(Configuration)' == 'Release'\"", project)
+        self.assertIn("<DebugType>None</DebugType>", project)
+        self.assertIn("<DebugSymbols>false</DebugSymbols>", project)
+        self.assertIn("<Deterministic>true</Deterministic>", project)
+
     def test_non_battle_damage_remains_observable_but_is_not_aggregated(self) -> None:
         source = (
             PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"

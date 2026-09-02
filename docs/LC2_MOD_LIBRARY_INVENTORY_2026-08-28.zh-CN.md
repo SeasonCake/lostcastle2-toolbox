@@ -35,7 +35,7 @@
 | `evilstone-power-duration` | 终始武器魂石之力延长 1.5.0 | 大萝卜鸡（QQ 上传者） | BepInEx IL2CPP 单 DLL | 源包 25,521 bytes / `34912DE6…CE39`；选择 DLL 27,648 bytes / `334A4C3B…A099`，排除 1.4.0 变体 | 1.5.11 候选随包；默认 999 秒，切换武器时结束，可由配置调整 |
 | `ice-pillar-enhancement` | 纵冰之杖加强 1.16.0 | 大萝卜鸡（QQ 上传者） | BepInEx IL2CPP 单 DLL | 源包 20,355 bytes / `9E3BF2D0…D79C`；`IcePillarCrash.dll` 47,104 bytes / `F4C53E57…D6253D`；DLL 未见独立作者署名 | 下一包候选；安装后重启自动生效，将冰锥 6→12、冷却 3→1 秒，无独立设置面板；游戏内功能尚未实测 |
 | `not-drug-god` | 我不是药神（测试版）1.0.0 | 木亦（QQ 上传者） | BepInEx IL2CPP 单 DLL | 源包 37,793 bytes / `CDDEE321…07993`；`LC2NotDrugGod.dll` 84,480 bytes / `B4D6DF01…AC8B37`；DLL 未见独立作者署名 | 下一包候选；F1 面板配置宝箱额外药水概率、原生/DIY 药水池；与三个既有 F1 MOD 冲突，建议不要同时启用；真实游戏功能尚未实测 |
-| `hex-augment` | 海克斯强化药水 2.7.6 | 时间喝奶 | BepInEx IL2CPP 单 DLL | 新收到的裸 DLL 与既有受管载荷均为 40,960 bytes / `50CEB677…E04ECC`，确认同一文件，不重复收录 | 提升到实战前段；F1 与一键丢钱、区域类型重铸、我不是药神测试版冲突，建议不要同时启用；真实联机逻辑未实测 |
+| `hex-augment` | 海克斯强化药水 2.7.6 | 時間與你 | BepInEx IL2CPP 单 DLL | 新收到的裸 DLL 与既有受管载荷均为 40,960 bytes / `50CEB677…E04ECC`，确认同一文件，不重复收录 | 提升到实战前段；F1 与一键丢钱、区域类型重铸、我不是药神测试版冲突，建议不要同时启用；真实联机逻辑未实测 |
 | `purple-critical-damage` | 暴击字体改紫色 1.0.0 | 兔子王お（QQ 上传者） | BepInEx IL2CPP 单 DLL | `LC2PurpleDamage暴击字体红色改紫色.dll` 13,824 bytes / `5863D6A9…35EECB`；仅静态读取，DLL 未见独立作者署名 | 下一包候选；默认只将本地玩家及本地召唤物物理暴击改为原生紫色飘字，无快捷键，可由配置调整；纯视觉，真实游戏显示未实测 |
 | `max-players-16` | 多人房间扩容（默认 7 人）1.3.0 | 梦羽 | BepInEx IL2CPP 单 DLL | 原整包 40,237,762 bytes / `F2DFFD09…1BDB2`；只选 `LostCastle2MaxPlayers16.dll` 15,872 bytes / `1247F19F…30F25` | v1.6.2 候选；偏房主建房，配置建议 1–16，加入别人房间前需卸载；无快捷键，真实 7–16 人联机未实测 |
 | `damage-meter` | 游戏内伤害统计 1.6.4 | 水生凛凛 | BepInEx IL2CPP 单 DLL | DLL 59,392 bytes / `91576442…A11`；插件版本 1.6.4，界面内嵌作者署名，QQ 上传者听 | 替换 1.5.1；支持联机玩家分列与逐房官方校准，排在目录后段；真实联机准确性仍待实测 |

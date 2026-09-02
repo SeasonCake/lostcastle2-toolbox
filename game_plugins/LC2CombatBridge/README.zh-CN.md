@@ -35,7 +35,7 @@
 - 0.4.25在真实运行前被阶段复审撤回：去重发生在完整重读取之后，普通样本cap会同时吞掉force边界，checker还提前假定dict必须等于cache-list及`active+dict`必须转场守恒。installed已回滚0.4.24。0.4.26把200ms单调时钟限频放在任何PlayerList/dict/network/cache读取之前，首个攻击与所有force边界旁路；普通额度不再影响边界，并记录suppressed/throttled计数。dict/cache与rollover只做关系分类，真实样本冻结前不因差异判FAIL；unmatched/collision使用每进程加盐HMAC opaque token辅助本地复核，不输出raw key、身份或pointer。
 - r19 四真人短局得到479个完整样本：`mCacheRoundDataDict`始终0 records；Statistics active在同房恒定，cache-list进房归零并按玩家实时单调增长。队友-only房本机slot3始终0，本机攻击房分别增加1,139/2,199；最后`active+cache=[45,888,35,652,41,555,3,338]`，精确等于OWNER远端123,095加本机3,338。Boss全0、NPC未覆盖；严格checker因此只签普通伤害raw realtime，rollover因旧版本没有真正room_exit force样本保持NOT_RUN。
 - 同局先离队再退出时，官方卡仍为本机3,338，但HUD跳45,888。冻结事件证明45,888精确来自旧P1，不是三队友求和：同session内LocalPlayer native token和Index从P4变P1，Bridge先按旧slot0取live，再创建`player-5`并覆盖身份，导致collision。0.4.27采用`active + cache-list`发布过程值；同session按平台HMAC或仍有效的旧token复用`player_id`，live按历史身份取值而可见`player_slot`采用当前Index，所以期望离队事件为`player-4/slot0/live=3338`。身份缺失/碰撞整组拒绝；现有OnChangeRoomEnd target同时增加Prefix房末强制样本，不新增Hook。
-- 1.7正式版沿用已经过真实多人局核对的Statistics过程值和SyncEnd官方final逻辑。`ReleaseDiagnosticsEnabled=false`，不会安装额外settlement network验收probe，也不会写高频逐事件、cache或终局采样Info日志；保留插件版本、启动/连接、transport reset、queue overflow与session/schema failure等低频支持信号。诊断开关不改变pipe数值路径，也不修改游戏对象。
+- Bridge 1.7.0 沿用已经过真实多人局核对的Statistics过程值和SyncEnd官方final逻辑；工具箱 1.7.1 只做 Release 构建隐私重编译，禁用会嵌入本机 PDB 绝对路径的调试目录，插件版本、公开 API、资源和 IL 方法体不变。`ReleaseDiagnosticsEnabled=false`，不会安装额外settlement network验收probe，也不会写高频逐事件、cache或终局采样Info日志；保留插件版本、启动/连接、transport reset、queue overflow与session/schema failure等低频支持信号。诊断开关不改变pipe数值路径，也不修改游戏对象。
 - 多人只向桌面发送会话内匿名`player-N`、槽位、本机标记和通过完整门的官方数值，不发送昵称、Steam ID、平台账号或原始身份。本机严格比较`LocalPlayer`对象，不假设1P/房主或slot0。真实0.4.17变身fallback与最终SyncEnd仍未运行。
 
 构建需要 .NET 6 SDK、BepInEx 6 和当前游戏生成的 interop 程序集：
@@ -43,5 +43,7 @@
 ```powershell
 dotnet build .\LC2CombatBridge.csproj -c Release -p:GameDir="<游戏目录>"
 ```
+
+Release 配置固定 `DebugType=None`、`DebugSymbols=false` 与确定性构建，正式 DLL 不携带 PDB/CodeView 本机路径；如需源码级调试，请使用非 Release 配置并只保留在本地。
 
 本地测试前，将生成的 `LC2CombatBridge.dll` 放入 `<游戏目录>\BepInEx\plugins\LC2CombatBridge\`。部署、游戏实测和发布是独立阶段；仅构建源码不会修改游戏目录。

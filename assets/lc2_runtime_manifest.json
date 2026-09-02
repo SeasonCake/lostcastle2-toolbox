@@ -1563,7 +1563,7 @@
     "filename": "LC2CombatBridge.dll",
     "target": "BepInEx/plugins/LC2CombatBridge/LC2CombatBridge.dll",
     "size_bytes": 98304,
-    "sha256": "3A346E29F8A7737F3C32716990ABBCB0248A0656C2FB8E28FAF888996A4A1C75"
+    "sha256": "7581AF04D698949439A02C190BD81E0E107F8CEF388262A8DD88B4C67CE90981"
   },
   "excluded_source_prefixes": [
     "BepInEx/plugins/",

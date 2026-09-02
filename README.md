@@ -26,8 +26,8 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 | Damage and HP semantics | Runtime-validated on the recorded game build |
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
-| Main toolbox and external combat HUD | Bridge 1.7 labels the compact HUD **realtime** while the detailed page explains **realtime estimate / settlement may correct**. Complete SyncEnd values are the **official settlement** and may correct upward or downward |
-| MOD management | v1.7 manages two existing tools plus 56 curated community MODs. All plugins share one pinned BepInEx runtime and ship only 57 minimal functional payload files |
+| Main toolbox and external combat HUD | Bridge 1.7.0 labels the compact HUD **realtime** while the detailed page explains **realtime estimate / settlement may correct**. Complete SyncEnd values are the **official settlement** and may correct upward or downward |
+| MOD management | v1.7.1 manages two existing tools plus 59 curated community MODs. All plugins share one pinned BepInEx runtime and ship only 60 minimal functional payload files |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
@@ -73,7 +73,7 @@ The pinned 7-Zip runtime and its license are included so source-mode archive ins
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The v1.7 MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 56 curated community MOD entries. The latest local intake adds Monster Treasure 11, Nightfall Bow Boost 1.1.0, and Reinforcement Transmitter: Lost Swordsman Shadow 1.0.0, while updating Reaper Summon from the Summon Master 2.1 source package. The other five entries moved to that source package are byte-identical to their existing payloads. Max Players 1.3.0 still ships only its 15,872-byte plugin instead of the source package's duplicated BepInEx stack; it is intended primarily for hosts and must be removed before joining another host's room. All entries share the pinned runtime and total 57 hash-bound functional files (3,522,509 bytes); generated config, cache, interop, Doorstop, and duplicate core files are excluded. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The v1.7.1 MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 59 curated community MOD entries. This intake upgrades Monster Treasure to 11.6 and Reaper Summon to the Summon Master 2.5 payload, adds Bobo Staff 1.9.2, Coil Summon Bobo 1.0.0, and Thunder Hammer: Angry Thunder Spirit 1.5.0, and moves five byte-identical summon payloads to the newer 2.5 source. The older Reinforcement Transmitter: Lost Swordsman Shadow remains because it has a distinct plugin GUID. The standalone `LostCastle2.MonsterPlusMod.dll` and Summon Master 2.4 are superseded inputs, not duplicate catalog entries. Max Players 1.3.0 still ships only its 15,872-byte plugin instead of the source package's duplicated BepInEx stack. All entries share the pinned runtime and total 60 hash-bound functional files (3,619,277 bytes); generated config, cache, interop, Doorstop, and duplicate core files are excluded. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 The bottom-left footer links to GitHub and the maintainer's [Bilibili space](https://space.bilibili.com/88048665?), followed by a `投喂` entry that shows the WeChat code by default and opens the local WeChat, Alipay, and explanation folder for friends who enjoy *Lost Castle 2* and want to support the maintainer or nudge an update.
 

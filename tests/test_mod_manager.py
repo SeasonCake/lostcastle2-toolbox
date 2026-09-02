@@ -344,10 +344,10 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 56)
+        self.assertEqual(len(catalog.entries), 59)
         self.assertEqual(
             sum(len(descriptor.operation.files) for descriptor in catalog.entries),
-            57,
+            60,
         )
         self.assertEqual(
             sum(
@@ -355,10 +355,17 @@ class ModManagerTests(unittest.TestCase):
                 for descriptor in catalog.entries
                 for spec in descriptor.operation.files
             ),
-            3_522_509,
+            3_619_277,
+        )
+        self.assertTrue(
+            all(
+                descriptor.integrity_policy.redistribution_status
+                == "maintainer_authorized_public_bundle_2026-09-02"
+                for descriptor in catalog.entries
+            )
         )
         self.assertIn(
-            "Count -ne 57",
+            "Count -ne 60",
             (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8"),
         )
         self.require_local_community_payloads()
@@ -394,6 +401,9 @@ class ModManagerTests(unittest.TestCase):
             "monster-treasure",
             "nightfall-bow-boost",
             "reinforce-hideyoshi",
+            "coil-summon-bobo",
+            "thunder-hammer-summon",
+            "bobo-staff",
         ):
             with self.subTest(mod_id=mod_id), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
@@ -518,6 +528,7 @@ class ModManagerTests(unittest.TestCase):
 
         hex_augment = catalog.get("hex-augment")
         self.assertEqual(hex_augment.display.version, "2.7.6")
+        self.assertEqual(hex_augment.display.author, "時間與你")
         self.assertEqual(hex_augment.operation.expected_filename, "LC2HexAugment.dll")
         self.assertEqual(hex_augment.operation.hotkeys, ("F1",))
         self.assertEqual(hex_augment.operation.panel_hotkey, "F1")
@@ -561,19 +572,20 @@ class ModManagerTests(unittest.TestCase):
 
         monster = catalog.get("monster-treasure")
         self.assertEqual(monster.display.name, "怪物宝藏")
-        self.assertEqual(monster.display.version, "11")
+        self.assertEqual(monster.display.version, "11.6")
         self.assertEqual(monster.display.author, "懒虫桑")
-        self.assertEqual(monster.operation.expected_filename, "怪物宝藏v11.dll")
+        self.assertEqual(monster.operation.expected_filename, "怪物宝藏v11.6.dll")
         self.assertEqual(monster.operation.hotkeys, ("Alt+F",))
         self.assertEqual(monster.operation.panel_hotkey, "ALT+F")
         self.assertIn("尚未实战验证", monster.display.usage_hint)
         self.assertEqual(
             monster.integrity_policy.sha256,
-            "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+            "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
         )
-        self.assertEqual(monster.integrity_policy.size_bytes, 86_016)
+        self.assertEqual(monster.integrity_policy.size_bytes, 107_008)
         self.assertTrue(
             {
+                "怪物宝藏v11.6.dll",
                 "怪物宝藏v11.dll",
                 "怪物宝藏v10.7.dll",
                 "怪物宝藏v10.5.dll",
@@ -614,13 +626,40 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(reinforce.integrity_policy.size_bytes, 23_552)
 
         reaper = catalog.get("reaper-summon")
-        self.assertEqual(reaper.display.version, "2.1")
-        self.assertIn("区域切换", reaper.display.summary)
+        self.assertEqual(reaper.display.version, "2.5")
+        self.assertIn("蓄力攻击红圈", reaper.display.summary)
         self.assertEqual(
             reaper.integrity_policy.sha256,
-            "DE603EC332109648B8F6B2F5C4E49F5219B6458D4053EC6679DEAFE0588EB07C",
+            "E750A179AFFB0E111BD3B3C7EF691D9EC33BC2E06C6F515BAF0DF8DF09566A1C",
         )
-        self.assertEqual(reaper.integrity_policy.size_bytes, 25_600)
+        self.assertEqual(reaper.integrity_policy.size_bytes, 29_184)
+
+        coil = catalog.get("coil-summon-bobo")
+        self.assertEqual(coil.display.version, "1.0.0")
+        self.assertEqual(coil.display.author, "兔子王お")
+        self.assertEqual(
+            coil.integrity_policy.sha256,
+            "E39B6ADA289999DE721B6AAE84BF4EF8BFC123758A959848810FAE2F89C70AC2",
+        )
+        self.assertEqual(coil.integrity_policy.size_bytes, 12_800)
+
+        thunder = catalog.get("thunder-hammer-summon")
+        self.assertEqual(thunder.display.version, "1.5.0")
+        self.assertEqual(thunder.display.author, "兔子王お")
+        self.assertEqual(
+            thunder.integrity_policy.sha256,
+            "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
+        )
+        self.assertEqual(thunder.integrity_policy.size_bytes, 31_744)
+
+        bobo_staff = catalog.get("bobo-staff")
+        self.assertEqual(bobo_staff.display.version, "1.9.2")
+        self.assertEqual(bobo_staff.display.author, "啊 这")
+        self.assertEqual(
+            bobo_staff.integrity_policy.sha256,
+            "D916BA3AC999B1BEE4249184159729B7D860413B031CFBEF49D6A1085E7036C7",
+        )
+        self.assertEqual(bobo_staff.integrity_policy.size_bytes, 27_648)
 
         unchanged_summon_payloads = {
             "evil-fire-crusher-summon": (
@@ -657,7 +696,7 @@ class ModManagerTests(unittest.TestCase):
                 self.assertEqual(descriptor.integrity_policy.sha256, sha256)
                 self.assertEqual(
                     source_entries[mod_id]["source"],
-                    "召唤大师珀亚2.1 非整合包.rar",
+                    "召唤大师珀亚V2.5 非整合包.rar",
                 )
 
     def test_community_catalog_prioritizes_practical_mods_over_cosmetics(self) -> None:

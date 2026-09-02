@@ -13,6 +13,12 @@
     <InteropDir>$(GameDir)\BepInEx\interop</InteropDir>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>None</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
   <ItemGroup>
     <Reference Include="BepInEx.Core">
       <HintPath>$(BepInExCoreDir)\BepInEx.Core.dll</HintPath>

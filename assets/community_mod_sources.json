@@ -31,23 +31,24 @@
     {
       "id": "monster-treasure",
       "sort_priority": 165,
-      "source": "怪物宝藏v11（修复了客机不生效bug，更多更新详情且看压缩包内txt文件bug找作者反馈）.rar",
-      "include": ["怪物宝藏v11.dll"],
-      "primary": "怪物宝藏v11.dll",
+      "source": "怪物宝藏v11.6（更新详情且看压缩包内txt文件，这波啊，是怪物大加强有bug找作者反馈）.rar",
+      "include": ["怪物宝藏v11.6.dll"],
+      "primary": "怪物宝藏v11.6.dll",
       "provides": [
+        "怪物宝藏v11.6.dll",
         "怪物宝藏v11.dll",
         "怪物宝藏v10.7.dll",
         "怪物宝藏v10.5.dll",
         "LostCastle2.MonsterPlusMod.dll"
       ],
       "name": "怪物宝藏",
-      "version": "11",
+      "version": "11.6",
       "author": "懒虫桑",
-      "summary": "按区域为敌对生物添加宝藏与冰属性附魔，并提供仅对 Boss 生效等设置",
-      "usage_hint": "安装后重启游戏，按 Alt+F 或在工具箱点击“打开 MOD 面板”；来源说明称已修复客机生效问题，但本工具箱尚未实战验证。与关卡动态血量、增强计划等同时启用时可能叠加改动，建议分开使用。",
+      "summary": "按区域为敌对生物添加宝藏、冰属性与光环效果，并提供 Boss 范围和保存设置",
+      "usage_hint": "安装后重启游戏，按 Alt+F 或在工具箱点击“打开 MOD 面板”；玩法逻辑仅由房主/单机启用，客机只查看面板。11.6 修复火环零血力竭、关闭残留和补发 Buff 等问题，但本工具箱尚未实战验证；与动态血量、增强计划等建议分开使用。",
       "hotkeys": ["Alt+F"],
       "panel_hotkey": "Alt+F",
-      "author_source": "DLL 内嵌“作者 懒虫桑”；用户提供的 QQ 上传截图显示上传者懒虫桑（2026-09-01）"
+      "author_source": "11.6 DLL 内嵌“作者 懒虫桑”；随包 9.2 更新说明与用户提供来源记录"
     },
     {
       "id": "armor-transmog",
@@ -120,7 +121,7 @@
       "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，首次启动会生成默认配置。",
       "hotkeys": ["INS"],
       "panel_hotkey": "INS",
-      "author_source": "DLL 内嵌作者团队署名；QQ 上传者时间喝奶"
+      "author_source": "DLL 内嵌作者团队署名；QQ 上传者時間與你"
     },
     {
       "id": "not-drug-god",
@@ -337,6 +338,20 @@
       "author_source": "BepInPlugin 版本 1.5.0；作者采用 QQ 上传者大萝卜鸡"
     },
     {
+      "id": "bobo-staff",
+      "sort_priority": 250,
+      "source": "新增武器法杖“啵啵法杖”.zip",
+      "include": ["ComboContract.dll"],
+      "primary": "ComboContract.dll",
+      "name": "啵啵法杖",
+      "version": "1.9.2",
+      "author": "啊 这",
+      "summary": "把终始之视改为可召唤啵啵的法杖，并提供冷却、耗蓝、上限与攻击加成配置",
+      "usage_hint": "安装后重启游戏自动生效；默认匹配终始之视（Staff_015），会替换技能和显示名。属于玩法修改，联机建议使用一致版本。",
+      "hotkeys": [],
+      "author_source": "BepInPlugin 1.9.2 元数据；用户确认作者 QQ 昵称为“啊 这”（2026-09-02）"
+    },
+    {
       "id": "summon-balance",
       "source": "召唤兽野猪 恶魔士兵平衡性加强.rar",
       "primary": "LC2.SummonRune野猪和恶魔士兵平衡性加强.dll",
@@ -350,7 +365,7 @@
     },
     {
       "id": "evil-fire-crusher-summon",
-      "source": "召唤大师珀亚2.1 非整合包.rar",
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
       "include": ["LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll"],
       "primary": "LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll",
       "name": "召唤邪火粉碎者",
@@ -364,7 +379,7 @@
     {
       "id": "nightmare-doll-skin",
       "sort_priority": 920,
-      "source": "召唤大师珀亚2.1 非整合包.rar",
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
       "include": ["LC2.NightmareDollNeedle噩梦娃娃皮肤.dll"],
       "primary": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
       "name": "噩梦娃娃皮肤",
@@ -377,7 +392,7 @@
     },
     {
       "id": "hideyoshi-summon",
-      "source": "召唤大师珀亚2.1 非整合包.rar",
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
       "include": ["LC2.HideyoshiSummon召唤狐狸剑姬.dll"],
       "primary": "LC2.HideyoshiSummon召唤狐狸剑姬.dll",
       "name": "召唤狐狸剑姬",
@@ -391,7 +406,7 @@
     {
       "id": "hand-color-white",
       "sort_priority": 930,
-      "source": "召唤大师珀亚2.1 非整合包.rar",
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
       "include": ["LC2.HandColorWhite手掌变白.dll"],
       "primary": "LC2.HandColorWhite手掌变白.dll",
       "name": "手掌变白",
@@ -404,16 +419,16 @@
     },
     {
       "id": "reaper-summon",
-      "source": "召唤大师珀亚2.1 非整合包.rar",
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
       "include": ["LC2.ReaperSummon召唤行刑者.dll"],
       "primary": "LC2.ReaperSummon召唤行刑者.dll",
       "name": "召唤行刑者",
-      "version": "2.1",
+      "version": "2.5",
       "author": "兔子王お",
-      "summary": "让游荡异灵契约连协召唤行刑者，并在区域切换后重置召唤状态",
-      "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效；区域切换后会延迟重置并重新召唤。",
+      "summary": "让游荡异灵契约连协召唤行刑者，过图后重召并可隐藏蓄力攻击红圈",
+      "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效；2.5 增加友方保护、随从拦截与蓄力红圈隐藏等配置。仅主机/单机执行召唤，联机建议使用一致版本。",
       "hotkeys": [],
-      "author_source": "作者提供的 QQ 上传列表截图；2.1 来源包（2026-09-01）"
+      "author_source": "作者提供的 QQ 上传列表截图；召唤大师珀亚 2.5 来源包与说明（2026-09-02）"
     },
     {
       "id": "reinforce-hideyoshi",
@@ -429,9 +444,41 @@
       "author_source": "DLL 未见独立作者署名；2.1 同包及既有 QQ 上传证据显示上传者兔子王お（2026-09-01）"
     },
     {
+      "id": "coil-summon-bobo",
+      "sort_priority": 245,
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
+      "include": ["LC2.CoilSummonBoBo磁暴线圈召唤啵啵.dll"],
+      "primary": "LC2.CoilSummonBoBo磁暴线圈召唤啵啵.dll",
+      "name": "磁暴线圈召唤啵啵",
+      "version": "1.0.0",
+      "author": "兔子王お",
+      "summary": "把磁暴线圈技能重定向为召唤啵啵，并让召唤物属性跟随玩家",
+      "usage_hint": "安装后重启游戏自动生效；仅主机/单机执行召唤，联机建议使用一致版本。",
+      "hotkeys": [],
+      "author_source": "BepInPlugin 元数据；召唤大师珀亚 2.5 来源包与既有上传来源"
+    },
+    {
+      "id": "thunder-hammer-summon",
+      "sort_priority": 240,
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
+      "include": ["LC2.ThunderHammer真雷神之锤.dll"],
+      "primary": "LC2.ThunderHammer真雷神之锤.dll",
+      "provides": [
+        "LC2.ThunderHammer真雷神之锤.dll",
+        "LC2.ThunderHammer真·雷神之锤.dll"
+      ],
+      "name": "雷神之锤召唤愤怒雷精灵",
+      "version": "1.5.0",
+      "author": "兔子王お",
+      "summary": "雷神之锤技能召唤愤怒雷精灵，并提供伤害、行动与水晶清理设置",
+      "usage_hint": "安装后重启游戏自动生效；2.5 修复雷精灵入场阶段行动。仅主机/单机执行召唤，联机建议使用一致版本。",
+      "hotkeys": [],
+      "author_source": "BepInPlugin 1.5.0 元数据；召唤大师珀亚 2.5 来源包与说明"
+    },
+    {
       "id": "summon-model-swap",
       "sort_priority": 940,
-      "source": "召唤大师珀亚2.1 非整合包.rar",
+      "source": "召唤大师珀亚V2.5 非整合包.rar",
       "include": ["LC2.SummonModelSwap召唤物模型替换.dll"],
       "primary": "LC2.SummonModelSwap召唤物模型替换.dll",
       "name": "召唤物模型替换",
@@ -579,7 +626,7 @@
       "primary": "LC2HexAugment.dll",
       "name": "海克斯强化药水",
       "version": "2.7.6",
-      "author": "时间喝奶",
+      "author": "時間與你",
       "summary": "在战斗房胜利后提供随机海克斯药水强化",
       "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。F1 与一键丢钱、区域类型重铸、我不是药神（测试版）冲突，建议不要同时启用。",
       "hotkeys": ["F1"],
