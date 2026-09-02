@@ -177,16 +177,19 @@ class CombatEventPump:
         inbox: CombatInbox,
         validator: CombatEventValidator,
         aggregator: CombatAggregator,
+        event_batch_sink: Callable[[tuple[Mapping[str, Any], ...]], None] | None = None,
     ) -> None:
         self.inbox = inbox
         self.validator = validator
         self.aggregator = aggregator
+        self.event_batch_sink = event_batch_sink
         self.fault_code: str | None = None
 
     def drain(self, *, limit: int = MAX_QUEUE_ITEMS) -> CombatDrainReport:
         processed = 0
         duplicates = 0
         notices = 0
+        accepted_events: list[Mapping[str, Any]] = []
         for item in self.inbox.drain(limit=limit):
             if self.fault_code is not None:
                 continue
@@ -207,9 +210,30 @@ class CombatEventPump:
                 continue
             if accepted:
                 processed += 1
+                accepted_events.append(dict(item))
+                if (
+                    item.get("event_type") == "status"
+                    and item.get("status") == "session_ended"
+                ):
+                    self._publish_accepted_events(accepted_events)
+                    accepted_events.clear()
             else:
                 duplicates += 1
+        self._publish_accepted_events(accepted_events)
         return CombatDrainReport(processed, duplicates, notices, self.fault_code)
+
+    def _publish_accepted_events(
+        self,
+        events: list[Mapping[str, Any]],
+    ) -> None:
+        if not events or self.event_batch_sink is None:
+            return
+        try:
+            self.event_batch_sink(tuple(events))
+        except Exception:
+            # Archival is an independent local side effect. A disk/export
+            # failure must not corrupt the live combat aggregation session.
+            pass
 
     def _fault(self, code: str) -> None:
         self.fault_code = code

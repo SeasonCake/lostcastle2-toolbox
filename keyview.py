@@ -46,7 +46,7 @@ from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, se
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.6.2"
+APP_VERSION = "1.7"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -2883,12 +2883,26 @@ def self_test() -> int:
             assert x + width <= WINDOW_WIDTH
             assert y + key_height <= pad_height
     game_exe = resolve_game_exe(DEFAULT_GAME_EXE)
-    runtime_setup = RuntimeSetupManager(
-        RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json",
-        RESOURCE_DIR / "third_party" / "lc2_runtime",
-        game_exe_provider=lambda: None,
-    )
-    runtime_setup.verify_bundle()
+    runtime_manifest = RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json"
+    runtime_bundle = RESOURCE_DIR / "third_party" / "lc2_runtime"
+    if runtime_bundle.is_dir():
+        RuntimeSetupManager(
+            runtime_manifest,
+            runtime_bundle,
+            game_exe_provider=lambda: None,
+        ).verify_bundle()
+        runtime_bundle_status = "verified"
+    else:
+        # Third-party binaries are deliberately absent from a clean source
+        # checkout. Keep CI useful without weakening packaged/local builds:
+        # a partially present bundle still takes the strict branch above.
+        manifest = json.loads(runtime_manifest.read_text(encoding="utf-8"))
+        assert manifest.get("schema_version") == 1
+        assert manifest.get("runtime_file_count") == len(
+            manifest.get("runtime_files") or []
+        )
+        assert (manifest.get("bridge") or {}).get("filename") == "LC2CombatBridge.dll"
+        runtime_bundle_status = "not_present_source_checkout"
     print(
         json.dumps(
             {
@@ -2897,6 +2911,7 @@ def self_test() -> int:
                 "available_key_count": len(KEY_DEFINITIONS),
                 "default_key_count": len(LOST_CASTLE_KEYS),
                 "game_exe_found": game_exe is not None,
+                "runtime_bundle": runtime_bundle_status,
             },
             ensure_ascii=False,
         )
@@ -3063,6 +3078,8 @@ def main(argv: list[str] | None = None) -> int:
         closing = True
         if combat_client is not None:
             combat_client.stop()
+        if combat_pump is not None:
+            combat_pump.drain()
         if shell is not None:
             shell.close()
         keyboard_app.shutdown()

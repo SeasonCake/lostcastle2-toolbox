@@ -11,8 +11,8 @@
 
 | 臂 | 身份 | 画面判定 |
 | --- | --- | --- |
-| `CLIENT-SLOT2-A150-main` | PID 34632 / HWND 331546 / 1022×816；receipt `4C75A543…E6EFB`；PNG `B4726D12…6B41C` | 四人、远端槽位0、本机槽位2；本机仍排第一并标“自己”。主卡个人 `480/Boss 0`；队伍单列合计 `34,328`；标题为“个人来源明细” |
-| `CLIENT-SLOT2-A200-hud` | PID 27916 / HWND 788106 / 610×554；receipt `075A9DE5…897DF`；PNG `DFAA83D9…81C07` | HUD 明确“个人伤害 480/Boss 0/DPS 48”，三名远端卡完整，未出现编号跳跃或裁切 |
+| `CLIENT-SLOT2-A150-main` | receipt-bound / 1022×816；receipt `4C75A543…E6EFB`；PNG `B4726D12…6B41C` | 四人、远端槽位0、本机槽位2；本机仍排第一并标“自己”。主卡个人 `480/Boss 0`；队伍单列合计 `34,328`；标题为“个人来源明细” |
+| `CLIENT-SLOT2-A200-hud` | receipt-bound / 610×554；receipt `075A9DE5…897DF`；PNG `DFAA83D9…81C07` | HUD 明确“个人伤害 480/Boss 0/DPS 48”，三名远端卡完整，未出现编号跳跃或裁切 |
 
 两臂回执绑定的 EXE、catalog、runtime manifest 与上方冻结身份一致；回执图当前哈希也与 `screenshot.sha256` 一致。QA 配置通过 `KEYVIEW_CONFIG_DIR` 写入各臂隔离目录，精确包保持 config0。
 

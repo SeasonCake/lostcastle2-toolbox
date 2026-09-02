@@ -11,10 +11,10 @@
 
 | 臂 | 进程绑定 | 窗口 | 回执 SHA-256 | 回执绑定图 SHA-256 | 判定 |
 | --- | --- | --- | --- | --- | --- |
-| `MOD-MIN100-hex-r11` | PID 31248 / HWND 1443514 | 802×776 | `2CFF7391…D9295` | `6D4DC308…DBF0E` | 100% 最小窗可见；F1 面板与三项冲突说明完整换行；按钮无裁切 |
-| `MOD-A200-purple-r11` | PID 29836 / HWND 3475016 | 1223×896 | `BB351503…5DBBC` | `24DC9E66…95354` | 200% 下纯视觉条目、居中作者、无快捷键与配置说明完整；按钮无裁切 |
-| `COMBAT-A150-party4-r11` | PID 7180 / HWND 2164364 | 1022×816 | `65DF396A…6348` | `3A238BA7…C4012` | 150% 主面板识别自己/队友1–3，队伍总伤害/占比/Boss/底部口径无裁切 |
-| `HUD-A200-party4-r11` | PID 8188 / HWND 2165720 | 610×554 | `E2B20A73…FEBFD` | `05C3F415…E55D1` | 200% 透明 HUD 的三张队友卡、占比条与 Boss 行全部可见 |
+| `MOD-MIN100-hex-r11` | receipt-bound | 802×776 | `2CFF7391…D9295` | `6D4DC308…DBF0E` | 100% 最小窗可见；F1 面板与三项冲突说明完整换行；按钮无裁切 |
+| `MOD-A200-purple-r11` | receipt-bound | 1223×896 | `BB351503…5DBBC` | `24DC9E66…95354` | 200% 下纯视觉条目、居中作者、无快捷键与配置说明完整；按钮无裁切 |
+| `COMBAT-A150-party4-r11` | receipt-bound | 1022×816 | `65DF396A…6348` | `3A238BA7…C4012` | 150% 主面板识别自己/队友1–3，队伍总伤害/占比/Boss/底部口径无裁切 |
+| `HUD-A200-party4-r11` | receipt-bound | 610×554 | `E2B20A73…FEBFD` | `05C3F415…E55D1` | 200% 透明 HUD 的三张队友卡、占比条与 Boss 行全部可见 |
 
 四臂 `receipt.json` 内记录的 EXE、社区目录和运行时清单哈希均与上方冻结身份一致；`window-internal.png` 当前哈希均与各自回执 `screenshot.sha256` 一致。四个精确候选进程均在 `--exit-after 10` 后自行退出，无残留。
 
@@ -30,7 +30,7 @@
 | 编号 | 状态 | 结论 |
 | --- | --- | --- |
 | `QA-CAPTURE-01` | CLOSED | 旧 r9 的外部截图覆盖回执同名文件，造成回执哈希与当前文件不一致；r11 分离回执绑定图与环境实屏，哈希链已闭合。 |
-| `QA-SCREEN-OCCLUSION-01` | EXCLUDED | r11 的三张非 HUD `screen.png` 被其他前景程序遮挡，只能证明屏幕像素被遮挡，不能代表候选；正式验收只使用 PID/HWND 回执绑定的 `window-internal.png`。 |
+| `QA-SCREEN-OCCLUSION-01` | EXCLUDED | r11 的三张非 HUD `screen.png` 被其他前景程序遮挡，只能证明屏幕像素被遮挡，不能代表候选；正式验收只使用进程/窗口回执绑定的 `window-internal.png`。 |
 | `QA-HUD-HANG-01` | CLOSED | Windows 图标消息改为 250 ms 有界 `SendMessageTimeoutW`；四臂均按时写回执并自行退出。 |
 | `MOD-ORDER-01` | CLOSED | 海克斯位于高实战价值区且明确 F1 冲突；紫色暴击位于功能类条目之后的视觉区。 |
 | `MOD-AUTHOR-CENTER-01` | CLOSED | 200% 紫色条目列表与详情均未出现作者字段挤压或裁切。 |

@@ -1,31 +1,33 @@
 # LC2 当前检查点（2026-08-31，Asia/Shanghai）
 
+> 历史快照：文件名与正文中的“当前”均指 2026-08-31 记录时点；正式 v1.7 的当前真相以源码、架构和发布说明为准。
+
 ## 角色、目标与阶段
 
-- 当前角色：LC2 工具箱 v1.6.2 / Bridge 0.4.12 收口、审计与发布负责人。
-- 当前目标：闭合多人快照溢出、owner 误归属、非 1P 本机绑定、离队保留、16 人协议/UI 与主界面滚动；统一社区 MOD 单一 BepInEx/最小载荷；冻结可分享包。
-- 当前阶段：`IMPLEMENTATION + PACKAGE + UI + ONE DIFFERENT-OWNER AUDIT VERIFIED / ZIP, COMMIT, PUSH, RELEASE NEXT`。
-- 当前授权边界：用户已要求全部完成后显式提交、push 与 Release；执行顺序固定为先完成一个 different-owner 综合只读审计，若有问题由当前实现 owner 修复并交同一审计 owner 复核，PASS 后再打 ZIP/提交/push/Release。游戏或工具箱运行时不得部署。
+- 当前角色：v1.6.3官方同步slot塌缩诊断与Bridge0.4.14 r3测试候选负责人。
+- 当前目标：按官方`mIndex`准确映射P1–P16，修复部分官方覆盖的团队分母，并以P标签对应结算卡。
+- 当前阶段：`0.4.13 R2 REAL MULTIPLAYER SLOT-COLLAPSE R-FAIL / 1.6.3 + BRIDGE 0.4.14 R3 DEPLOYED / REAL RETEST NEXT`。
+- 当前授权边界：当前只执行诊断、源码/测试/构建、双零部署和本地测试候选；真实0.4.14闭合与审计前不提交、不push、不新建Release。游戏或工具箱运行时不得再次部署。
 
 ## 仓库与运行身份
 
 | 项目 | 当前值 |
 | --- | --- |
-| 仓库 | `C:\xiangmuyunxing\biancheng\2026\lostcastle2-keyview` |
-| 产品 source / remote | `ed7da670d207be3b0cae605d0264b5b7edbe330f` 与 `origin/main` 对齐并标记 `v1.6.1`；正式 Release 为 `https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.6.1` |
-| 工作树 | v1.6.1 后的 1.6.2/0.4.12 多人、16 人 UI、MOD 与文档修改；第三方二进制、日志、截图、package 仍按 ignore 合同留在本机，未 stage/commit/push |
-| 游戏/盒子进程 | 2026-08-31 精确包/桌面 self-test 与 UI 截图后复核：exact `LostCastle2.exe` 与 `失落城堡2工具箱.exe` 均为 0 |
-| 精确工具箱候选 | `package/失落城堡2工具箱1.6.2-实时数值监测+一键MOD安装`；1,761 文件、166 目录、`166,635,553` B、0 配置文件；EXE `6,470,904` B / `EBFF9584…3F0025` / 版本 1.6.2 |
-| 桌面候选 | `C:\Users\shenc\Desktop\失落城堡2工具箱1.6.2-预备正式版`；与项目包 1,761 文件逐项零差异、self-test exit 0 |
-| 分享 ZIP | `C:\Users\shenc\Desktop\失落城堡2工具箱1.6.2-实时数值监测+一键MOD安装.zip`；137,107,216 B / `B244610C…772431`；7-Zip与.NET UTF-8/文件数/config0回读PASS |
-| 游戏目录 Bridge | 已精确部署并回读 `0.4.12`；0.4.10 exact rollback 已冻结 |
-| 运行 DLL SHA-256 | `3229359A7D901CEBCD523109261A034704CA06B0E3EAD0829ADC5B19ED976D8D` |
-| `Plugin.cs` SHA-256 | `A0EB5E9A5520CC0624492C4E2BEA78154EE777C3607E3906AAF4E3856D44849D` |
-| Harmony Patch 数 | 0.4.8–0.4.12 均为 `15`；快照/owner/16 人修复未增加 Hook |
+| 仓库 | `<repo>` |
+| 产品 source / remote | `758db3ae731613e2c3e4fcbfb9d7fd0058286f66` 与`origin/main`/`v1.6.2`对齐；v1.6.2多人统计已被本轮实战判R-FAIL |
+| 工作树 | v1.6.2后1.6.3/0.4.14官方P位、协议/聚合、测试与文档修改；二进制/日志/截图/package仍ignored，未stage/commit/push |
+| 游戏/盒子进程 | 0.4.14双零部署、桌面self-test与UI截图后均为0 |
+| 精确工具箱候选 | `package/失落城堡2工具箱1.6.3-实时数值监测+一键MOD安装`；1,761文件、166目录、`166,644,611` B、config0；EXE6,472,447 B / `18917B4C…3044A1` / 1.6.3 |
+| 桌面候选 | `<desktop>/失落城堡2工具箱1.6.3-多人官方槽位测试版-r3`；与项目包逐文件零差异、self-test exit0；r2及更早目录作废 |
+| 分享 ZIP | v1.6.2 ZIP `B244610C…772431` 已确认多人少算，不作为本轮测试对象；1.6.3尚未打ZIP |
+| 游戏目录 Bridge | 已精确部署并回读0.4.14；0.4.13r2 exact rollback已冻结 |
+| 运行 DLL SHA-256 | `343B69EF9FBBB982BB323F8EE291DC37B9783109A775A71A102F46706A3C6E24` |
+| `Plugin.cs` SHA-256 | `D7D87FB251DB6D91EB98D9243B9ECAD797ECA3FCD0458794FCB72A1992AC7A4D` |
+| Harmony Patch 数 | 0.4.8–0.4.14均为15；0.4.14只改官方记录到匿名P位的映射和桌面分母/标签 |
 
 本文所有 `artifacts/runtime-deploy/...` 定位都指向本机被 `.gitignore` 排除的二进制/回滚证据，fresh clone 不包含，故只作本机恢复定位，不声称是仓库链接。
 
-0.4.12 候选、0.4.10 exact rollback 与部署回执位于本机 `artifacts/runtime-deploy/2026-08-30-bridge-0.4.12-snapshot-owner-16p/`；当前游戏目录 DLL 已回读为 52,736 B / `3229359A…76D8D`。
+0.4.14 r3候选与0.4.13r2 rollback位于`artifacts/runtime-deploy/2026-08-31-bridge-0.4.14-official-slot-map-r3/`；当前游戏目录DLL为59,392 B / `343B69EF…3C6E24`。
 
 0.3.6 候选、PDB、回滚和完整运行 receipt 位于本机 `artifacts/runtime-deploy/2026-08-28-bridge-0.3.6/`。
 
@@ -56,7 +58,7 @@
 - Tk scaling 1.5 / 2.0 实际 PrintWindow 截图通过；GitHub 按钮宽度大于文字宽度，无重叠或截断。
 - 版本已顺延为 `1.5.4`；原生构建内全量 `90 passed`，源码/源包/桌面包 self-test 均 PASS。
 - UI 几何和打包 EXE 的 100%/125%/150%/175%/200% 五档矩阵均通过，最终 verdict 为 `VERIFIED`。
-- 源包与桌面包 `1688` 文件逐文件哈希一致；桌面路径为 `C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.4`。
+- 源包与桌面包 `1688` 文件逐文件哈希一致；桌面路径为 `<desktop>/失落城堡2工具箱 1.5.4`。
 - EXE SHA-256：`A3FA9BAB74D0CE11D1A16FB63D2D335E597EF88A41A33EE82EAEF46763F44420`。
 
 ## 承伤 70 vs 35：已闭合
@@ -113,7 +115,7 @@
 ## 2026-08-28 最终桌面候选 1.5.5
 
 - 版本号、EXE 资源和使用说明统一为 `1.5.5`；构建内全量 `97 passed`，源码与桌面包 self-test 均 PASS。
-- 桌面目录：`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.5`；旧 `1.5.4` 未覆盖。
+- 桌面目录：`<desktop>/失落城堡2工具箱 1.5.5`；旧 `1.5.4` 未覆盖。
 - 桌面包 `1688` 文件、`118617744` 字节；EXE SHA-256：`0D99BACBB14BBC131DB7395CACDD2A4FCA251F28FFD3F33A2C0D633A82917F56`。
 - 金币编辑器二进制未随包分发；用户选择原始压缩包后才会执行本地精确校验和安装。
 - package receipt 覆盖 1.0/1.25/1.5/1.75 scaling、640×480 最小窗口、千倍大数、HUD、MOD 和设置页；源码几何 receipt 同步通过。最终 verdict：`VERIFIED`，详见 `artifacts/ui-acceptance/2026-08-28-toolbox-1.5.5-final/VERDICT.zh-CN.md`。
@@ -155,12 +157,12 @@
 - 已完整读取 `LC2 工作 4`，后续以当前源码、本文件和当前运行身份为权威，不再重复加载旧图片/整段历史。
 - 接管时分支/HEAD 仍为 `main` / `d6ce78e05a7d6bb5de33ccdeb11e831c0f6f8ab0`，共享脏树为 18 项 tracked 修改、6 个 untracked 路径；未暂存、未提交，也未把继承改动归到本轮。
 - 0.4.1 重新通过隔离 SDK Release 构建（0 warning / 0 error）、Python 全量 `104 passed`、工具箱 self-test 和 `git diff --check`；候选哈希未漂移。
-- 游戏退出后先冻结 installed 0.4.0 为 `artifacts/runtime-deploy/2026-08-28-bridge-0.4.1/LC2CombatBridge.0.4.0.rollback.dll`，再部署 exact 0.4.1。游戏目录回读为 `41,472` 字节、SHA-256 `D499BA6BA2B21851F7C325F37503CEE418A66E4AA91A8D2A7C200FCC076B3744`；部署后两次 `LostCastle2.exe + C:\xiangmuyunxing\steamapps\common\Lost Castle 2\LostCastle2.exe` exact 查询均为 0。
+- 游戏退出后先冻结 installed 0.4.0 为 `artifacts/runtime-deploy/2026-08-28-bridge-0.4.1/LC2CombatBridge.0.4.0.rollback.dll`，再部署 exact 0.4.1。游戏目录回读为 `41,472` 字节、SHA-256 `D499BA6BA2B21851F7C325F37503CEE418A66E4AA91A8D2A7C200FCC076B3744`；部署后两次 `LostCastle2.exe + <game>/LostCastle2.exe` exact 查询均为 0。
 - `UI-CLIP-01` 与 `HUD-DEFAULT-01` 的源码候选验收为 `VERIFIED`：H1-H8 覆盖空/正常/千倍值、最长地区、Tk 1.0-2.0 与 HUD 0.85/1.25；真实 D1/D2 证明默认显示 HUD、显式 opt-out 不显示；隐藏后可恢复。详情见 `artifacts/ui-acceptance/2026-08-28-hud-location-default-source/VERDICT.zh-CN.md`。
 - 非 DPI-aware 抓图曾产生一次假裁切，已按证据故障保留并排除；有效 D1/D2 使用 `PER_MONITOR_AWARE_V2`，未修改候选源码。
 - 下一桌面包仍未重打。当前终点是作者实机验证 0.4.1：自然启动/pipe、禁咒羊皮纸或房间系统回蓝进入底层兜底、正常官方回蓝不双计、游戏内地区文字完整。实机闭合后再统一顺延桌面版本并做 exact package 验收。
 - 自伤/伤势生命和逐道具 Hook 继续 deferred；本轮不夹带。
-- 16:17 已启动仓库源码候选供作者实测：`C:\Python313\python.exe keyview.py --show-page combat`，PID `9148`。16:17:39 回读主窗口 HWND `3410728` 与 HUD HWND `4720930` 均可见；游戏 exact 进程仍为 0，运行 DLL 仍为 0.4.1 哈希。此为源码候选，不是新的桌面包；实测期间不要再启动桌面 1.5.5 造成双客户端。
+- 已通过 `<python> keyview.py --show-page combat` 启动仓库源码候选供作者实测；主窗口与 HUD 均可见，游戏进程仍为 0，运行 DLL 身份仍为 0.4.1。此为源码候选，不是新的桌面包；实测期间不要再启动桌面 1.5.5 造成双客户端。
 
 ## 2026-08-28 16:43 0.4.1 实测与宽敞默认
 
@@ -169,19 +171,19 @@
 - 作者随后关闭游戏；游戏 exact 进程复核为 0，Bridge 仍是已部署 0.4.1，本轮未替换 DLL。
 - 作者选择工具箱默认使用“宽敞”，并要求宽敞预设更大。源码现为：紧凑 `840×650、90%`、标准 `1000×720、100%`、宽敞/默认 `1280×900、115%`。旧默认 `900×650、100%` 与旧宽敞 `1160×840、115%` 自动迁移；标准、紧凑和自定义尺寸保持。
 - 尺寸实现通过聚焦 `43 passed`、全量 `107 passed`、self-test 和差异格式检查。只读验收在关闭首轮主页摘要和第二轮 Treeview 大数裁切后，Iteration 3 对主页正常/千倍值、紧凑反例、战斗页 125%/175%、设置页 150%/200% 及三档操作全部 `VERIFIED`。
-- 真实迁移：旧本地 `1160×840、115%` 由 PID `8864` 加载为 `1280×900、115%`；主窗口 HWND `1967948` 与默认 HUD HWND `133006` 可见。全窗截图 `1302×956`，SHA-256 `8A833D233585F13E2A7D79986026DFA41106C222C3203D29B61DA6D7D5810B67`。验收见 `artifacts/ui-acceptance/2026-08-28-toolbox-spacious-default-source/VERDICT.zh-CN.md`。
+- 真实迁移：旧本地 `1160×840、115%` 加载为 `1280×900、115%`；主窗口与默认 HUD 均可见。全窗截图 `1302×956`，SHA-256 `8A833D233585F13E2A7D79986026DFA41106C222C3203D29B61DA6D7D5810B67`。验收见 `artifacts/ui-acceptance/2026-08-28-toolbox-spacious-default-source/VERDICT.zh-CN.md`。
 - 当时源码工具箱曾留在设置页供作者查看；随后已按下节完成 1.5.6 打包并关闭源码进程。提交、推送和公开发布仍未执行。
 
 ## 2026-08-28 17:02 最终桌面包 1.5.6
 
 - 作者授权进入打包阶段；版本、EXE 资源、包目录与使用说明统一为 `1.5.6`。旧桌面 `1.5.5` 保留，未覆盖。
-- 最终桌面目录：`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.6`；EXE FileVersion / ProductVersion 均为 `1.5.6`。
+- 最终桌面目录：`<desktop>/失落城堡2工具箱 1.5.6`；EXE FileVersion / ProductVersion 均为 `1.5.6`。
 - 最终 EXE SHA-256：`85F37430FB6863FB3076A05FDFE4F01B7730B7440BCE8006D29FA395C06CFD59`；包体 `1688` 文件、`118618824` 字节。源包与桌面副本对全部文件逐项核对相对路径、大小和 SHA-256，一致。
 - 聚焦测试 `17 passed + 26 passed`，全量 `107 passed`，构建内再次 `107 passed`；源码和桌面包 self-test、py_compile、diff check 均通过。
 - Iteration 1 在 Tk 1.25 最小窗口发现来源明细法力列越界，旧候选判红废弃；Iteration 2 只调整来源列请求宽度，最小窗口五列全显，175%/200% 千倍大数保持完整。
 - 最终 EXE 12-arm 矩阵覆盖 100%/125%/150%/175%/200%、无设置默认宽敞、HUD 默认开启、显式 opt-out、主页、战斗、MOD、设置和最小窗口；receipt checker 与像素审阅均为 `VERIFIED`。桌面副本另做 exact-path 默认启动 receipt，同样 `VERIFIED`。证据见 `artifacts/ui-acceptance/2026-08-28-toolbox-1.5.6-final/VERDICT.zh-CN.md`。
 - Bridge 与游戏目录本轮未改；仍为 0.4.1 exact runtime。官方回蓝 114/114 不双计已闭合；缺官方 callback 时的底层兜底保持 `NOT RUN`、以后自然观察。
-- 17:04 从桌面副本无 QA 参数自然启动，PID `5996`，ExecutablePath 精确为桌面 `1.5.6` EXE；主窗 HWND `7276446`、HUD HWND `2492226` 均可见，游戏 exact 进程数为 0。该进程留给作者实测；首次启动产生的本地 config 属于运行状态，不是候选二进制漂移。
+- 从桌面副本无 QA 参数自然启动，ExecutablePath 精确指向桌面 `1.5.6` EXE；主窗与 HUD 均可见，游戏进程数为 0。首次启动产生的本地 config 属于运行状态，不是候选二进制漂移。
 - 提交、推送和公开发布未执行；自伤/伤势生命与逐道具 Hook 继续 deferred。
 
 ## 2026-08-28 18:46 金币编辑器随包与桌面包 1.5.7
@@ -191,7 +193,7 @@
 - 卡片说明为：“安装后启动游戏，按 F5 打开窗口；输入数量并保存，返回主菜单再进入游戏生效。”。“启动游戏”复用工具箱已有的启动/聚焦 Lost Castle 2 路径；只有插件状态为精确已安装时才启用，未安装、完整性失败或操作进行中均禁用。
 - 版本、EXE 资源、包目录和使用说明统一为 `1.5.7`。聚焦测试 `13 passed + 18 passed + 26 passed`，源码全量 `110 passed`，原生构建内再次 `110 passed`；源码/包/桌面 self-test、py_compile 和 diff check 均通过。
 - 包形隔离测试使用临时假游戏目录完成随包来源解析、安装、精确状态识别、卸载和同级插件保留；真实游戏目录未写入。启动按钮回调正控调用一次、未安装反例不调用；真实游戏启动保持 `NOT RUN`。
-- 最终桌面目录：`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.7`；旧 1.5.6 未覆盖。EXE FileVersion / ProductVersion 均为 `1.5.7`，SHA-256 `4F2CD80C0EEDE3F8905CFFC157BCAAC7BD31EAD43BB73338AA7917666705FB91`。
+- 最终桌面目录：`<desktop>/失落城堡2工具箱 1.5.7`；旧 1.5.6 未覆盖。EXE FileVersion / ProductVersion 均为 `1.5.7`，SHA-256 `4F2CD80C0EEDE3F8905CFFC157BCAAC7BD31EAD43BB73338AA7917666705FB91`。
 - 源包与桌面副本均为 `1689` 文件、`107` 目录、`118628736` 字节；逐文件相对路径、大小和 SHA-256 清单零差异。桌面 exact-path self-test 退出码 `0`，截图后工具箱与游戏进程均为 `0`。
 - 冻结 EXE UI 矩阵覆盖 MOD 未安装/隔离夹具已安装、Tk 1.0/1.25/1.5/1.75、`640×480` 最小窗口，以及概览、战斗千倍值、设置和 HUD；结构 checker 及像素审阅全部 `VERIFIED`。桌面副本另做 exact-path MOD 页回执，同样 `VERIFIED`。证据见本机 `artifacts/ui-acceptance/2026-08-28-toolbox-1.5.7-gold-bundled/VERDICT.zh-CN.md`。
 - 1.5.7 新增差异尚未提交；HEAD 仍为 `359785b93ffdfe39b9a2a67abce5f05c4a41d540`。推送、公开发布、自伤/伤势生命与逐道具 Hook 均未执行。
@@ -205,7 +207,7 @@
 - 包内提供 `MOD自动添加说明.txt` 和 `用户MOD/请把MOD放到这里.txt`，包含 schema 1 的 `lc2-mod.json` 示例、字段规则和可直接交给 AI 的整理提示词。
 - 源码全量 `118 passed`；原生构建内再次 `118 passed`；冻结包 self-test 退出码 `0`。46 个默认条目在隔离假游戏目录逐项完成安装、精确状态识别和卸载，且保留无关同级插件；包内 7-Zip 完成 7Z 导入、登记和重载正控。
 - 冻结 EXE UI 验收覆盖 MOD 100%/125% 最小窗口/175%、社区条目已安装、150% 归档导入预览，以及概览、战斗千倍值、设置和 HUD；9 份回执路径与哈希唯一一致，最终 `VERIFIED`。证据见本机 `artifacts/ui-acceptance/2026-08-28-toolbox-community-mods/VERDICT.zh-CN.md`。
-- 最终桌面目录：`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.8`；旧 1.5.7 保留。EXE FileVersion / ProductVersion 均为 `1.5.8`，SHA-256 `43F855FD0BFC516AD99985CE01A9CD1822D7CF1DE0266619C2433D3F0C554E94`。
+- 最终桌面目录：`<desktop>/失落城堡2工具箱 1.5.8`；旧 1.5.7 保留。EXE FileVersion / ProductVersion 均为 `1.5.8`，SHA-256 `43F855FD0BFC516AD99985CE01A9CD1822D7CF1DE0266619C2433D3F0C554E94`。
 - 源包与桌面副本均为 `1,742` 文件、`156` 目录、`124,390,970` 字节；全部相对路径、大小和 SHA-256 零差异。桌面 exact-path self-test 退出码 `0`，随后工具箱与游戏进程均为 `0`。
 - 未向真实游戏安装/卸载新增社区 MOD，未启动真实游戏，也未执行任何第三方 MOD DLL/EXE。本节与 1.5.8 源码、目录、测试和说明作为一次收口提交；父提交为 `359785b93ffdfe39b9a2a67abce5f05c4a41d540`，提交后推送 `main` 并以远端回读为最终身份。
 
@@ -222,7 +224,7 @@
   这是明确的运行状态，不是 1.5.8 候选字节漂移。
 - 1.5.8 的 source/package/UI acceptance 可保留为 scoped PASS；真实社区 MOD 安装/启动、第三方
   DLL/EXE 执行与公共再分发仍为 `not-run / separate-stage`，不得由隔离假游戏目录测试外推。
-- LC2 工作1–4 已由作者归档；归档任务仍可按 task ID 读取，不影响本仓库、工作5记录或后续复盘。
+- LC2 工作1–4 已由作者归档；历史记录仍可按仓库内索引回读，不影响后续复盘。
   动态项目真相只取本 Git、当前检查点和真实产物，不要求取消归档或重放旧图片上下文。
 
 ## 2026-08-29 本地桌面包 1.5.9
@@ -233,7 +235,7 @@
 - 武器皮肤替换以同插件身份的 1.5 原位替换 1.2；载荷 `LC2.StaffSkinSwap.dll` 为 `20,992` 字节 / `5827C562C7E614B366EC7D2C4907AA72729D611CEFC5012598DBADC57FA614C0`。新增“隐藏震击环绕球”1.0，载荷 `11,776` 字节 / `7A0C082EFE54CFAF7977515A09668EFB01E3CE9C25E22845249FDF1C1291D3E5`。战利品 V2.4.0 因同身份、低于现有 2.5.3 且标注有 bug 未加入。
 - 页脚新增“投喂”按钮与 hover；默认展示微信二维码，点击打开随包 `赞助与投喂` 目录。文案只表达因热爱《失落城堡2》、愿意支持加菲或催更时投喂猫罐头；未沿用 BigKing 的原付费语境。目录包含微信 PNG/JPG、支付宝、两张猫图和说明，共 6 个哈希绑定文件。
 - 构建门新增原生命令退出码检查，图标生成、测试、self-test 或 PyInstaller 任一失败都会立即终止。最终源码与构建内均为 `122 passed`，源码/包/桌面 self-test 均退出 `0`。包形验证对 47 个默认 MOD 逐项安装、精确状态识别、卸载并保留无关插件；包内 7-Zip 对武器幻化 RAR 完成导入与登记。
-- 最终源包：`package/失落城堡2工具箱 1.5.9`；最终桌面：`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.9`。两者均为 1,749 个文件、`125,569,376` 字节，逐文件相对路径、大小和 SHA-256 零差异。
+- 最终源包：`package/失落城堡2工具箱 1.5.9`；最终桌面：`<desktop>/失落城堡2工具箱 1.5.9`。两者均为 1,749 个文件、`125,569,376` 字节，逐文件相对路径、大小和 SHA-256 零差异。
 - 最终 EXE：`6,207,037` 字节，SHA-256 `8BD31A260C4AB308FFF3EF1E7B179B6A382DEA236D863ADBDF98A645F85D70B9`；FileVersion / ProductVersion 均为 `1.5.9`。冻结 EXE 的主页、MOD 宽敞/200% 最小窗、设置 200%、战斗页、HideWeaponFX、武器皮肤 1.5、微信 hover、默认 HUD 与 opt-out 均 `VERIFIED`；本机回执见 `artifacts/ui-acceptance-1.5.9-final/VERDICT.zh-CN.md`。
 - 未向真实游戏安装、卸载或执行任何新增第三方 MOD，未启动真实游戏；游戏与桌面候选 exact name + ExecutablePath 连续两次均为 `0`。真实游戏兼容性等待作者后续实测。
 - 本轮尚未 commit、push、创建 GitHub Release 或公开发布；当前 HEAD 仍为 `364bab6ae142d5bf30571ec8ef7b5f3e1678dc41`（ahead 2）。
@@ -249,7 +251,7 @@
 
 ## 2026-08-29 1.5.10 本地候选与全新环境收口
 
-- 最终源包与桌面分别为 `package/失落城堡2工具箱 1.5.10`、`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.10`；两侧都是 1,755 个文件、161 个目录、`166,142,080` 字节，逐文件相对路径/大小/SHA-256 零差异。
+- 最终源包与桌面分别为 `package/失落城堡2工具箱 1.5.10`、`<desktop>/失落城堡2工具箱 1.5.10`；两侧都是 1,755 个文件、161 个目录、`166,142,080` 字节，逐文件相对路径/大小/SHA-256 零差异。
 - 最终 EXE 为 `6,222,051` 字节 / `64226A7E9831E3EE4127AA254083D7B1680658062C0481E10A34ABF900E809A8`，FileVersion / ProductVersion 均为 1.5.10。
 - 全新环境初始化随包提供清洁 BepInEx `6.0.0-be.785` 与 Bridge 0.4.1。运行时 ZIP 为 `40,402,401` 字节 / `0B617BC439F53E39680444F1EFD84C2B31A96D144D3267EE06EBEA05B59738A8`，307 个成员；明确排除来源中的 plugins/cache/interop、多人上限 MOD 和全部研究探针。BepInEx LGPL-2.1 全文与源码提交定位随包。
 - 首次点击启动游戏或首次安装 DLL MOD 时出现“首次初始化”，文案明确不自动安装/启用社区 MOD并默认关闭调试控制台。包形空目录安装/重复安装均 `ready`；唯一新增插件为 exact Bridge；不同核心反例在任何写入前阻断。
@@ -266,7 +268,7 @@
 - HUD 总伤害面板增加结构留白，千万级数字不再被 bar 裁切；小字整体上调。默认位置仍为 `[500,16]`，避免覆盖金币等左上小窗。
 - Windows AppUserModelID、EXE 资源和 Tk 默认图标统一为盒子黄色 `K`。页脚保持 GitHub → bilibili → 投喂；MOD 版本/作者列间距、实战优先排序和署名分层均已落地。
 - 默认社区目录为 49 个条目、50 个载荷文件、`3,230,669` 字节。新增终始武器 1.5.0 和玩家实时属性/队友面板，游戏内伤害统计升级为 1.6.4 并后移；同功能族只保留最新版本。
-- 最终项目包与干净分享目录分别为 `package/失落城堡2工具箱 1.5.11`、`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.11-预备正式版`。两侧均为 1,757 个文件、163 个目录、`166,216,333` 字节，逐文件零差异。已实测的旧桌面 `1.5.11-final` 含作者本机配置，不作为分享源。
+- 最终项目包与干净分享目录分别为 `package/失落城堡2工具箱 1.5.11`、`<desktop>/失落城堡2工具箱 1.5.11-预备正式版`。两侧均为 1,757 个文件、163 个目录、`166,216,333` 字节，逐文件零差异。已实测的旧桌面 `1.5.11-final` 含作者本机配置，不作为分享源。
 - 最终 EXE 为 `6,237,475` 字节 / `3A6B08D97D7172292748BEB37A364A99357789BDDA759D84CA29CEDD14BF6D8C`；固定数值版与字符串版均为 `1.5.11.0 / 1.5.11`。源码全量 `145 passed + 7 subtests`，构建内 `145 passed`；清洁运行时门通过。
 - 最终 EXE 额外复核 100% 最小主界面、175% MOD 页和 200% 四人 HUD。四人 HUD 从 `610×516` 增至 `610×554`，三个队友卡的 Boss 行实际高度均为 30、请求高度均为 30，几何 checker 为 `VERIFIED`；干净截图确认数字、bar 和 Boss 行无裁切。证据保存在本机 `artifacts/ui-acceptance/2026-08-29-toolbox-1.5.11-final4/`。
 - 当前作者只需后续自然实测真实 2P–4P 和更多第三方 MOD 组合；0.4.2 单人闪避回蓝与小数累计口径已闭合。commit、push 和 GitHub 预发布已获授权，完成后以远端回读为准。
@@ -279,8 +281,8 @@
 
 ## 2026-08-29 预备正式版分享包
 
-- 干净来源目录：`C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.11-预备正式版`；与项目 `package/失落城堡2工具箱 1.5.11` 的 1,757 个文件逐项零差异，不含作者本机 settings/macros。
-- 分享 ZIP：`C:\Users\shenc\Desktop\失落城堡2工具箱1.5.11-实时数值监测+一键MOD安装.zip`，`136,726,230` 字节，SHA-256 `524C3BBA642C308DA03CCF7B9FC9777668C8D37D7F253E397517290E22062982`。
+- 干净来源目录：`<desktop>/失落城堡2工具箱 1.5.11-预备正式版`；与项目 `package/失落城堡2工具箱 1.5.11` 的 1,757 个文件逐项零差异，不含作者本机 settings/macros。
+- 分享 ZIP：`<desktop>/失落城堡2工具箱1.5.11-实时数值监测+一键MOD安装.zip`，`136,726,230` 字节，SHA-256 `524C3BBA642C308DA03CCF7B9FC9777668C8D37D7F253E397517290E22062982`。
 - 7-Zip 完整性测试退出码 0；强制 UTF-8 文件名后，Windows/.NET 回读唯一顶层目录为“失落城堡2工具箱 1.5.11-预备正式版”，且唯一主 EXE 名称正确。首个错误代码页 ZIP 已按精确身份删除，不得分发。
 - 发布包采用 PyInstaller EXE/PYZ 封装，不直接散发 `.py`，但没有新增加密、反调试或重保护；这是作者选定的适度封装，便于群友共享和后续维护。
 
@@ -293,7 +295,7 @@
 - 桌面 `1.5.12-锁血兼容测试版` 与项目包逐文件零差异，均为 1,757 文件、162 目录、`166,217,064` B；EXE 版本 `1.5.12`，SHA-256 `4E48267F...B8DAD31`。运行时首次/重复安装、控制台关闭与不同核心写前阻断均 PASS。
 - 主战斗页新增一行低强调说明：“法力按底层小数累计，界面最终取整；与逐次整数相加可能有少量差异。”；紧凑 HUD 不增加说明。冻结 EXE 的 100%/200% 战斗页和 200% 四人 HUD 均经几何 checker 与像素审阅 `VERIFIED`。
 - 真实 65% 锁血正控 `R-PASS`：游戏画面 `49/140`，即真实 max 仍为 140、可用 35% 精确为 49；HUD 保持绿色“实时”，结算保留总伤害 `63,952`、Boss `26,969`、受击承伤 `205`、回复 `191`、法力消耗/恢复 `162/162`。BepInEx 明确加载 0.4.3、pipe connected，Bridge error/resource conversion/stack mismatch 匹配均为 0。
-- 干净分享 ZIP：`C:\Users\shenc\Desktop\失落城堡2工具箱1.5.12-实时数值监测+一键MOD安装.zip`，`136,662,047` B / SHA-256 `103E8A1363343CF031FC32F4C39C4EC4C4AF3A83B31979340E262E9809EF947F`。7-Zip 完整性 PASS；.NET 回读唯一 UTF-8 顶层目录为 `失落城堡2工具箱 1.5.12`，1,757 个文件、唯一主 EXE、0 个 config 文件。
+- 干净分享 ZIP：`<desktop>/失落城堡2工具箱1.5.12-实时数值监测+一键MOD安装.zip`，`136,662,047` B / SHA-256 `103E8A1363343CF031FC32F4C39C4EC4C4AF3A83B31979340E262E9809EF947F`。7-Zip 完整性 PASS；.NET 回读唯一 UTF-8 顶层目录为 `失落城堡2工具箱 1.5.12`，1,757 个文件、唯一主 EXE、0 个 config 文件。
 - `NOT RUN`：20%/40% 档位逐档真实选择、洗掉生命锁定、冠军腰带/药剂的当前与最大生命变化、2P–4P 队友独立锁血；自动合同正控不能替代这些人口。
 
 ## 2026-08-29 1.5.13 / Bridge 0.4.4 魔晶石回蓝候选
@@ -302,7 +304,7 @@
 - 冻结日志精确记录前两次官方消耗各 `19`，每次回调处为 `206/225`，下一次根操作前又是 `225`；期间没有官方恢复 callback 或现有 `runtime_gain`。根因是恢复在同一底层 `ChangeCurrentMp` 根操作内发生，入口/出口净变化为 0，旧 fallback 的 `effective>0` 条件把“先扣19、再回19”抵消掉。
 - 0.4.4 不增加 Hook；统一 fallback 为 `max(0, after-before+same_operation_spend-official_recovery_covered)`。编译 DLL 直接反射五臂：净零回满 19、纯消耗 0、部分返还 4、官方已覆盖 0、纯低层恢复 19，全部 PASS。
 - 0.4.4 为 `46,592` B / `CF223767...CE3966`；0.4.3 exact rollback 已冻结并在游戏进程连续两次为 0 时部署。源码/构建内均为 149/149 PASS。
-- 桌面 `C:\Users\shenc\Desktop\失落城堡2工具箱 1.5.13-魔晶石回蓝测试版` 与项目包逐文件零差异；EXE 版本 1.5.13。100% 主战斗页和 200% 四人 HUD 均 `VERIFIED`。
+- 桌面 `<desktop>/失落城堡2工具箱 1.5.13-魔晶石回蓝测试版` 与项目包逐文件零差异；EXE 版本 1.5.13。100% 主战斗页和 200% 四人 HUD 均 `VERIFIED`。
 - GitHub `v1.5.12` 预发布在下载数仍为 0 时已将标题与首行改为“暂缓下载：魔晶石恢复漏记”；不删除、不移动 tag。1.5.13 真实复测通过后才进入新的 commit/push/Release。
 
 ## 2026-08-29 Bridge 0.4.5 / 工具箱 1.6.0 收口
@@ -399,3 +401,24 @@
 - 初审 `HUD-SELF-SHARE-BAR-01` 判定旧A200多人HUD文字被压到14px且bar消失，综合门一度为Release Hold。r2保持外框尺寸，用底部原空白扩展recent卡；四个A200 arm文字均27/27px且bar可见，P16-MIN100保持17/17px。
 - r2精确包 UI 13臂全部绑定`EBFF9584…3F0025`；主界面、MOD像素不变，HUD skill checker和像素审阅已绿。同一different-owner窄复核关闭`HUD-SELF-SHARE-BAR-01`，其余ledger未重开，最终结论`VERIFIED / RELEASE PASS`。证据在 `artifacts/ui-acceptance/2026-08-31-toolbox-1.6.2-final-r2-0.4.12/`。下一步按用户授权生成ZIP、显式提交、push并发布v1.6.2。
 - 分享ZIP为137,107,216 B / `B244610C…772431`；7-Zip完整性PASS，.NET回读唯一UTF-8顶层目录、1,761文件、唯一EXE、config0及解压总字节一致。当前下一步为显式提交、push与v1.6.2 Release。
+
+## 2026-08-31 v1.6.2真实三人少算与1.6.3官方累计候选
+
+- 作者使用正式v1.6.2解压目录完整打完三人局。HUD三人分别为`7,293,748 / 9,924,156 / 9,597,741`，官方卡为`8,475,632 / 10,035,357 / 13,163,701`；全队少`4,859,045`。
+- GitHub v1.6.2资产下载数仍为0；已保留tag/提交/资产并把Release改成预发布，标题为“暂缓下载：v1.6.2 多人伤害少算，等待1.6.3复测”，避免群友误下。
+- HUD/官方团队Boss为`12,173,916 / 12,114,545`，只差59,371；扣除Boss后普通怪伤害为`14,641,729 / 19,560,145`，少4,918,416。缺口几乎全在低HP普通怪，逐击`min(real,hpBefore)`不能继续作为最终官方总量；Boss玩家间错分是owner独立问题。
+- 关闭日志12,028,286 B / `9A6097C7…C0FE12`。唯一首次黄色code为`damage_stack_mismatch`；queue、snapshot missing和致命session error均0。代码确认该路径在CaptureHp后只清空parent/depth栈，官方回调仍EmitDamage，故不应显示“有事件跳过”。
+- 当前interop直接提供网络`AdventureRecordPlayerData.mDamageValue/mBossDamageValue/mID/mIndex`与结算fallback`DamageCollector.mAtkDmg/mAtkDmg_Boss`。0.4.13按Player ID/ClientID/TransportID和Index映射到匿名slot，在`party_updated`附带不回退官方累计；主卡、队伍合计、占比和Boss取官方值，逐击只用于DPS、来源与诊断。回营预加载前强制最终同步。
+- 该修复不读取/发送昵称、Steam ID或平台账号；原始identity只在Bridge进程内匹配当前Player，桌面只收到`player-N`、slot、本机标志和数值。15 Hook不变，无角色/武器/Boss/道具/固定数值特判。
+- 实战三人数字已成为自动回归：全队31,674,690、Boss12,114,545及三名玩家逐项官方值；旧观察少4,859,045、旧快照回退、离队保留、16人/17人负控均覆盖。全量186项、C# SDK6.0.428 Release 0 warning/0 error、包形和self-test PASS。
+- r2额外锁定本局index基准并避免同slot token双算。1.6.3包/桌面均1,761文件、166,643,738 B、config0，EXE`4BB048B3…80D5CD`；Bridge0.4.13 r2为58,880 B / `A0738C53…EA7C96F`，已双零部署。下一步只需真实三人局观察`LC2CB-OFFICIAL`并对比最终卡；当前不commit、不push、不Release。
+
+## 2026-08-31 0.4.13 r2官方slot塌缩与0.4.14 r3
+
+- 四人局早期HUD本机31,835，P位1,635/10,008/8,780；比例100%/5%/31%/27%，均以31,835作分母，确认部分官方覆盖时分母错误。最终本机HUD40,851,600近似团队量，而官方本机仅11,929,682。
+- 最终官方四卡：11,929,682/4,250,377；2,090,147/844,705；7,818,009/3,178,449；17,021,820/6,748,754。HUD远端仍为逐击观察1,586,460/688,315、7,728,499/3,526,557、16,606,274/7,798,165。
+- 54条`LC2CB-OFFICIAL`全部slot0–2=null，slot3从0增长到40,851,600/14,880,152；日志直接证明Bridge把所有官方record塌缩到本机slot3。
+- 根因是0.4.13错误优先用`AdventureRecordPlayerData.mID`匹配当前Player；该字段不是Player网络身份。0.4.14改为官方`mIndex`主映射，dictionary `pair.Key`只在index不可用时按ID/ClientID/TransportID兜底；日志增加network/fallback record数、index base和raw indices且不暴露identity。
+- roster存在时团队总量/Boss始终取每个P位当前显示值之和；全员官方齐全时不再加未归属，部分覆盖时未覆盖P位继续用逐击并计未归属。避免“本机数字像团队、占比却100%”。
+- 显示改为`自己 · Pn`、`P1–P16`、`Pn（离队）`。合成本机slot3精确显示“自己 · P4”，P1/P2/P3伤害18,760/8,940/480与本机6,148的比例55/26/1/18%，合计100%。
+- 0.4.14为59,392 B / `343B69EF…3C6E24`，全量188项、C#0 warning/0 error、包/桌面/运行时/MOD与UI冒烟PASS；r3桌面见本文顶部。真实0.4.14尚未运行，不commit、不push、不Release。

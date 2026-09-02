@@ -80,6 +80,7 @@ def main() -> int:
         "import_source": args.import_source.name,
         "import_payload_files": len(draft.payload),
         "import_name": draft.name,
+        "import_version": draft.version,
         "import_author": draft.author,
         "import_registry": "passed",
     }

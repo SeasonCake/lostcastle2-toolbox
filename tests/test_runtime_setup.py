@@ -203,10 +203,10 @@ class RuntimeSetupTests(unittest.TestCase):
         self.assertFalse(any("damageprobe" in path or "maxplayers" in path for path in folded))
         self.assertEqual(
             manifest["bridge"]["sha256"],
-            "3229359A7D901CEBCD523109261A034704CA06B0E3EAD0829ADC5B19ED976D8D",
+            "3A346E29F8A7737F3C32716990ABBCB0248A0656C2FB8E28FAF888996A4A1C75",
         )
-        self.assertEqual(manifest["bridge"]["size_bytes"], 52736)
-        self.assertIn("LC2CombatBridge 0.4.12", manifest["runtime_version"])
+        self.assertEqual(manifest["bridge"]["size_bytes"], 98304)
+        self.assertIn("LC2CombatBridge 1.7.0", manifest["runtime_version"])
 
 
 if __name__ == "__main__":

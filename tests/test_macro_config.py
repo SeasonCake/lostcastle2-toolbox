@@ -22,6 +22,7 @@ class MacroConfigTests(unittest.TestCase):
             {"once", "hold_repeat", "toggle_repeat"},
         )
         self.assertTrue(all(not profile.enabled for profile in profiles))
+        self.assertTrue(all(profile.limits.max_runtime_ms == 60_000 for profile in profiles))
 
     def test_save_and_load_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

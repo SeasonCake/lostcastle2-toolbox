@@ -8,8 +8,9 @@ The repository currently contains:
 
 - a customizable keyboard/mouse input overlay;
 - opt-in, foreground-only input macros with a global emergency stop;
-- a read-only combat research probe;
+- a read-only combat bridge;
 - versioned contracts and a replayable aggregator for damage, healing, mana, effects, and shields;
+- in-memory current-match statistics that reset at explicit session boundaries without writing per-match archives by default;
 - a managed entry point for attributed third-party tools.
 
 The application now starts in a calculator-style main toolbox window. It manages the keyboard overlay, macros, and a compact combat HUD; full combat details live in the main window. The v2 event contract keeps game observation, aggregation, and presentation separate so new items normally require a source-registry entry instead of new UI logic.
@@ -25,10 +26,16 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 | Damage and HP semantics | Runtime-validated on the recorded game build |
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
-| Main toolbox and external combat HUD | Real four-player runs confirmed that local identity is not guessed from slot 1 and isolated the old 8,192-snapshot table clear. v1.6.2/Bridge 0.4.12 uses oldest-snapshot eviction, visible degradation, a narrowed owner chain, and a 16-player contract; real retesting remains pending |
-| MOD management | v1.6.2 manages two existing tools plus 53 curated community MODs. All plugins share one pinned BepInEx runtime and ship only 54 minimal functional payload files |
+| Main toolbox and external combat HUD | Bridge 1.7 labels the compact HUD **realtime** while the detailed page explains **realtime estimate / settlement may correct**. Complete SyncEnd values are the **official settlement** and may correct upward or downward |
+| MOD management | v1.7 manages two existing tools plus 56 curated community MODs. All plugins share one pinned BepInEx runtime and ship only 57 minimal functional payload files |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
+
+## Combat data contract
+
+- During a match, the compact HUD labels per-player damage and Boss damage **realtime**. The detailed page says **realtime estimate** and explains that settlement may correct it. The values use verified in-game process data, but are not promised to equal the later result screen.
+- Only a complete per-player SyncEnd snapshot is labelled **official settlement**. It replaces the estimate as-is and may move a player's value up or down. Per-hit observation remains useful for recent DPS, source details, damage taken, and resource changes.
+- The release keeps current-match state in memory and resets it at explicit session boundaries. It does not write per-event journals, match ZIP files, or acceptance-probe data by default.
 
 ## Development
 
@@ -66,7 +73,7 @@ The pinned 7-Zip runtime and its license are included so source-mode archive ins
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The v1.6.2 MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 53 curated community MOD entries. The new Max Players 1.3.0 entry ships only its 15,872-byte plugin instead of the source package's duplicated BepInEx stack; it is intended primarily for hosts and must be removed before joining another host's room. All 53 community entries share the toolbox's pinned runtime and total 54 hash-bound functional files (3,391,437 bytes); generated config, cache, interop, Doorstop, and duplicate core files are excluded. Practical combat and resource tools are listed before cosmetic entries, with hotkey conflicts stated in usage guidance. Each entry supports exact install and uninstall. Files or folders placed in the package's `用户MOD` inbox can be statically inspected and added through an editable preview. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The v1.7 MOD page includes Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 56 curated community MOD entries. The latest local intake adds Monster Treasure 11, Nightfall Bow Boost 1.1.0, and Reinforcement Transmitter: Lost Swordsman Shadow 1.0.0, while updating Reaper Summon from the Summon Master 2.1 source package. The other five entries moved to that source package are byte-identical to their existing payloads. Max Players 1.3.0 still ships only its 15,872-byte plugin instead of the source package's duplicated BepInEx stack; it is intended primarily for hosts and must be removed before joining another host's room. All entries share the pinned runtime and total 57 hash-bound functional files (3,522,509 bytes); generated config, cache, interop, Doorstop, and duplicate core files are excluded. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 The bottom-left footer links to GitHub and the maintainer's [Bilibili space](https://space.bilibili.com/88048665?), followed by a `投喂` entry that shows the WeChat code by default and opens the local WeChat, Alipay, and explanation folder for friends who enjoy *Lost Castle 2* and want to support the maintainer or nudge an update.
 

@@ -33,6 +33,20 @@ def common_event(event_type: str, sequence: int, **fields: object) -> dict[str, 
 
 
 class CombatAggregatorTests(unittest.TestCase):
+    def test_foreign_terminal_receipt_is_an_explicit_safe_boundary(self) -> None:
+        aggregator = CombatAggregator()
+        aggregator.ingest(
+            common_event("status", 0, session_id="session-a", status="session_started")
+        )
+        aggregator.ingest(
+            common_event("status", 73, session_id="session-b", status="session_ended")
+        )
+
+        snapshot = aggregator.snapshot()
+        self.assertEqual(snapshot.session_id, "session-b")
+        self.assertEqual(snapshot.connection_state, "ended")
+        self.assertEqual(snapshot.personal_damage, 0)
+
     def setUp(self) -> None:
         registry = SourceRegistry.from_file(PROJECT_ROOT / "assets" / "combat_sources.json")
         scenario_registry = ScenarioRegistry.from_file(
@@ -150,13 +164,13 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.personal_recent_dps, 12.0)
         self.assertEqual(snapshot.unattributed_damage, 20)
         self.assertEqual(snapshot.unattributed_boss_damage, 0)
-        self.assertEqual(snapshot.player_breakdown["opaque-local"]["label"], "自己")
+        self.assertEqual(snapshot.player_breakdown["opaque-local"]["label"], "自己 · P1")
         self.assertEqual(snapshot.player_breakdown["opaque-local"]["damage_dealt"], 120)
         self.assertAlmostEqual(
             snapshot.player_breakdown["opaque-local"]["damage_share"],
             120 / 220,
         )
-        self.assertEqual(snapshot.player_breakdown["opaque-peer"]["label"], "队友 1")
+        self.assertEqual(snapshot.player_breakdown["opaque-peer"]["label"], "P2")
         self.assertEqual(snapshot.player_breakdown["opaque-peer"]["boss_damage"], 80)
         self.assertEqual(
             snapshot.personal_source_breakdown["combat.player.normal"]["damage_dealt"],
@@ -179,6 +193,548 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.detected_player_count, 1)
         self.assertFalse(snapshot.player_breakdown["opaque-peer"]["active"])
         self.assertEqual(snapshot.player_breakdown["opaque-peer"]["damage_dealt"], 80)
+
+    def test_live_party_totals_replace_and_final_can_correct_downward(self) -> None:
+        members = [
+            {"player_id": "opaque-local", "player_slot": 0, "is_local": True},
+            {"player_id": "opaque-peer", "player_slot": 1, "is_local": False},
+        ]
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=members,
+            )
+        )
+        for sequence, owner, damage in (
+            (2, "opaque-local", 120),
+            (3, "opaque-peer", 80),
+        ):
+            self.aggregator.ingest(
+                common_event(
+                    "damage_resolution",
+                    sequence,
+                    damage_direction="dealt",
+                    settlement_damage=damage,
+                    applied_hp_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    is_boss=False,
+                    owner_player_id=owner,
+                    source_token="combat.player.normal",
+                )
+            )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                4,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {**members[0], "live_damage": 150, "live_boss_damage": 20},
+                    {**members[1], "live_damage": 240, "live_boss_damage": 40},
+                ],
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertTrue(snapshot.live_damage_complete)
+        self.assertFalse(snapshot.official_damage_complete)
+        self.assertEqual(snapshot.total_damage, 390)
+        self.assertEqual(snapshot.boss_damage, 60)
+
+        # Between room-boundary cache anchors, accepted per-hit deltas stay live.
+        for sequence, owner, damage in (
+            (5, "opaque-local", 30),
+            (6, "opaque-peer", 20),
+        ):
+            self.aggregator.ingest(
+                common_event(
+                    "damage_resolution",
+                    sequence,
+                    damage_direction="dealt",
+                    settlement_damage=damage,
+                    applied_hp_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    is_boss=False,
+                    owner_player_id=owner,
+                    source_token="combat.player.normal",
+                )
+            )
+        self.assertEqual(self.aggregator.snapshot().total_damage, 440)
+
+        # Repeating the same anchor for a roster refresh must not erase the delta.
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                7,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {**members[0], "live_damage": 150, "live_boss_damage": 20},
+                    {**members[1], "live_damage": 240, "live_boss_damage": 40},
+                ],
+            )
+        )
+        self.assertEqual(self.aggregator.snapshot().total_damage, 440)
+
+        # A room boundary without a changed live snapshot preserves delayed
+        # official-cache deltas (observed in the real MainCastle story room).
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                8,
+                status="room_started",
+                aggregate=False,
+                room_id="L1:Test:2",
+                stage_level=1,
+                scenario_id="Test",
+                room_index=2,
+                map_file_name="Map_Test_2",
+            )
+        )
+        self.assertEqual(self.aggregator.snapshot().total_damage, 440)
+
+        # If any slot receives a changed live snapshot, every slot re-anchors;
+        # unchanged slots must not retain the prior provisional room delta.
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                9,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {**members[0], "live_damage": 150, "live_boss_damage": 20},
+                    {**members[1], "live_damage": 220, "live_boss_damage": 40},
+                ],
+            )
+        )
+        self.assertEqual(self.aggregator.snapshot().total_damage, 370)
+
+        # Live cache snapshots are replaceable, including a downward correction.
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                10,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {**members[0], "live_damage": 140, "live_boss_damage": 10},
+                    {**members[1], "live_damage": 220, "live_boss_damage": 30},
+                ],
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 360)
+        self.assertEqual(snapshot.boss_damage, 40)
+
+        # Exact SyncEnd official values remain authoritative even when lower.
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                11,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        **members[0],
+                        "official_damage": 100,
+                        "official_boss_damage": 5,
+                    },
+                    {
+                        **members[1],
+                        "official_damage": 200,
+                        "official_boss_damage": 15,
+                    },
+                ],
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertTrue(snapshot.official_damage_complete)
+        self.assertEqual(snapshot.total_damage, 300)
+        self.assertEqual(snapshot.boss_damage, 20)
+        self.assertEqual(
+            snapshot.player_breakdown["opaque-local"]["live_damage"],
+            None,
+        )
+        self.assertEqual(
+            snapshot.player_breakdown["opaque-local"]["last_live_damage"],
+            140,
+        )
+        self.assertEqual(
+            snapshot.player_breakdown["opaque-local"]["official_damage"],
+            100,
+        )
+        self.assertEqual(
+            snapshot.player_breakdown["opaque-local"]["observed_damage_dealt"],
+            150,
+        )
+
+    def test_missing_live_snapshot_falls_back_to_observed(self) -> None:
+        member = {"player_id": "opaque-local", "player_slot": 0, "is_local": True}
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[member],
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "damage_resolution",
+                2,
+                damage_direction="dealt",
+                settlement_damage=120,
+                applied_hp_damage=120,
+                mitigated_damage=0,
+                overkill_damage=0,
+                is_boss=True,
+                owner_player_id="opaque-local",
+                source_token="combat.player.normal",
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                3,
+                status="party_updated",
+                aggregate=False,
+                party_members=[{**member, "live_damage": 90, "live_boss_damage": 30}],
+            )
+        )
+        self.assertEqual(self.aggregator.snapshot().total_damage, 90)
+
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                4,
+                status="party_updated",
+                aggregate=False,
+                party_members=[member],
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertFalse(snapshot.live_damage_complete)
+        self.assertEqual(snapshot.total_damage, 120)
+        self.assertEqual(snapshot.boss_damage, 120)
+
+    def test_official_party_totals_override_observed_damage_without_rewriting_sources(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "opaque-local",
+                        "player_slot": 0,
+                        "is_local": True,
+                    },
+                    {
+                        "player_id": "opaque-peer",
+                        "player_slot": 1,
+                        "is_local": False,
+                    },
+                ],
+            )
+        )
+        for sequence, owner, damage, boss in (
+            (2, "opaque-local", 120, True),
+            (3, "opaque-peer", 80, False),
+            (4, None, 20, False),
+        ):
+            self.aggregator.ingest(
+                common_event(
+                    "damage_resolution",
+                    sequence,
+                    damage_direction="dealt",
+                    settlement_damage=damage,
+                    applied_hp_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    is_boss=boss,
+                    owner_player_id=owner,
+                    source_token="combat.player.normal",
+                )
+            )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                5,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "opaque-local",
+                        "player_slot": 0,
+                        "is_local": True,
+                        "official_damage": 150,
+                        "official_boss_damage": 30,
+                    },
+                    {
+                        "player_id": "opaque-peer",
+                        "player_slot": 1,
+                        "is_local": False,
+                        "official_damage": 240,
+                        "official_boss_damage": 90,
+                    },
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertTrue(snapshot.official_damage_complete)
+        self.assertTrue(snapshot.official_boss_damage_complete)
+        self.assertEqual(snapshot.total_damage, 390)
+        self.assertEqual(snapshot.boss_damage, 120)
+        self.assertEqual(snapshot.personal_damage, 150)
+        self.assertEqual(snapshot.personal_boss_damage, 30)
+        self.assertEqual(
+            snapshot.player_breakdown["opaque-local"]["observed_damage_dealt"],
+            120,
+        )
+        self.assertEqual(
+            snapshot.player_breakdown["opaque-local"]["official_damage"],
+            150,
+        )
+        self.assertEqual(
+            snapshot.personal_source_breakdown["combat.player.normal"]["damage_dealt"],
+            120,
+        )
+        self.assertEqual(snapshot.unattributed_damage, 20)
+        self.assertAlmostEqual(
+            snapshot.player_breakdown["opaque-peer"]["damage_share"],
+            240 / 390,
+        )
+
+        # A transient stale network snapshot must not roll cumulative official
+        # totals backwards.
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                6,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "opaque-local",
+                        "player_slot": 0,
+                        "is_local": True,
+                        "official_damage": 140,
+                        "official_boss_damage": 20,
+                    },
+                    {
+                        "player_id": "opaque-peer",
+                        "player_slot": 1,
+                        "is_local": False,
+                        "official_damage": 220,
+                        "official_boss_damage": 80,
+                    },
+                ],
+            )
+        )
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 390)
+        self.assertEqual(snapshot.boss_damage, 120)
+
+    def test_partial_official_coverage_keeps_team_denominator_consistent(self) -> None:
+        members = [
+            {
+                "player_id": f"player-{index}",
+                "player_slot": index,
+                "is_local": index == 0,
+            }
+            for index in range(4)
+        ]
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=members,
+            )
+        )
+        observed = (11_412, 1_635, 10_008, 8_780)
+        for sequence, (member, damage) in enumerate(
+            zip(members, observed, strict=True),
+            start=2,
+        ):
+            self.aggregator.ingest(
+                common_event(
+                    "damage_resolution",
+                    sequence,
+                    damage_direction="dealt",
+                    settlement_damage=damage,
+                    applied_hp_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    is_boss=False,
+                    owner_player_id=member["player_id"],
+                    source_token="combat.player.normal",
+                )
+            )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                6,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {**members[0], "official_damage": 31_835},
+                    *members[1:],
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertFalse(snapshot.official_damage_complete)
+        self.assertEqual(snapshot.personal_damage, 31_835)
+        self.assertEqual(snapshot.total_damage, 52_258)
+        self.assertAlmostEqual(combat_personal_share := (
+            snapshot.personal_damage / snapshot.total_damage
+        ), 31_835 / 52_258)
+        self.assertLess(combat_personal_share, 1.0)
+        self.assertAlmostEqual(
+            sum(row["damage_share"] for row in snapshot.player_breakdown.values()),
+            1.0,
+        )
+        self.assertEqual(
+            [row["label"] for row in snapshot.player_breakdown.values()],
+            ["自己 · P1", "P2", "P3", "P4"],
+        )
+
+    def test_departed_player_keeps_history_but_leaves_visible_team_total(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "local",
+                        "player_slot": 0,
+                        "is_local": True,
+                        "official_damage": 100,
+                        "official_boss_damage": 40,
+                    },
+                    {
+                        "player_id": "peer",
+                        "player_slot": 1,
+                        "is_local": False,
+                        "official_damage": 200,
+                        "official_boss_damage": 80,
+                    },
+                ],
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                2,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "local",
+                        "player_slot": 0,
+                        "is_local": True,
+                        "official_damage": 160,
+                        "official_boss_damage": 60,
+                    },
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 160)
+        self.assertEqual(snapshot.boss_damage, 60)
+        self.assertEqual(snapshot.personal_damage, 160)
+        self.assertFalse(snapshot.player_breakdown["peer"]["active"])
+        self.assertEqual(snapshot.player_breakdown["peer"]["damage_dealt"], 200)
+
+    def test_real_0412_multiplayer_gap_is_closed_by_official_party_totals(self) -> None:
+        observed = (
+            ("local", 7_293_748, 2_465_442),
+            ("peer-1", 9_924_156, 5_062_190),
+            ("peer-2", 9_597_741, 4_646_284),
+        )
+        official = (
+            ("local", 8_475_632, 2_331_390),
+            ("peer-1", 10_035_357, 4_012_909),
+            ("peer-2", 13_163_701, 5_770_246),
+        )
+        members = [
+            {
+                "player_id": player_id,
+                "player_slot": slot,
+                "is_local": slot == 0,
+            }
+            for slot, (player_id, _damage, _boss) in enumerate(observed)
+        ]
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=members,
+            )
+        )
+        sequence = 2
+        for player_id, damage, boss in observed:
+            for value, is_boss in ((boss, True), (damage - boss, False)):
+                self.aggregator.ingest(
+                    common_event(
+                        "damage_resolution",
+                        sequence,
+                        damage_direction="dealt",
+                        settlement_damage=value,
+                        applied_hp_damage=value,
+                        mitigated_damage=0,
+                        overkill_damage=0,
+                        is_boss=is_boss,
+                        owner_player_id=player_id,
+                        source_token="combat.player.normal",
+                    )
+                )
+                sequence += 1
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                sequence,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        **members[slot],
+                        "official_damage": damage,
+                        "official_boss_damage": boss,
+                    }
+                    for slot, (_player_id, damage, boss) in enumerate(official)
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 31_674_690)
+        self.assertEqual(snapshot.boss_damage, 12_114_545)
+        self.assertEqual(snapshot.personal_damage, 8_475_632)
+        self.assertEqual(snapshot.personal_boss_damage, 2_331_390)
+        self.assertEqual(
+            snapshot.total_damage - sum(item[1] for item in observed),
+            4_859_045,
+        )
+        for player_id, damage, boss in official:
+            row = snapshot.player_breakdown[player_id]
+            self.assertEqual(row["damage_dealt"], damage)
+            self.assertEqual(row["boss_damage"], boss)
 
     def test_non_host_local_player_is_bound_by_flag_not_slot_zero(self) -> None:
         self.aggregator.ingest(
@@ -217,7 +773,7 @@ class CombatAggregatorTests(unittest.TestCase):
         self.assertEqual(snapshot.total_damage, 260)
         self.assertEqual(snapshot.personal_damage, 140)
         self.assertEqual(snapshot.personal_boss_damage, 0)
-        self.assertEqual(snapshot.player_breakdown["local-client"]["label"], "自己")
+        self.assertEqual(snapshot.player_breakdown["local-client"]["label"], "自己 · P3")
         self.assertEqual(snapshot.player_breakdown["local-client"]["player_slot"], 2)
         self.assertFalse(snapshot.player_breakdown["remote-host"]["is_local"])
 
@@ -247,8 +803,298 @@ class CombatAggregatorTests(unittest.TestCase):
             )
         )
         snapshot = self.aggregator.snapshot()
-        self.assertEqual(snapshot.player_breakdown["peer-old"]["label"], "离队成员")
-        self.assertEqual(snapshot.player_breakdown["peer-new"]["label"], "队友 1")
+        self.assertEqual(snapshot.player_breakdown["peer-old"]["label"], "P1（离队）")
+        self.assertEqual(snapshot.player_breakdown["peer-new"]["label"], "P1")
+
+    def test_replaced_token_in_same_slot_does_not_double_official_team_total(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "local",
+                        "player_slot": 2,
+                        "is_local": True,
+                        "official_damage": 50,
+                        "official_boss_damage": 10,
+                    },
+                    {
+                        "player_id": "peer-old",
+                        "player_slot": 0,
+                        "is_local": False,
+                        "official_damage": 100,
+                        "official_boss_damage": 20,
+                    },
+                ],
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                2,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "local",
+                        "player_slot": 2,
+                        "is_local": True,
+                        "official_damage": 60,
+                        "official_boss_damage": 15,
+                    },
+                    {
+                        "player_id": "peer-new",
+                        "player_slot": 0,
+                        "is_local": False,
+                        "official_damage": 150,
+                        "official_boss_damage": 30,
+                    },
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 210)
+        self.assertEqual(snapshot.boss_damage, 45)
+        self.assertEqual(snapshot.personal_damage, 60)
+        self.assertFalse(snapshot.player_breakdown["peer-old"]["active"])
+        self.assertTrue(snapshot.player_breakdown["peer-new"]["active"])
+
+    def test_departed_slot_is_not_kept_in_the_visible_team_denominator(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "local", "player_slot": 0, "is_local": True},
+                    {"player_id": "peer-2", "player_slot": 1, "is_local": False},
+                    {"player_id": "peer-3", "player_slot": 2, "is_local": False},
+                    {"player_id": "peer-4", "player_slot": 3, "is_local": False},
+                ],
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "damage_resolution",
+                2,
+                damage_direction="dealt",
+                settlement_damage=16_606_274,
+                applied_hp_damage=16_606_274,
+                mitigated_damage=0,
+                overkill_damage=0,
+                is_boss=True,
+                owner_player_id="peer-4",
+                source_token="combat.player.normal",
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                3,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "local", "player_slot": 0, "is_local": True},
+                    {"player_id": "peer-2", "player_slot": 1, "is_local": False},
+                    {"player_id": "peer-3", "player_slot": 2, "is_local": False},
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 0)
+        self.assertFalse(snapshot.player_breakdown["peer-4"]["active"])
+        self.assertEqual(
+            sum(
+                row["damage_dealt"]
+                for row in snapshot.player_breakdown.values()
+                if row["active"]
+            ),
+            snapshot.total_damage,
+        )
+
+    def test_local_token_replacement_excludes_the_inactive_local_history(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {"player_id": "local-old", "player_slot": 0, "is_local": True},
+                    {"player_id": "remote", "player_slot": 1, "is_local": False},
+                ],
+            )
+        )
+        for sequence, owner, damage in (
+            (2, "local-old", 100),
+            (4, "local-new", 20),
+        ):
+            if sequence == 4:
+                self.aggregator.ingest(
+                    common_event(
+                        "status",
+                        3,
+                        status="party_updated",
+                        aggregate=False,
+                        party_members=[
+                            {"player_id": "local-new", "player_slot": 0, "is_local": True},
+                            {"player_id": "remote", "player_slot": 1, "is_local": False},
+                        ],
+                    )
+                )
+            self.aggregator.ingest(
+                common_event(
+                    "damage_resolution",
+                    sequence,
+                    damage_direction="dealt",
+                    settlement_damage=damage,
+                    applied_hp_damage=damage,
+                    mitigated_damage=0,
+                    overkill_damage=0,
+                    is_boss=False,
+                    owner_player_id=owner,
+                    source_token="combat.player.normal",
+                )
+            )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.total_damage, 20)
+        self.assertEqual(snapshot.personal_damage, 20)
+        self.assertFalse(snapshot.player_breakdown["local-old"]["active"])
+        self.assertTrue(snapshot.player_breakdown["local-new"]["active"])
+
+    def test_same_session_local_slot_change_keeps_stable_identity_and_live_total(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "player-1",
+                        "player_slot": 0,
+                        "is_local": False,
+                        "live_damage": 45888,
+                        "live_boss_damage": 0,
+                    },
+                    {
+                        "player_id": "player-2",
+                        "player_slot": 1,
+                        "is_local": False,
+                        "live_damage": 35652,
+                        "live_boss_damage": 0,
+                    },
+                    {
+                        "player_id": "player-3",
+                        "player_slot": 2,
+                        "is_local": False,
+                        "live_damage": 41555,
+                        "live_boss_damage": 0,
+                    },
+                    {
+                        "player_id": "player-4",
+                        "player_slot": 3,
+                        "is_local": True,
+                        "live_damage": 3338,
+                        "live_boss_damage": 0,
+                    },
+                ],
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                2,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "player-4",
+                        "player_slot": 0,
+                        "is_local": True,
+                        "live_damage": 3338,
+                        "live_boss_damage": 0,
+                    }
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.personal_damage, 3338)
+        self.assertEqual(snapshot.total_damage, 3338)
+        self.assertTrue(snapshot.player_breakdown["player-4"]["active"])
+        self.assertEqual(snapshot.player_breakdown["player-4"]["player_slot"], 0)
+        self.assertFalse(snapshot.player_breakdown["player-1"]["active"])
+
+    def test_r19_new_local_token_positive_control_reproduces_45888(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                1,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "player-1",
+                        "player_slot": 0,
+                        "is_local": False,
+                        "live_damage": 45888,
+                        "live_boss_damage": 0,
+                    },
+                    {
+                        "player_id": "player-4",
+                        "player_slot": 3,
+                        "is_local": True,
+                        "live_damage": 3338,
+                        "live_boss_damage": 0,
+                    },
+                ],
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                2,
+                status="party_updated",
+                aggregate=False,
+                party_members=[
+                    {
+                        "player_id": "player-5",
+                        "player_slot": 0,
+                        "is_local": True,
+                        "live_damage": 45888,
+                        "live_boss_damage": 0,
+                    }
+                ],
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.personal_damage, 45888)
+        self.assertTrue(snapshot.player_breakdown["player-5"]["active"])
+        self.assertFalse(snapshot.player_breakdown["player-4"]["active"])
+
+    def test_party_update_rejects_duplicate_player_slot(self) -> None:
+        with self.assertRaises(CombatEventError):
+            self.aggregator.ingest(
+                common_event(
+                    "status",
+                    1,
+                    status="party_updated",
+                    aggregate=False,
+                    party_members=[
+                        {"player_id": "local", "player_slot": 3, "is_local": True},
+                        {"player_id": "peer", "player_slot": 3, "is_local": False},
+                    ],
+                )
+            )
 
     def test_party_update_rejects_duplicate_player_identity(self) -> None:
         with self.assertRaises(CombatEventError):
@@ -351,7 +1197,7 @@ class CombatAggregatorTests(unittest.TestCase):
                     self.assertEqual(row["damage_dealt"], expected[player_id])
                     self.assertEqual(
                         row["label"],
-                        "自己" if player_index == 0 else f"队友 {player_index}",
+                        "自己 · P1" if player_index == 0 else f"P{player_index + 1}",
                     )
 
     def test_hp_mp_overflow_blocking_and_shield_layers_are_generic_events(self) -> None:
@@ -584,6 +1430,38 @@ class CombatAggregatorTests(unittest.TestCase):
         snapshot = self.aggregator.snapshot()
         self.assertEqual(snapshot.session_id, "session-b")
         self.assertEqual(snapshot.total_damage, 0)
+
+    def test_same_session_transport_resume_keeps_totals_and_marks_gap(self) -> None:
+        self.aggregator.ingest(
+            common_event(
+                "damage_resolution",
+                1,
+                damage_direction="dealt",
+                settlement_damage=120,
+                applied_hp_damage=120,
+                mitigated_damage=0,
+                overkill_damage=0,
+                is_boss=False,
+                source_token="combat.player.normal",
+            )
+        )
+        self.aggregator.ingest(
+            common_event(
+                "status",
+                2,
+                status="session_started",
+                detail="degraded:transport_reconnected",
+                aggregate=False,
+            )
+        )
+
+        snapshot = self.aggregator.snapshot()
+        self.assertEqual(snapshot.session_id, "session-a")
+        self.assertEqual(snapshot.total_damage, 120)
+        self.assertEqual(
+            snapshot.diagnostic_warning,
+            "degraded:transport_reconnected",
+        )
         self.assertEqual(snapshot.connection_state, "live")
 
     def test_recent_dps_is_a_ten_second_average_and_expires_outside_window(self) -> None:

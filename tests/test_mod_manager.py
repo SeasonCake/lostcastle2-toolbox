@@ -19,6 +19,7 @@ from toolbox.mod_manager import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_COMMUNITY_PAYLOAD_ROOT = PROJECT_ROOT / "third_party" / "community_mods"
 
 
 def catalog_payload(content: bytes) -> dict[str, object]:
@@ -73,6 +74,10 @@ def plugin_catalog_payload(content: bytes, archive_content: bytes = b"archive") 
 
 
 class ModManagerTests(unittest.TestCase):
+    def require_local_community_payloads(self) -> None:
+        if not LOCAL_COMMUNITY_PAYLOAD_ROOT.is_dir():
+            self.skipTest("local third-party community payloads are not in source checkout")
+
     def make_manager(self, root: Path, content: bytes) -> ModManager:
         catalog_path = root / "catalog.json"
         catalog_path.write_text(json.dumps(catalog_payload(content)), encoding="utf-8")
@@ -339,7 +344,24 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 53)
+        self.assertEqual(len(catalog.entries), 56)
+        self.assertEqual(
+            sum(len(descriptor.operation.files) for descriptor in catalog.entries),
+            57,
+        )
+        self.assertEqual(
+            sum(
+                spec.size_bytes
+                for descriptor in catalog.entries
+                for spec in descriptor.operation.files
+            ),
+            3_522_509,
+        )
+        self.assertIn(
+            "Count -ne 57",
+            (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8"),
+        )
+        self.require_local_community_payloads()
         bundled_root = PROJECT_ROOT / "third_party"
         for descriptor in catalog.entries:
             self.assertTrue(descriptor.operation.files)
@@ -352,6 +374,57 @@ class ModManagerTests(unittest.TestCase):
                     hashlib.sha256(payload.read_bytes()).hexdigest().upper(),
                     spec.sha256,
                 )
+
+    def test_new_community_mod_entries_fail_closed_on_traversal_and_tampering(self) -> None:
+        catalog_path = PROJECT_ROOT / "assets" / "community_mod_catalog.json"
+        raw_catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        monster_entry = next(
+            entry for entry in raw_catalog["entries"] if entry["id"] == "monster-treasure"
+        )
+        traversal_entry = json.loads(json.dumps(monster_entry, ensure_ascii=False))
+        traversal_entry["operation"]["bundle_dir"] = "../community_mods/monster-treasure"
+        with self.assertRaises(ModManagerError):
+            ModCatalog.from_payload(
+                {"schema_version": 2, "entries": [traversal_entry]}
+            )
+
+        self.require_local_community_payloads()
+        catalog = ModCatalog.from_file(catalog_path)
+        for mod_id in (
+            "monster-treasure",
+            "nightfall-bow-boost",
+            "reinforce-hideyoshi",
+        ):
+            with self.subTest(mod_id=mod_id), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                game = root / "game"
+                (game / "BepInEx" / "plugins").mkdir(parents=True)
+                game_exe = game / "LostCastle2.exe"
+                game_exe.write_bytes(b"game")
+                descriptor = catalog.get(mod_id)
+                assert descriptor.operation.bundle_dir is not None
+                source_root = PROJECT_ROOT / "third_party" / descriptor.operation.bundle_dir
+                bundled_root = root / "bundled"
+                for spec in descriptor.operation.files:
+                    source = source_root.joinpath(*Path(spec.path).parts)
+                    target = bundled_root / descriptor.operation.bundle_dir / Path(spec.path)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(source.read_bytes())
+                manager = ModManager(
+                    catalog,
+                    root / "managed",
+                    bundled_root,
+                    game_exe_provider=lambda: game_exe,
+                )
+                manager.install(mod_id)
+                self.assertTrue(manager.status(mod_id).installed)
+                self.assertTrue(manager.uninstall(mod_id))
+
+                primary = descriptor.operation.files[0]
+                tampered = bundled_root / descriptor.operation.bundle_dir / Path(primary.path)
+                tampered.write_bytes(tampered.read_bytes() + b"tampered")
+                with self.assertRaises(ModIntegrityError):
+                    manager.install(mod_id)
 
     def test_latest_mod_family_versions_and_new_payload_identities_are_frozen(self) -> None:
         catalog = ModCatalog.from_file(
@@ -486,6 +559,107 @@ class ModManagerTests(unittest.TestCase):
             "1247F19FC0C0447B18E38FABC0AE08EF13967282A116D58C2CFF9FBD3A630F25",
         )
 
+        monster = catalog.get("monster-treasure")
+        self.assertEqual(monster.display.name, "怪物宝藏")
+        self.assertEqual(monster.display.version, "11")
+        self.assertEqual(monster.display.author, "懒虫桑")
+        self.assertEqual(monster.operation.expected_filename, "怪物宝藏v11.dll")
+        self.assertEqual(monster.operation.hotkeys, ("Alt+F",))
+        self.assertEqual(monster.operation.panel_hotkey, "ALT+F")
+        self.assertIn("尚未实战验证", monster.display.usage_hint)
+        self.assertEqual(
+            monster.integrity_policy.sha256,
+            "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+        )
+        self.assertEqual(monster.integrity_policy.size_bytes, 86_016)
+        self.assertTrue(
+            {
+                "怪物宝藏v11.dll",
+                "怪物宝藏v10.7.dll",
+                "怪物宝藏v10.5.dll",
+                "lostcastle2.monsterplusmod.dll",
+            }.issubset({item.casefold() for item in monster.operation.provides})
+        )
+
+        nightfall = catalog.get("nightfall-bow-boost")
+        self.assertEqual(nightfall.display.name, "噩梦降临强化")
+        self.assertEqual(nightfall.display.version, "1.1.0")
+        self.assertEqual(nightfall.display.author, "兔子王お")
+        self.assertEqual(
+            nightfall.operation.expected_filename,
+            "LC2.NightfallBowBoost噩梦降临强化.dll",
+        )
+        self.assertEqual(nightfall.operation.hotkeys, ())
+        self.assertIsNone(nightfall.operation.panel_hotkey)
+        self.assertIn("没有独立面板或快捷键", nightfall.display.usage_hint)
+        self.assertEqual(
+            nightfall.integrity_policy.sha256,
+            "0CE5AB7F2B07ECED9574610168D5524D07E212E39E8E2951AB794600480E5626",
+        )
+        self.assertEqual(nightfall.integrity_policy.size_bytes, 19_968)
+
+        reinforce = catalog.get("reinforce-hideyoshi")
+        self.assertEqual(reinforce.display.name, "增援发信仪召唤失落剑客幽影")
+        self.assertEqual(reinforce.display.version, "1.0.0")
+        self.assertEqual(reinforce.display.author, "兔子王お")
+        self.assertEqual(
+            reinforce.operation.expected_filename,
+            "LC2.ReinforceHideyoshi真·雷神之锤.dll",
+        )
+        self.assertIn("建议二选一", reinforce.display.usage_hint)
+        self.assertEqual(
+            reinforce.integrity_policy.sha256,
+            "25F1B761DFFBFB4DA48612B84626704E8AA134F60E705BF79683E91C51260A5D",
+        )
+        self.assertEqual(reinforce.integrity_policy.size_bytes, 23_552)
+
+        reaper = catalog.get("reaper-summon")
+        self.assertEqual(reaper.display.version, "2.1")
+        self.assertIn("区域切换", reaper.display.summary)
+        self.assertEqual(
+            reaper.integrity_policy.sha256,
+            "DE603EC332109648B8F6B2F5C4E49F5219B6458D4053EC6679DEAFE0588EB07C",
+        )
+        self.assertEqual(reaper.integrity_policy.size_bytes, 25_600)
+
+        unchanged_summon_payloads = {
+            "evil-fire-crusher-summon": (
+                "2.0",
+                "CADAEEA51269D395646342FF7F40FC85677103744D1AB527EB1CFE5814204B0A",
+            ),
+            "nightmare-doll-skin": (
+                "2.0",
+                "C1256E175D6C8F95E014A1BD39F1CD35639E281D065A05DBC25748398D8D345E",
+            ),
+            "hideyoshi-summon": (
+                "2.0",
+                "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C",
+            ),
+            "hand-color-white": (
+                "2.0",
+                "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
+            ),
+            "summon-model-swap": (
+                "2.0",
+                "5F4EB7890A3F14919DD0F5C1854D84594137F4DD6BE9586C4D118FD0C3E65D4E",
+            ),
+        }
+        source_payload = json.loads(
+            (PROJECT_ROOT / "assets" / "community_mod_sources.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        source_entries = {entry["id"]: entry for entry in source_payload["entries"]}
+        for mod_id, (version, sha256) in unchanged_summon_payloads.items():
+            with self.subTest(mod_id=mod_id):
+                descriptor = catalog.get(mod_id)
+                self.assertEqual(descriptor.display.version, version)
+                self.assertEqual(descriptor.integrity_policy.sha256, sha256)
+                self.assertEqual(
+                    source_entries[mod_id]["source"],
+                    "召唤大师珀亚2.1 非整合包.rar",
+                )
+
     def test_community_catalog_prioritizes_practical_mods_over_cosmetics(self) -> None:
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
@@ -509,6 +683,7 @@ class ModManagerTests(unittest.TestCase):
         self.assertLess(ids.index("purple-critical-damage"), ids.index("armor-transmog"))
 
     def test_all_community_mods_install_and_uninstall_in_isolated_game(self) -> None:
+        self.require_local_community_payloads()
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )

@@ -148,7 +148,7 @@ def mod_launch_action(
 
 def combat_state_label(state: str, *, compact: bool = False) -> str:
     labels = {
-        "live": ("● 实时", "● 实时记录中"),
+        "live": ("● 实时", "● 实时估算"),
         "connecting": ("● 连接中", "● 正在连接战斗桥接"),
         "stale": ("● 延迟", "● 战斗桥接响应延迟"),
         "error": ("● 异常", "● 战斗数据异常，本轮统计已停止"),
@@ -167,6 +167,85 @@ def combat_state_color(state: str) -> str:
     if state == "stale":
         return GOLD
     return MUTED
+
+
+@dataclass(frozen=True)
+class CombatStatusPresentation:
+    """Visible combat-data status without conflating transport and value basis."""
+
+    kind: str
+    label: str
+    color: str
+    explanation: str = ""
+
+    @property
+    def text(self) -> str:
+        if not self.explanation:
+            return self.label
+        return f"{self.label} · {self.explanation}"
+
+
+def combat_status_presentation(
+    snapshot: CombatSnapshot,
+    *,
+    compact: bool = False,
+) -> CombatStatusPresentation:
+    """Map a snapshot to an honest, stable status for full and compact surfaces."""
+
+    state = snapshot.connection_state
+    degraded = bool(snapshot.diagnostic_warning)
+    official_complete = bool(
+        snapshot.official_damage_complete
+        and snapshot.official_boss_damage_complete
+    )
+
+    # Transport failures and wait states stay primary. A missing final must not
+    # turn "connecting", "stale", "error", or "disconnected" into an estimate
+    # badge that hides the operational state.
+    if state in {"connecting", "stale", "error", "disconnected"}:
+        return CombatStatusPresentation(
+            kind=state,
+            label=combat_state_label(state, compact=compact),
+            color=combat_state_color(state),
+        )
+
+    if official_complete:
+        label = "● 官方" if compact else "● 官方结算"
+        if degraded:
+            label += " · 跳过" if compact else "（有事件跳过）"
+        return CombatStatusPresentation(
+            kind="official",
+            label=label,
+            color=GREEN,
+        )
+
+    if state == "live":
+        label = combat_state_label(state, compact=compact)
+        if degraded:
+            label += " · 跳过" if compact else "（有事件跳过）"
+        return CombatStatusPresentation(
+            kind="estimate",
+            label=label,
+            color=GOLD if degraded or not compact else GREEN,
+            explanation="" if compact else "结算可能校正",
+        )
+
+    if state == "ended":
+        label = combat_state_label(state, compact=compact)
+        if degraded:
+            label += " · 跳过" if compact else "（有事件跳过）"
+        return CombatStatusPresentation(
+            kind="ended",
+            label=label,
+            color=GOLD if degraded else MUTED,
+            explanation="" if compact else "实时估算 · 结算可能校正",
+        )
+
+    return CombatStatusPresentation(
+        kind="disconnected",
+        label=combat_state_label("disconnected", compact=compact),
+        color=MUTED,
+    )
 
 
 def clamp_main_window_size(
@@ -354,11 +433,19 @@ def combat_hud_size(
         (remote_players + HUD_TEAMMATES_PER_COLUMN - 1) // HUD_TEAMMATES_PER_COLUMN
     )
     teammate_column_width = round((230 + 20 * high_dpi) * scale)
-    height_gain = 160 if int(player_count) >= 2 else 84
+    multiplayer = int(player_count) >= 2
+    mid_dpi = max(0.0, min(0.5, float(tk_scaling) - 1.0))
+    if multiplayer:
+        # Tk font baselines grow before the older >1.5 high-DPI breakpoint.
+        # Reserve that real 1.0..1.5 growth for the local share row, then taper
+        # the later gain so the established 2.5 maximum remains unchanged.
+        height = 474 + round(40 * mid_dpi) + round(140 * high_dpi)
+    else:
+        height = 474 + round(84 * high_dpi)
     return (
         round((350 + 40 * high_dpi) * scale)
         + teammate_columns * teammate_column_width,
-        round((474 + height_gain * high_dpi) * scale),
+        round(height * scale),
     )
 
 
@@ -377,16 +464,24 @@ def hud_panel_height(
 def hud_recent_panel_height(tk_scaling: float, *, multiplayer: bool) -> int:
     """Reserve the multiplayer share label and bar at high DPI."""
 
+    if multiplayer:
+        mid_dpi = max(0.0, min(0.5, float(tk_scaling) - 1.0))
+        high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
+        return 114 + round(40 * mid_dpi) + round(72 * high_dpi)
     return hud_panel_height(
         114,
         tk_scaling,
-        high_dpi_gain=92 if multiplayer else 34,
+        high_dpi_gain=34,
     )
 
 
 def main_window_min_size(tk_scaling: float) -> tuple[int, int]:
+    mid_dpi = max(0.0, min(0.5, float(tk_scaling) - 1.0))
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
-    return 780 + round(840 * high_dpi), 700 + round(280 * high_dpi)
+    return (
+        780 + round(840 * high_dpi),
+        700 + round(40 * mid_dpi) + round(260 * high_dpi),
+    )
 
 
 def main_metric_card_height(tk_scaling: float) -> int:
@@ -397,6 +492,22 @@ def main_metric_card_height(tk_scaling: float) -> int:
 def main_team_panel_height(tk_scaling: float) -> int:
     high_dpi = max(0.0, min(1.0, float(tk_scaling) - 1.5))
     return 115 + round(36 * high_dpi)
+
+
+def combat_team_grid_layout(
+    visible_count: int,
+    viewport_width: int,
+    ui_scale: float,
+) -> tuple[int, int, bool]:
+    """Return card/content widths and whether horizontal recovery is needed."""
+
+    viewport = max(1, int(viewport_width))
+    actual_columns = max(0, min(MAX_PARTY_MEMBERS, int(visible_count)))
+    columns = max(4, actual_columns)
+    cell_width = max(round(150 * float(ui_scale)), viewport // 4)
+    content_width = cell_width * columns
+    needs_scroll = cell_width * actual_columns > viewport
+    return cell_width, content_width, needs_scroll
 
 
 def hud_teammate_card_height(tk_scaling: float) -> int:
@@ -1384,14 +1495,10 @@ class CombatHudWindow:
             return
         try:
             snapshot = self.aggregator.snapshot()
-            degraded = bool(snapshot.diagnostic_warning)
+            status = combat_status_presentation(snapshot, compact=True)
             self.labels["hud_status"].configure(
-                text=(
-                    "● 实时 · 有事件跳过"
-                    if snapshot.connection_state == "live" and degraded
-                    else combat_state_label(snapshot.connection_state, compact=True)
-                ),
-                fg=GOLD if degraded else combat_state_color(snapshot.connection_state),
+                text=status.text,
+                fg=status.color,
             )
             _set_metric_label(
                 self.labels["damage"],
@@ -1817,7 +1924,6 @@ class ToolboxShell:
             font=("Segoe UI", 8, "bold"),
         )
         self.labels["app_version"].pack(side="right", padx=(0, 12))
-
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True)
         self.sidebar = tk.Frame(body, bg=SIDEBAR, width=150, padx=9, pady=12)
@@ -3756,14 +3862,10 @@ class ToolboxShell:
             fg=GREEN if game_running else MUTED,
         )
         snapshot = self.combat_aggregator.snapshot()
-        degraded = bool(snapshot.diagnostic_warning)
+        combat_status = combat_status_presentation(snapshot)
         self.labels["combat_status"].configure(
-            text=(
-                "● 实时（有事件跳过）"
-                if snapshot.connection_state == "live" and degraded
-                else combat_state_label(snapshot.connection_state)
-            ),
-            fg=GOLD if degraded else combat_state_color(snapshot.connection_state),
+            text=combat_status.text,
+            fg=combat_status.color,
         )
         self.labels["combat_summary"].configure(
             text=(
@@ -3831,16 +3933,19 @@ class ToolboxShell:
 
     def _refresh_combat(self) -> None:
         snapshot = self.combat_aggregator.snapshot()
-        live = snapshot.connection_state == "live"
-        degraded = bool(snapshot.diagnostic_warning)
+        combat_status = combat_status_presentation(snapshot)
+        shows_active_data = combat_status.kind in {"estimate", "official"}
+        status_parts = [combat_status.label]
+        if shows_active_data:
+            status_parts.append(format_stage_location(snapshot))
+        if combat_status.explanation:
+            status_parts.append(combat_status.explanation)
+        status_text = " · ".join(status_parts)
+        if not shows_active_data:
+            status_text += "；键盘和宏不受影响"
         self.labels["combat_connection"].configure(
-            text=(
-                f"● 实时{'（有事件跳过）' if degraded else ''} · "
-                f"{format_stage_location(snapshot)}"
-                if live
-                else f"{combat_state_label(snapshot.connection_state)}；键盘和宏不受影响"
-            ),
-            fg=GOLD if degraded else combat_state_color(snapshot.connection_state),
+            text=status_text,
+            fg=combat_status.color,
         )
         _set_metric_label(
             self.labels["combat_damage"],
@@ -3881,12 +3986,12 @@ class ToolboxShell:
                 )
             elif not team_visible and self.combat_team_panel.winfo_manager():
                 self.combat_team_panel.pack_forget()
-        if self.combat_team_scrollbar is not None:
-            if team_visible and len(team_rows) > 4:
-                if not self.combat_team_scrollbar.winfo_manager():
-                    self.combat_team_scrollbar.pack(side="bottom", fill="x")
-            elif self.combat_team_scrollbar.winfo_manager():
-                self.combat_team_scrollbar.pack_forget()
+        if (
+            self.combat_team_scrollbar is not None
+            and not team_visible
+            and self.combat_team_scrollbar.winfo_manager()
+        ):
+            self.combat_team_scrollbar.pack_forget()
         self.labels["combat_team_heading"].configure(
             text=f"队伍伤害 · {max(1, snapshot.detected_player_count)} 人"
         )
@@ -3964,12 +4069,12 @@ class ToolboxShell:
         if canvas is None or grid is None or window_id is None:
             return
         viewport_width = max(1, canvas.winfo_width())
-        visible_count = max(4, min(MAX_PARTY_MEMBERS, self._combat_team_visible_count))
-        cell_width = max(
-            round(150 * self.main_ui_scale),
-            viewport_width // 4,
+        cell_width, content_width, needs_scroll = combat_team_grid_layout(
+            self._combat_team_visible_count,
+            viewport_width,
+            self.main_ui_scale,
         )
-        content_width = cell_width * visible_count
+        visible_count = max(4, min(MAX_PARTY_MEMBERS, self._combat_team_visible_count))
         for column in range(MAX_PARTY_MEMBERS):
             grid.grid_columnconfigure(
                 column,
@@ -3983,6 +4088,13 @@ class ToolboxShell:
         canvas.configure(
             scrollregion=(0, 0, content_width, max(1, canvas.winfo_height()))
         )
+        scrollbar = self.combat_team_scrollbar
+        if scrollbar is not None:
+            if self._combat_team_visible_count >= 2 and needs_scroll:
+                if not scrollbar.winfo_manager():
+                    scrollbar.pack(side="bottom", fill="x")
+            elif scrollbar.winfo_manager():
+                scrollbar.pack_forget()
 
     def _draw_combat_team_share(self, index: int) -> None:
         if not 0 <= index < len(self.combat_team_bars):

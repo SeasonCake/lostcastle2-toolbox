@@ -17,7 +17,7 @@ EMERGENCY_MODIFIERS = ("CTRL", "SHIFT")
 def default_profile_data() -> list[dict[str, Any]]:
     common_limits = {
         "foreground_only": True,
-        "max_runtime_ms": 10_000,
+        "max_runtime_ms": 60_000,
         "repeat_delay_ms": 80,
     }
     return [

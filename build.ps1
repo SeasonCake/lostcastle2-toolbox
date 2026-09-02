@@ -34,7 +34,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $goldEditorPath).Hash -ne $gold
 if (-not (Test-Path -LiteralPath $communityModsPath -PathType Container)) {
     throw 'Missing prepared community MOD payloads.'
 }
-if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 54) {
+if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 57) {
     throw 'Prepared community MOD payload file count mismatch.'
 }
 $runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
@@ -99,7 +99,16 @@ py -3 .\generate_icon.py
 if ($LASTEXITCODE -ne 0) {
     throw "Icon generation failed with exit code $LASTEXITCODE."
 }
-py -3 -m unittest discover -s .\tests -v
+$excludedReleaseTests = @(
+    'test_prepare_lc2_public_catalog.py',
+    'test_prepare_lc2_public_runtime.py',
+    'test_public_build.py'
+)
+$releaseTestModules = Get-ChildItem -LiteralPath '.\tests' -File -Filter 'test_*.py' |
+    Where-Object { $_.Name -notin $excludedReleaseTests } |
+    Sort-Object Name |
+    ForEach-Object { 'tests.' + $_.BaseName }
+py -3 -m unittest @releaseTestModules -v
 if ($LASTEXITCODE -ne 0) {
     throw "Test suite failed with exit code $LASTEXITCODE."
 }
@@ -134,7 +143,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $packageParent = Join-Path $projectRoot 'package'
-$packageRoot = Join-Path $packageParent '失落城堡2工具箱1.6.2-实时数值监测+一键MOD安装'
+$packageRoot = Join-Path $packageParent '失落城堡2工具箱1.7-实时数值监测+一键MOD安装'
 if (Test-Path -LiteralPath $packageRoot) {
     $resolvedPackageRoot = (Resolve-Path -LiteralPath $packageRoot).Path
     $expectedPackageRoot = [System.IO.Path]::GetFullPath($packageRoot)
@@ -146,11 +155,10 @@ if (Test-Path -LiteralPath $packageRoot) {
 }
 $packageConfig = Join-Path $packageRoot 'config'
 $packageModules = Join-Path $packageRoot 'modules'
-$packageExports = Join-Path $packageRoot 'exports'
 $packageUserMods = Join-Path $packageRoot '用户MOD'
 $packageSupport = Join-Path $packageRoot '赞助与投喂'
 $packageRuntimeNotices = Join-Path $packageRoot '运行环境'
-foreach ($directory in @($packageRoot, $packageConfig, $packageModules, $packageExports, $packageUserMods, $packageSupport, $packageRuntimeNotices)) {
+foreach ($directory in @($packageRoot, $packageConfig, $packageModules, $packageUserMods, $packageSupport, $packageRuntimeNotices)) {
     if (-not (Test-Path -LiteralPath $directory)) {
         New-Item -ItemType Directory -Path $directory | Out-Null
     }
@@ -159,10 +167,15 @@ $runtimeRoot = Join-Path $projectRoot 'dist\失落城堡2工具箱'
 Get-ChildItem -LiteralPath $runtimeRoot -Force | Copy-Item -Destination $packageRoot -Recurse -Force
 Copy-Item -LiteralPath '.\package_assets\使用说明.txt' -Destination $packageRoot -Force
 Copy-Item -LiteralPath '.\package_assets\MOD自动添加说明.txt' -Destination $packageRoot -Force
+Copy-Item -LiteralPath '.\LICENSE' -Destination $packageRoot -Force
+Copy-Item -LiteralPath '.\THIRD_PARTY_NOTICES.md' -Destination $packageRoot -Force
 Copy-Item -LiteralPath '.\package_assets\用户MOD\请把MOD放到这里.txt' -Destination $packageUserMods -Force
 Copy-Item -LiteralPath '.\package_assets\modules.README.txt' -Destination (Join-Path $packageModules 'README.txt') -Force
-Copy-Item -LiteralPath '.\package_assets\exports.README.txt' -Destination (Join-Path $packageExports 'README.txt') -Force
 Get-ChildItem -LiteralPath $supportAssetsPath -File | Copy-Item -Destination $packageSupport -Force
 Get-ChildItem -LiteralPath $runtimeNoticesPath -File | Copy-Item -Destination $packageRuntimeNotices -Force
+if (-not (Test-Path -LiteralPath (Join-Path $packageRoot 'LICENSE') -PathType Leaf) -or
+    -not (Test-Path -LiteralPath (Join-Path $packageRoot 'THIRD_PARTY_NOTICES.md') -PathType Leaf)) {
+    throw 'Packaged license or third-party notices are missing.'
+}
 
 Write-Output $packageRoot

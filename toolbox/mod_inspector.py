@@ -206,6 +206,79 @@ def _dotnet_user_strings(content: bytes) -> str:
         logger.setLevel(previous_level)
 
 
+def _read_compressed_uint(data: bytes, offset: int) -> tuple[int, int]:
+    if offset >= len(data):
+        raise ValueError("compressed integer is truncated")
+    first = data[offset]
+    if first & 0x80 == 0:
+        return first, offset + 1
+    if first & 0xC0 == 0x80:
+        if offset + 1 >= len(data):
+            raise ValueError("compressed integer is truncated")
+        return ((first & 0x3F) << 8) | data[offset + 1], offset + 2
+    if first & 0xE0 == 0xC0:
+        if offset + 3 >= len(data):
+            raise ValueError("compressed integer is truncated")
+        return (
+            ((first & 0x1F) << 24)
+            | (data[offset + 1] << 16)
+            | (data[offset + 2] << 8)
+            | data[offset + 3],
+            offset + 4,
+        )
+    raise ValueError("compressed integer prefix is invalid")
+
+
+def _read_serialized_string(data: bytes, offset: int) -> tuple[str | None, int]:
+    if offset >= len(data):
+        raise ValueError("serialized string is truncated")
+    if data[offset] == 0xFF:
+        return None, offset + 1
+    length, start = _read_compressed_uint(data, offset)
+    end = start + length
+    if end > len(data):
+        raise ValueError("serialized string is truncated")
+    return data[start:end].decode("utf-8"), end
+
+
+def _bepin_plugin_metadata(content: bytes) -> tuple[str, str, str] | None:
+    """Read BepInPlugin(guid, name, version) without loading the assembly."""
+
+    logger = logging.getLogger("dnfile.stream")
+    previous_level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        image = dnfile.dnPE(data=content)
+        table = image.net.mdtables.CustomAttribute if image.net is not None else None
+        if table is None:
+            return None
+        for attribute in table.rows:
+            constructor = getattr(attribute.Type, "row", None)
+            owner = getattr(getattr(constructor, "Class", None), "row", None)
+            if (
+                str(getattr(owner, "TypeNamespace", "")) != "BepInEx"
+                or str(getattr(owner, "TypeName", "")) != "BepInPlugin"
+                or str(getattr(constructor, "Name", "")) != ".ctor"
+            ):
+                continue
+            data = attribute.Value.value_bytes()
+            if not data.startswith(b"\x01\x00"):
+                continue
+            offset = 2
+            values: list[str] = []
+            for _index in range(3):
+                value, offset = _read_serialized_string(data, offset)
+                if not value:
+                    raise ValueError("BepInPlugin contains an empty fixed argument")
+                values.append(value)
+            return values[0], values[1], values[2]
+    except Exception:
+        return None
+    finally:
+        logger.setLevel(previous_level)
+    return None
+
+
 def _unique_matches(pattern: str, text: str, *, flags: int = 0) -> tuple[str, ...]:
     values: list[str] = []
     for match in re.finditer(pattern, text, flags):
@@ -255,17 +328,21 @@ class ModPackageInspector:
         )
         document_text = "\n".join(_decode_text(reader(member.path)) for member in documents)
         binary_chunks: list[str] = []
+        plugin_metadata: list[tuple[str, str, str]] = []
         for member in payload_members:
             if member.suffix != ".dll" or member.size_bytes > 8 * 1024 * 1024:
                 continue
             content = reader(member.path)
             binary_chunks.extend((_binary_strings(content), _dotnet_user_strings(content)))
+            metadata = _bepin_plugin_metadata(content)
+            if metadata is not None and metadata not in plugin_metadata:
+                plugin_metadata.append(metadata)
         binary_text = "\n".join(binary_chunks)
         contextual_binary = "\n".join(
             line
             for line in binary_text.splitlines()
             if re.search(
-                r"(?i)(?:作者\s*[:：]|author\s*[:：=]|快捷键|hotkey|toggle|panel|面板|按\s*(?:F\d|INS))",
+                r"(?i)(?:作者(?:\s*[:：]|\s+)|author\s*[:：=]|快捷键|hotkey|toggle|panel|面板|按\s*(?:F\d|INS))",
                 line,
             )
         )
@@ -277,6 +354,7 @@ class ModPackageInspector:
             manifest,
             combined_text,
             bool(documents),
+            tuple(plugin_metadata),
         )
 
     def read_payload(self, draft: ModDraft) -> dict[str, bytes]:
@@ -472,6 +550,7 @@ class ModPackageInspector:
         manifest: dict[str, object] | None,
         combined_text: str,
         has_documents: bool,
+        plugin_metadata: tuple[tuple[str, str, str], ...],
     ) -> ModDraft:
         display = manifest.get("display") if manifest else None
         if display is not None and not isinstance(display, dict):
@@ -479,9 +558,12 @@ class ModPackageInspector:
         display = display if isinstance(display, dict) else {}
         dll_names = [Path(item.target_path).stem for item in payload if item.target_path.casefold().endswith(".dll")]
         source_name = source.stem
-        version_matches = _unique_matches(
-            r"(?i)(?:^|[^0-9])v?(\d+\.\d+(?:\.\d+){0,2})(?:[^0-9]|$)",
-            source_name,
+        version_matches = tuple(
+            value[1:] if value.casefold().startswith("v") else value
+            for value in _unique_matches(
+                r"(?i)(?:^|[^A-Za-z0-9])(v\d+(?:\.\d+){0,3}|\d+\.\d+(?:\.\d+){0,2})(?:[^0-9]|$)",
+                source_name,
+            )
         )
         payload_version = (
             split_versioned_dll_stem(dll_names[0]) if len(dll_names) == 1 else None
@@ -518,7 +600,7 @@ class ModPackageInspector:
             if panel_hotkey not in normalized_hotkeys:
                 hotkeys = (*hotkeys, panel_hotkey)
         authors = _unique_matches(
-            r"(?im)(?:作者\s*[:：]?|author\s*[:：=]|(?:^|\s)by\s+)([\w\u3400-\u9fff.\-]{1,30})",
+            r"(?im)(?:作者(?:\s*[:：]\s*|\s+)|author\s*[:：=]\s*|(?:^|\s)by\s+)([\w\u3400-\u9fff.\-]{1,30})",
             combined_text,
         )
         manifest_id = manifest.get("id") if manifest else None
@@ -533,6 +615,8 @@ class ModPackageInspector:
         detected_version = (
             version_matches[0]
             if version_matches
+            else plugin_metadata[0][2]
+            if len({item[2] for item in plugin_metadata}) == 1
             else payload_version[2]
             if payload_version
             else "1.0"
@@ -552,6 +636,8 @@ class ModPackageInspector:
             evidence.append("随包说明")
         if manifest:
             evidence.append("lc2-mod.json")
+        if plugin_metadata:
+            evidence.append("BepInPlugin 元数据")
         warnings: list[str] = []
         folded_name = source.name.casefold()
         for marker, message in (

@@ -10,16 +10,16 @@
 
 | 项目 | 当前记录 |
 | --- | --- |
-| 记录日期 | 2026-08-31（Asia/Shanghai） |
+| 记录日期 | 2026-09-01（Asia/Shanghai） |
 | Steam app / build | `2445690` / `24795992`；已从本机 manifest 复核 |
 | Unity / IL2CPP metadata | `6000.3.16f1` / `39` |
 | `GameAssembly.dll` | `747E8BECB7B97B014D7F282C1EB60A7A4754A8A1DF01CEB943C03967F6E6F1C5` |
 | `global-metadata.dat` | `D42663B5ED61E9D5D30FCEF878969507C4B04951595DD61D63B5E0BD7017984A` |
 | `LC2.Core.dll` interop | `0267065BFB4CF8E4B7BD369C2240212901294C85B931DD6259FFAF02E5AFEFAF` |
 | BepInEx | `6.0.0-be.785`，commit `6abdba47eeebe08552282e7a58ef0f4a9ab60b62` |
-| 当前项目源码 | 工具箱 `1.6.2` / Bridge `0.4.12` 候选；15 个 Hook 不变。0.4.10 真实完整四人局暴露快照整表清空与 owner 误归属；0.4.11/0.4.12 分别改为最旧淘汰与收窄 owner 链，并把全链扩到 16 人 |
-| 当前游戏目录 | Bridge `0.4.12` 已部署，52,736 B / SHA-256 `3229359A7D901CEBCD523109261A034704CA06B0E3EAD0829ADC5B19ED976D8D`；0.4.10 exact rollback 为 `B27FC892…7CB0FA` |
-| 桌面端 | 1.6.2 r2 exact candidate 为 1,761 文件、`166,635,553` B、config0；EXE 6,470,904 B / `EBFF9584…3F0025`；A200个人占比bar裁切已修，13臂绑定r2 EXE，真实0.4.12尚未运行 |
+| 当前项目源码 | 工具箱1.6.3 r17延迟live锚点候选 / Bridge0.4.24；16 Hook。仅live实际变化时全槽重锚，room变化不清delta；final checker重建实际过程显示；archive默认128 MiB |
+| 当前游戏目录 | Bridge0.4.24已部署，78,336 B / `AED74353…21115A`；0.4.23 exact rollback=`9BDB748B…698C9C` |
+| 桌面端 | 1.6.3 r17延迟live锚点候选1,761文件、166目录、166,679,118 B、config0；EXE6,486,850 B / `FBC0050A…1CD04`；项目包与桌面逐文件差异0。当前r15长局已final，r17实机未运行 |
 
 证据标签：
 
@@ -64,8 +64,8 @@
 | 来源显示“未知” | `assets/combat_sources.json` | 游戏更新的新 token，或 Bridge 自己发出的 token 未登记 | 当前已知缺口：`enemy.damage`；`set_cur_hp` 已登记为“直接生命变化” |
 | 护盾、自伤、诅咒长期为 0 | Bridge 是否真正发出 `effect_stack/resource_change` | 协议和聚合字段存在不代表游戏入口已接通 | `U`。当前属于协议/测试预留，不能标成已完成功能 |
 | 重连后统计被清空或错 session | `session_id`、`sequence`、显式 `session_started` | 断线重连被误当新局；异 session 事件无显式边界 | `T/S`。结束态重连保持 `session_ended`；仍需实机断线正控 |
-| 多人顶部伤害高于个人结算、队友编号跳号或大量未归属 | 全局 `total_damage`、本机 token、`mAtkerInHierarchy/OwnerEntity/Master` 归属链、active roster | v1.6.1 顶部直接显示队伍全量；旧 owner 会漏技能/召唤物；0.4.9 的 StandMaster/EntityID 根又可能把远端量错归本机 | `R-FAIL`：0.4.10 完整局本机比官方多267,006，而队伍合计仍少143,460。0.4.12只接受 Player/native、OwnerEntity hierarchy与Creature.Master；真实客机/召唤物待复测 |
-| 多人长局中途变“异常”或出现事件跳过 | Bridge fault code、damage snapshot 数、queue overflow | 0.4.9 任一局部故障冻结；0.4.10虽可恢复，但旧8192上限执行整表Clear，会让一次overflow连锁missing | `R-FAIL→S/T`：真实0.4.10先`damage_snapshot_overflow`再`missing`；0.4.11最旧未消费淘汰避免整表清空，0.4.12保持queue致命。真实0.4.12待复测 |
+| 多人个人/全队伤害、Boss或占比不一致 | 官方`mDamageValue/mBossDamageValue/mIndex`、逐击观察、匿名slot、团队分母 | 0.4.12逐击少算；0.4.13又把官方record全映到本机slot3，部分覆盖时分母退回本机值 | 两轮`R-FAIL`；0.4.14用mIndex主映射、P1–P16标签，分母始终为各P位显示值和，真实待复测 |
+| 多人长局中途变“异常”或出现事件跳过 | Bridge fault code、damage snapshot数、queue overflow、stack诊断 | 0.4.9冻结；0.4.10整表Clear连锁missing；0.4.12唯一`damage_stack_mismatch`实际只重置parent/depth且没有跳过EmitDamage | 0.4.13把stack mismatch改为`damage_event_skipped=False`计数诊断，不再标黄；真实snapshot/conversion仍黄色，queue仍致命 |
 
 ## 3. 用户指标端到端主表
 
@@ -426,6 +426,33 @@
 - 主窗口最多16格并只在>4人时显示横向拖动条；HUD队友按列优先，每列3人，5/8/16人分别扩至2/3/5列。Mini HUD多人时在DPS卡空行显示“自己队伍占比”与bar，单人不显示。
 - 精确包182项、源码/包/桌面self-test与运行时/MOD包形PASS。初审发现旧A200多人HUD个人占比bar被裁切；r2保持外框尺寸并把底部空白分给recent卡，四个A200臂文字27/27px且bar可见。Bridge DLL 52,736 B / `3229359A…76D8D`，r2工具箱EXE 6,470,904 B / `EBFF9584…3F0025`。真实0.4.12多人、客机、远端召唤物、7–16人云端房间仍为`NOT RUN`。
 - 默认7人MOD只纳入15,872 B / `1247F19F…30F25`功能DLL；53个社区条目共54文件/3,391,437 B，共用唯一固定BepInEx运行时，不携带重复framework/cache/interop/cfg。体积证据见`artifacts/mod-analysis/2026-08-30-managed-payload-footprint/`。
+
+## 23. 0.4.12三人普通怪少算与0.4.13官方逐玩家校准
+
+- 正式v1.6.2三人最终HUD/官方：本机`7,293,748/8,475,632`，队友1`9,924,156/10,035,357`，队友2`9,597,741/13,163,701`；团队`26,815,645/31,674,690`，少4,859,045。
+- HUD/官方团队Boss为`12,173,916/12,114,545`，差59,371；非Boss为`14,641,729/19,560,145`，差4,918,416。该分布能证伪“只是最后一击漏一条”，并把主根因收窄到普通怪逐击重建口径；玩家Boss错分另由owner路径造成。
+- 日志只有首次`damage_stack_mismatch`，无queue overflow、snapshot missing或致命错误。`EndHpSnapshot`先CaptureHp，再检查ThreadStatic parent栈；不匹配只Clear嵌套栈，`OfficialAttackerDamagePatch`仍随后EmitDamage。因此0.4.12黄色提示对该code语义错误。
+- 当前interop字段经只读反射与SDK实编译确认：`StageNetworkCtrl._multiRoundDataDic`值为`AdventureRecordPlayerData`，提供`mID/mIndex/mDamageValue/mBossDamageValue`；`SettlementDataMgr.mCacheRoundDataDict`提供`DamageCollector.mAtkDmg/mAtkDmg_Boss`。
+- 0.4.13每秒及房间/回营边界把上述官方累计附到匿名party成员。网络值按同slot跨record求和，结算fallback取不回退最大值；ID/ClientID/TransportID优先映射当前Player，Index/有界ordinal仅作fallback。Python只有当roster官方值完整时用官方团队总量/Boss；每名玩家有官方值即覆盖主卡，逐击观察值继续保留在来源、DPS和诊断字段中。
+- 旧/延迟官方快照只取max，防止累计倒退；离队token保留最后官方值。协议只允许0..2^53-1整数，16人接受/17人拒绝不变。0.4.12实战三人数字逐项进入回归。
+- 0.4.13 r2构建58,880 B / `A0738C53…EA7C96F`，PDB24,748 B / `48548115…A3029`，SDK6.0.428为0 warning/0 error；Python全量187项。r2锁定index基准并对同slot token去重，已双零部署，真实多人`NOT RUN`。
+
+## 24. 0.4.13 r2官方record塌缩与0.4.14 P位合同
+
+- 四人局最终官方总伤害为38,859,658，四名玩家分别11,929,682、2,090,147、7,818,009、17,021,820；0.4.13 HUD本机却为40,851,600，远端仍为逐击1,586,460/7,728,499/16,606,274。
+- 日志54次官方摘要从头到尾只有slot3非null，最终`slot3:damage=40851600:boss=14880152`；slot0–2全null。当前PlayerManager本机Index为3，因此官方record被全部归到本机P4。
+- 0.4.13构造record identity时错误使用`AdventureRecordPlayerData.mID`；实机证明它不是逐玩家`Player.ID/ClientID/TransportID`。0.4.14忽略该字段，先按record.mIndex和本局锁定的0/1基准映射；只在index无效时使用dictionary pair.Key匹配Player三类网络ID。
+- 早期本机31,835，P位1,635/10,008/8,780却显示100%/5%/31%/27%，证明`official_complete=false`时旧team denominator回退`self.total_damage`。0.4.14在roster存在时统一求和各slot有效值；部分官方覆盖使用“该slot官方值，否则逐击值”，再有界加入未归属，因此各P位占比与bar始终同分母。
+- UI标签不再使用不明确“队友1/2/3”：本机为`自己 · Pn`，活动为`Pn`，离队为`Pn（离队）`。slot3合成正控在主界面/HUD均显示自己P4与远端P1/P2/P3，比例合计100%。
+- 0.4.14日志官方摘要额外写`network_records/fallback_records/index_base/raw_indices`，不写原始key、ID或昵称。候选59,392 B / `343B69EF…3C6E24`，全量188项、C#和包形PASS，真实`NOT RUN`。
+
+## 25. 0.4.14 r3无远端官方值与0.4.15短房诊断门
+
+- 0.4.14真实四人局的54次摘要全部`network_records=0/fallback_records=1`；singleton cache最终32,669,460/11,901,301恰等于HUD主卡，却不等于本机官方10,380,702/3,449,829，禁止再当某P official。
+- GameAssembly/native闭合最终时序：`StageNetworkCtrl.SyncAdventureRecordDataEnd`计算并写回每P Damage/BossDamage，调用`StatisticsMgr.SyncMultiplyRoundData`物化record/save list，随后清空`_multiRoundDataDic`。因此可靠读取点是SyncEnd返回后的`mCurAdventureRecordSaveData.mAdventureRecordPlayerDataList`；`mIndex == Player.Index`，0基直接映射，不再使用ID、ordinal或base heuristic。
+- 0.4.15仅在最终record slot集合与本局历史roster完全一致、无非法/重复slot时发布整组official，否则整组拒绝。房内实时仍用逐击观察；registered-player attacker callback只输出覆盖、转发和slot冲突诊断，未经短房证明不改变`owner_player_id`。
+- Python可见团队分母仅使用active roster，duplicate slot拒绝，本机token替换只使用active local；同run pipe重连保持GUID/累计并标`degraded:transport_reconnected`。
+- `tools/check_lc2_multiplayer_probe.py`要求至少两个远端slot、registered/Settlement hit完整重合、至少一个远端转发样本且冲突为0，并拒绝退局phantom session。0.4.15短房owner子门208/208通过，但整体仅因`phantom_session_after_round_start`失败；退出后单卡7,453可能是团队/当前缓存折叠，个人口径UNKNOWN。0.4.16离线全量200项、SDK6.0.428 Release 0 warning/0 error；最终四P、包/UI和发布仍`NOT RUN`。
 
 主要维护入口：
 

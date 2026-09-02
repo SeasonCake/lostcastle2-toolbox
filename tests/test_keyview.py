@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from contextlib import redirect_stderr, redirect_stdout
 import io
+import inspect
 from itertools import combinations
 import json
 from pathlib import Path
@@ -17,6 +18,16 @@ import keyview
 
 
 class KeyViewTests(unittest.TestCase):
+    def test_release_runtime_keeps_combat_data_in_memory_only(self) -> None:
+        main_source = inspect.getsource(keyview.main)
+        self.assertNotIn("CombatMatchArchiver", main_source)
+        self.assertNotIn("event_batch_sink=", main_source)
+        build_source = (Path(__file__).resolve().parents[1] / "build.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("packageExports", build_source)
+        self.assertNotIn("exports.README", build_source)
+
     def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:
         root = mock.Mock()
         keyview.apply_app_window_icon(root)
@@ -49,11 +60,23 @@ class KeyViewTests(unittest.TestCase):
             }.issubset(sizes)
         )
 
+    def test_build_package_includes_project_and_third_party_notices(self) -> None:
+        build_source = (Path(__file__).resolve().parents[1] / "build.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Copy-Item -LiteralPath '.\\LICENSE'", build_source)
+        self.assertIn(
+            "Copy-Item -LiteralPath '.\\THIRD_PARTY_NOTICES.md'",
+            build_source,
+        )
+        self.assertIn("Packaged license or third-party notices are missing.", build_source)
+
     def test_windows_fixed_and_string_versions_match_the_app_version(self) -> None:
         version_source = (
             Path(__file__).resolve().parents[1] / "version_info.txt"
         ).read_text(encoding="utf-8")
-        numeric_version = tuple(int(part) for part in keyview.APP_VERSION.split(".")) + (0,)
+        numeric_parts = [int(part) for part in keyview.APP_VERSION.split(".")]
+        numeric_version = tuple((numeric_parts + [0, 0, 0, 0])[:4])
         rendered_numeric = ", ".join(str(part) for part in numeric_version)
         self.assertIn(f"filevers=({rendered_numeric})", version_source)
         self.assertIn(f"prodvers=({rendered_numeric})", version_source)
@@ -165,8 +188,29 @@ class KeyViewTests(unittest.TestCase):
                 self.assertEqual(keyview.self_test(), 0)
         payload = json.loads(output.getvalue())
         self.assertTrue(payload["game_exe_found"])
+        self.assertEqual(payload["runtime_bundle"], "verified")
         self.assertNotIn("game_exe", payload)
         self.assertNotIn(str(private_path), output.getvalue())
+
+    def test_source_self_test_is_explicit_when_third_party_runtime_is_absent(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            resource_root = Path(temp_dir)
+            (resource_root / "assets").mkdir()
+            (resource_root / "assets" / "lc2_runtime_manifest.json").write_text(
+                (project_root / "assets" / "lc2_runtime_manifest.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with mock.patch.object(keyview, "RESOURCE_DIR", resource_root):
+                with mock.patch.object(keyview, "resolve_game_exe", return_value=None):
+                    with redirect_stdout(output):
+                        self.assertEqual(keyview.self_test(), 0)
+        payload = json.loads(output.getvalue())
+        self.assertFalse(payload["game_exe_found"])
+        self.assertEqual(payload["runtime_bundle"], "not_present_source_checkout")
 
     def test_window_size_parser_accepts_bounded_qa_geometry(self) -> None:
         self.assertEqual(keyview.parse_window_size("780x560"), (780, 560))

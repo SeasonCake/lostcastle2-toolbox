@@ -3,7 +3,7 @@
 - 生命周期：`SUPERSEDED INITIAL CANDIDATE / DIFFERENT-OWNER RELEASE HOLD`。初审发现 A200 多人 HUD 的个人占比 bar 被裁切；不得用于最终放行。
 - 精确 EXE：6,470,608 B / SHA-256 `ECC6A51EDA3F929DF610EC09FAA101489B2D6FCD60A27F9C907971AFDFF0647A`；FileVersion/ProductVersion 均为 1.6.2。
 - 运行时清单：`232360AFD3C225E213C775BBACAFA51F1311B1F820954F7C96F6FDB60A12E630`；社区目录：`9EEEFD73A2EC5D29AC5FECFC034E3292F29F6071A59A123510D50DC817E255B3`。
-- 每个 arm 的 `receipt.json`、`window-internal.png` 与进程命令行绑定到同一 EXE；截图均由对应 PID 的窗口直接捕获。
+- 每个 arm 的 `receipt.json`、`window-internal.png` 与进程命令行绑定到同一 EXE；截图均由对应回执窗口直接捕获。
 
 | arm | 窗口 | 截图 SHA-256 | 结论 |
 | --- | ---: | --- | --- |

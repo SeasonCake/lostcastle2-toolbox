@@ -4,8 +4,10 @@ import json
 import os
 from pathlib import Path
 import threading
+import tempfile
 import time
 import unittest
+from unittest import mock
 import uuid
 
 from toolbox.combat_aggregator import CombatAggregator
@@ -77,6 +79,92 @@ class CombatLineDecoderTests(unittest.TestCase):
             [{"first": 1}, {"second": 2}],
         )
         decoder.finish()
+
+
+class CombatEventPumpArchiveSinkTests(unittest.TestCase):
+    def test_sink_receives_only_accepted_events_in_one_batch(self) -> None:
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        validator = CombatEventValidator.from_file(
+            PROJECT_ROOT / "contracts" / "combat_event.schema.json"
+        )
+        batches: list[tuple[dict[str, object], ...]] = []
+        pump = CombatEventPump(
+            inbox,
+            validator,
+            aggregator,
+            event_batch_sink=lambda events: batches.append(
+                tuple(dict(item) for item in events)
+            ),
+        )
+        first = status_event()
+        inbox.publish_event(first)
+        inbox.publish_event(first)
+
+        report = pump.drain()
+
+        self.assertEqual(report.processed_events, 1)
+        self.assertEqual(report.duplicate_events, 1)
+        self.assertEqual(len(batches), 1)
+        self.assertEqual(batches[0], (first,))
+
+    def test_session_end_flushes_before_a_new_session_in_the_same_drain(self) -> None:
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        validator = CombatEventValidator.from_file(
+            PROJECT_ROOT / "contracts" / "combat_event.schema.json"
+        )
+        batches: list[tuple[dict[str, object], ...]] = []
+        pump = CombatEventPump(
+            inbox,
+            validator,
+            aggregator,
+            event_batch_sink=lambda events: batches.append(
+                tuple(dict(item) for item in events)
+            ),
+        )
+        ended = status_event(1, status="session_ended")
+        started = status_event(0)
+        started["session_id"] = "session-b"
+        started["event_id"] = "session-b:0"
+        inbox.publish_event(status_event())
+        inbox.publish_event(ended)
+        inbox.publish_event(started)
+
+        report = pump.drain()
+
+        self.assertEqual(report.processed_events, 3)
+        self.assertEqual(len(batches), 2)
+        self.assertEqual([item["session_id"] for item in batches[0]], ["session-a", "session-a"])
+        self.assertEqual([item["session_id"] for item in batches[1]], ["session-b"])
+
+
+class CombatEventPumpReleaseLifecycleTests(unittest.TestCase):
+    def test_default_session_lifecycle_creates_no_archive_files(self) -> None:
+        inbox = CombatInbox()
+        aggregator = CombatAggregator()
+        validator = CombatEventValidator.from_file(
+            PROJECT_ROOT / "contracts" / "combat_event.schema.json"
+        )
+        pump = CombatEventPump(inbox, validator, aggregator)
+        second = status_event(0)
+        second["session_id"] = "session-b"
+        second["event_id"] = "session-b:0"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            release_root = Path(temp_dir)
+            with mock.patch.dict(
+                os.environ,
+                {"KEYVIEW_COMBAT_ARCHIVE_DIR": str(release_root / "exports")},
+            ):
+                inbox.publish_event(status_event())
+                inbox.publish_event(status_event(1, status="session_ended"))
+                inbox.publish_event(second)
+                report = pump.drain()
+
+            self.assertEqual(report.processed_events, 3)
+            self.assertEqual(aggregator.snapshot().session_id, "session-b")
+            self.assertEqual(list(release_root.rglob("*")), [])
 
     def test_invalid_utf8_json_and_non_object_are_rejected(self) -> None:
         cases = (
@@ -284,10 +372,51 @@ class CombatTransportContractTests(unittest.TestCase):
         self.validator.validate(
             status_event(1, status="party_updated", party_members=members)
         )
+        official_members = [
+            {
+                **member,
+                "official_damage": index * 1_000,
+                "official_boss_damage": index * 100,
+            }
+            for index, member in enumerate(members)
+        ]
+        self.validator.validate(
+            status_event(
+                2,
+                status="party_updated",
+                party_members=official_members,
+            )
+        )
+        live_members = [
+            {
+                **member,
+                "live_damage": index * 900,
+                "live_boss_damage": index * 90,
+            }
+            for index, member in enumerate(members)
+        ]
+        self.validator.validate(
+            status_event(
+                3,
+                status="party_updated",
+                party_members=live_members,
+            )
+        )
         with self.assertRaises(CombatSchemaError):
             self.validator.validate(
                 status_event(
-                    2,
+                    4,
+                    status="party_updated",
+                    party_members=[
+                        {**members[0], "official_damage": 1.5},
+                        *members[1:],
+                    ],
+                )
+            )
+        with self.assertRaises(CombatSchemaError):
+            self.validator.validate(
+                status_event(
+                    5,
                     status="party_updated",
                     party_members=[
                         *members,

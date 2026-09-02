@@ -13,6 +13,7 @@ from tools.prepare_community_mods import selected_payload
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_COMMUNITY_PAYLOAD_ROOT = PROJECT_ROOT / "third_party" / "community_mods"
 
 
 class ModInspectorTests(unittest.TestCase):
@@ -90,6 +91,10 @@ class ModInspectorTests(unittest.TestCase):
             self.assertEqual(draft.hotkeys, ("F1",))
             self.assertIsNone(draft.panel_hotkey)
 
+    @unittest.skipUnless(
+        LOCAL_COMMUNITY_PAYLOAD_ROOT.is_dir(),
+        "local third-party community payloads are not in source checkout",
+    )
     def test_managed_dotnet_user_strings_recover_embedded_author_without_guessing_panel(self) -> None:
         source = (
             PROJECT_ROOT
@@ -101,6 +106,46 @@ class ModInspectorTests(unittest.TestCase):
         draft = self.make_inspector().inspect(source)
         self.assertEqual(draft.author, "懒虫桑")
         self.assertIsNone(draft.panel_hotkey)
+
+    @unittest.skipUnless(
+        LOCAL_COMMUNITY_PAYLOAD_ROOT.is_dir(),
+        "local third-party community payloads are not in source checkout",
+    )
+    def test_monster_v11_filename_and_embedded_author_beat_feedback_wording(self) -> None:
+        payload = (
+            PROJECT_ROOT
+            / "third_party"
+            / "community_mods"
+            / "monster-treasure"
+            / "怪物宝藏v11.dll"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = (
+                Path(temp_dir)
+                / "怪物宝藏v11（修复客机bug，bug找作者反馈）.dll"
+            )
+            source.write_bytes(payload.read_bytes())
+            draft = self.make_inspector().inspect(source)
+        self.assertEqual(draft.version, "11")
+        self.assertEqual(draft.author, "懒虫桑")
+        self.assertNotEqual(draft.author, "反馈")
+
+    @unittest.skipUnless(
+        LOCAL_COMMUNITY_PAYLOAD_ROOT.is_dir(),
+        "local third-party community payloads are not in source checkout",
+    )
+    def test_nightfall_version_comes_from_bepin_plugin_metadata(self) -> None:
+        source = (
+            PROJECT_ROOT
+            / "third_party"
+            / "community_mods"
+            / "nightfall-bow-boost"
+            / "LC2.NightfallBowBoost噩梦降临强化.dll"
+        )
+        draft = self.make_inspector().inspect(source)
+        self.assertEqual(draft.version, "1.1.0")
+        self.assertEqual(draft.author, "社区未署名")
+        self.assertIn("BepInPlugin 元数据", draft.evidence)
 
     def test_manifest_rejects_unsupported_or_duplicate_modifier_panel_hotkey(self) -> None:
         for panel_hotkey in ("F13", "CTRL+CTRL+F5"):

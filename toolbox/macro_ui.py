@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 import queue
 import tkinter as tk
@@ -29,18 +30,21 @@ BG = "#F3EEE3"
 PANEL = "#FBF9F4"
 CONTROL = "#F3EBDD"
 CONTROL_HOVER = "#E8DDCD"
+CAPTURE_CONTROL = "#E3D6C4"
+CAPTURE_HOVER = "#D8C9B5"
 OUTLINE = "#D7CAB7"
 TEXT = "#292725"
-MUTED = "#7F766B"
+MUTED = "#6F675E"
 ACCENT = "#D86F4C"
 ACCENT_DARK = "#D86F4C"
 GOOD = "#397B64"
+PAUSED = "#956B38"
 BAD = "#C34B37"
 
 MODE_LABELS = {
     "once": "按一次：执行一遍",
     "hold_repeat": "按住：持续循环",
-    "toggle_repeat": "开关：再按一次停止",
+    "toggle_repeat": "开关：再次按下或到时停止",
 }
 MODE_IDS = {label: mode for mode, label in MODE_LABELS.items()}
 ACTION_LABELS = {
@@ -63,6 +67,88 @@ STEP_KEYS = tuple(
     + ["LEFT", "UP", "DOWN", "RIGHT", "LMB", "RMB", "MMB"]
     + [f"F{number}" for number in range(1, 13)]
 )
+
+KEYSYM_ALIASES = {
+    "RETURN": "ENTER",
+    "KP_ENTER": "ENTER",
+    "SPACE": "SPACE",
+    "TAB": "TAB",
+    "CAPS_LOCK": "CAPS",
+    "ESCAPE": "ESC",
+    "BACKSPACE": "BACK",
+    "LEFT": "LEFT",
+    "UP": "UP",
+    "DOWN": "DOWN",
+    "RIGHT": "RIGHT",
+    "CONTROL_L": "CTRL",
+    "CONTROL_R": "CTRL",
+    "SHIFT_L": "SHIFT",
+    "SHIFT_R": "SHIFT",
+    "ALT_L": "ALT",
+    "ALT_R": "ALT",
+}
+
+
+def key_from_tk_keysym(keysym: str) -> str | None:
+    """Translate one Tk key event into the macro key vocabulary."""
+    normalized = str(keysym).strip().upper()
+    if not normalized:
+        return None
+    alias = KEYSYM_ALIASES.get(normalized)
+    if alias is not None:
+        return alias
+    if len(normalized) == 1 and normalized in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+        return normalized
+    if normalized.startswith("F") and normalized[1:].isdigit():
+        number = int(normalized[1:])
+        if 1 <= number <= 12:
+            return f"F{number}"
+    return None
+
+
+def captured_key_for_target(target: str, keysym: str) -> str | None:
+    key = key_from_tk_keysym(keysym)
+    if key is None:
+        return None
+    allowed = TRIGGER_KEYS if target == "trigger_key" else STEP_KEYS if target == "step_key" else ()
+    return key if key in allowed else None
+
+
+def seconds_text_from_milliseconds(milliseconds: int) -> str:
+    seconds = Decimal(milliseconds) / Decimal(1000)
+    return format(seconds.normalize(), "f")
+
+
+def milliseconds_from_seconds_text(value: str) -> int:
+    try:
+        seconds = Decimal(str(value).strip())
+    except InvalidOperation as exception:
+        raise ValueError("最长运行时间必须是秒数") from exception
+    if not seconds.is_finite():
+        raise ValueError("最长运行时间必须是有限秒数")
+    milliseconds = seconds * Decimal(1000)
+    if milliseconds != milliseconds.to_integral_value():
+        raise ValueError("最长运行时间最多保留三位小数")
+    return int(milliseconds)
+
+
+def runtime_presentation(state: MacroState) -> tuple[str, str]:
+    labels = {
+        MacroState.RUNNING: "● 宏运行中",
+        MacroState.BLOCKED_FOCUS: "● 安全暂停 · 请回游戏后重按",
+        MacroState.TIME_LIMIT: "● 已到最长运行时间",
+        MacroState.ERROR: "● 宏执行错误",
+        MacroState.STOPPING: "● 正在停止",
+        MacroState.STOPPED: "● 已停止",
+        MacroState.COMPLETED: "● 已完成",
+        MacroState.TRIGGER_RELEASED: "● 已松开停止",
+    }
+    text = labels.get(state, "● 待命 · 仅在游戏前台执行")
+    if state is MacroState.ERROR:
+        return text, BAD
+    if state in {MacroState.BLOCKED_FOCUS, MacroState.TIME_LIMIT, MacroState.STOPPING}:
+        return text, PAUSED
+    return text, GOOD
 
 
 def _is_key_down(key: str) -> bool:
@@ -102,11 +188,20 @@ class MacroFeature:
         self._selected_index: int | None = None
         self._loading_form = False
         self._dirty = False
+        self._step_draft_dirty = False
         self._emergency_down = False
         self._rearm_required = False
         self._advanced_visible = False
-        self.advanced_frame: tk.Frame | None = None
+        self.advanced_window: tk.Toplevel | None = None
         self.advanced_button: tk.Button | None = None
+        self._key_combos: dict[str, ttk.Combobox] = {}
+        self._capture_buttons: dict[str, tk.Button] = {}
+        self._capture_target: str | None = None
+        self._capture_release_key: str | None = None
+        self._runtime_state: MacroState | None = None
+        self.step_key_label: tk.Label | None = None
+        self.step_ms_label: tk.Label | None = None
+        self.step_ms_entry: tk.Entry | None = None
         self._closed = False
         self._after_id = self.root.after(20, self._tick)
 
@@ -127,7 +222,7 @@ class MacroFeature:
         window.minsize(780, 680)
         window.attributes("-topmost", False)
 
-        header = tk.Frame(window, bg=BG, padx=20, pady=16)
+        header = tk.Frame(window, bg=BG, padx=20, pady=12)
         header.pack(fill="x")
         tk.Label(
             header,
@@ -145,9 +240,9 @@ class MacroFeature:
         ).pack(side="left", padx=(12, 0), pady=(8, 0))
         self.runtime_label = tk.Label(
             header,
-            text="● 待命",
+            text="● 待命 · 仅在游戏前台执行",
             bg=BG,
-            fg=GOOD,
+            fg=MUTED,
             font=("Microsoft YaHei UI", 9, "bold"),
         )
         self.runtime_label.pack(side="right", pady=(8, 0))
@@ -156,9 +251,9 @@ class MacroFeature:
             window,
             fill="#EEE2D2",
             outline="#DDCBB8",
-            height=48,
+            height=44,
             content_padx=14,
-            content_pady=5,
+            content_pady=4,
         )
         notice_panel.pack(fill="x", padx=20)
         notice = notice_panel.content
@@ -174,10 +269,10 @@ class MacroFeature:
             text="切出游戏、退出或修改配置时也会立即停止并释放按键。",
             bg="#EEE2D2",
             fg=MUTED,
-            font=("Microsoft YaHei UI", 8),
+            font=("Microsoft YaHei UI", 9),
         ).pack(side="right")
 
-        content = tk.Frame(window, bg=BG, padx=20, pady=14)
+        content = tk.Frame(window, bg=BG, padx=20, pady=10)
         content.pack(fill="both", expand=True)
         left_panel = RoundedPanel(
             content,
@@ -241,7 +336,7 @@ class MacroFeature:
             text="",
             bg=BG,
             fg=MUTED,
-            font=("Microsoft YaHei UI", 8),
+            font=("Microsoft YaHei UI", 9),
             anchor="w",
         )
         self.status_label.pack(side="left", fill="x", expand=True)
@@ -256,7 +351,7 @@ class MacroFeature:
         # consume the remaining height. This keeps Save/Stop visible at min size.
         content.pack_forget()
         footer.pack_forget()
-        footer.pack(side="bottom", fill="x", pady=(0, 16))
+        footer.pack(side="bottom", fill="x", pady=(0, 12))
         content.pack(fill="both", expand=True)
 
         self._refresh_profile_list(select=0 if self.profiles else None)
@@ -289,7 +384,7 @@ class MacroFeature:
             "enabled": tk.BooleanVar(),
             "trigger_key": tk.StringVar(value="F5"),
             "mode": tk.StringVar(value=MODE_LABELS["once"]),
-            "max_runtime_ms": tk.StringVar(value="10000"),
+            "max_runtime_seconds": tk.StringVar(value="60"),
             "repeat_delay_ms": tk.StringVar(value="80"),
             "step_action": tk.StringVar(value=ACTION_LABELS["tap"]),
             "step_key": tk.StringVar(value="J"),
@@ -298,8 +393,20 @@ class MacroFeature:
         self.modifier_vars = {
             key: tk.BooleanVar(value=False) for key in ("CTRL", "ALT", "SHIFT")
         }
-        for variable in (*self.vars.values(), *self.modifier_vars.values()):
+        for name in (
+            "name",
+            "enabled",
+            "trigger_key",
+            "mode",
+            "max_runtime_seconds",
+            "repeat_delay_ms",
+        ):
+            self.vars[name].trace_add("write", self._mark_dirty)
+        for variable in self.modifier_vars.values():
             variable.trace_add("write", self._mark_dirty)
+        self.vars["step_action"].trace_add("write", self._on_step_editor_change)
+        self.vars["step_key"].trace_add("write", self._mark_step_draft)
+        self.vars["step_ms"].trace_add("write", self._mark_step_draft)
 
         tk.Label(top, text="名称", bg=PANEL, fg=MUTED, font=("Microsoft YaHei UI", 8)).grid(
             row=0, column=0, sticky="w"
@@ -336,12 +443,13 @@ class MacroFeature:
         tk.Label(trigger, text="同时按（可选）", bg=CONTROL, fg=MUTED).grid(
             row=1, column=1, columnspan=3, sticky="w", padx=(8, 0), pady=(0, 3)
         )
-        tk.Label(trigger, text="运行方式", bg=CONTROL, fg=MUTED).grid(
-            row=1, column=4, sticky="w", padx=(16, 0), pady=(0, 3)
-        )
-        self._combo(trigger, self.vars["trigger_key"], TRIGGER_KEYS, width=10).grid(
-            row=2, column=0, sticky="ew"
-        )
+        self._key_picker(
+            trigger,
+            target="trigger_key",
+            variable=self.vars["trigger_key"],
+            values=TRIGGER_KEYS,
+            width=7,
+        ).grid(row=2, column=0, sticky="ew")
         for column, modifier in enumerate(("CTRL", "ALT", "SHIFT"), start=1):
             tk.Checkbutton(
                 trigger,
@@ -356,31 +464,45 @@ class MacroFeature:
                 bd=0,
                 font=("Segoe UI", 8, "bold"),
             ).grid(row=2, column=column, padx=(8, 0))
-        self._combo(trigger, self.vars["mode"], tuple(MODE_IDS), width=22).grid(
-            row=2, column=4, sticky="e", padx=(16, 0)
-        )
         trigger.grid_columnconfigure(4, weight=1)
 
-        self.advanced_button = self._button(
-            trigger,
-            "显示高级设置",
-            self._toggle_advanced_settings,
-            width=12,
+        runtime_limit = tk.Frame(trigger, bg=CONTROL)
+        runtime_limit.grid(row=3, column=0, columnspan=6, sticky="ew", pady=(9, 0))
+        tk.Label(
+            runtime_limit,
+            text="运行方式",
+            bg=CONTROL,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 9),
+        ).pack(side="left")
+        self._combo(runtime_limit, self.vars["mode"], tuple(MODE_IDS), width=17).pack(
+            side="left", padx=(7, 12)
         )
-        self.advanced_button.grid(row=3, column=0, columnspan=5, sticky="w", pady=(9, 0))
-        limits = tk.Frame(trigger, bg=CONTROL)
-        self.advanced_frame = limits
-        limits.grid(row=4, column=0, columnspan=6, sticky="ew", pady=(9, 0))
-        tk.Label(limits, text="最长运行 (ms)", bg=CONTROL, fg=MUTED).pack(side="left")
-        self._entry(limits, self.vars["max_runtime_ms"], width=9).pack(
-            side="left", padx=(6, 18)
+        tk.Label(
+            runtime_limit,
+            text="最长运行",
+            bg=CONTROL,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 9),
+        ).pack(side="left")
+        self._entry(runtime_limit, self.vars["max_runtime_seconds"], width=5).pack(
+            side="left", padx=(7, 5)
         )
-        tk.Label(limits, text="每轮间隔 (ms)", bg=CONTROL, fg=MUTED).pack(side="left")
-        self._entry(limits, self.vars["repeat_delay_ms"], width=9).pack(
-            side="left", padx=(6, 0)
-        )
-        limits.grid_remove()
+        tk.Label(
+            runtime_limit,
+            text="秒",
+            bg=CONTROL,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 9),
+        ).pack(side="left")
 
+        self.advanced_button = self._button(
+            runtime_limit,
+            "更多",
+            self._toggle_advanced_settings,
+            width=4,
+        )
+        self.advanced_button.pack(side="right")
         steps_header = tk.Frame(parent, bg=PANEL)
         steps_header.pack(fill="x", pady=(2, 6))
         tk.Label(
@@ -414,7 +536,7 @@ class MacroFeature:
             background=CONTROL,
             foreground=TEXT,
             relief="flat",
-            font=("Microsoft YaHei UI", 8, "bold"),
+            font=("Microsoft YaHei UI", 9, "bold"),
         )
         style.map(
             "Macro.Treeview",
@@ -457,11 +579,20 @@ class MacroFeature:
         fields = tk.Frame(editor, bg=PANEL)
         fields.pack(fill="x")
         tk.Label(fields, text="动作", bg=PANEL, fg=MUTED).grid(row=0, column=0, sticky="w")
-        tk.Label(fields, text="按键", bg=PANEL, fg=MUTED).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        tk.Label(fields, text="时长 / 等待 (ms)", bg=PANEL, fg=MUTED).grid(row=0, column=2, sticky="w", padx=(8, 0))
+        self.step_key_label = tk.Label(fields, text="按键", bg=PANEL, fg=MUTED)
+        self.step_key_label.grid(row=0, column=1, sticky="w", padx=(8, 0))
+        self.step_ms_label = tk.Label(fields, text="按住时长 (ms)", bg=PANEL, fg=MUTED)
+        self.step_ms_label.grid(row=0, column=2, sticky="w", padx=(8, 0))
         self._combo(fields, self.vars["step_action"], tuple(ACTION_IDS), width=10).grid(row=1, column=0, sticky="ew")
-        self._combo(fields, self.vars["step_key"], STEP_KEYS, width=10).grid(row=1, column=1, sticky="ew", padx=(8, 0))
-        self._entry(fields, self.vars["step_ms"], width=12).grid(row=1, column=2, sticky="ew", padx=(8, 0))
+        self._key_picker(
+            fields,
+            target="step_key",
+            variable=self.vars["step_key"],
+            values=STEP_KEYS,
+            width=7,
+        ).grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        self.step_ms_entry = self._entry(fields, self.vars["step_ms"], width=12)
+        self.step_ms_entry.grid(row=1, column=2, sticky="ew", padx=(8, 0))
         fields.grid_columnconfigure(0, weight=1)
         fields.grid_columnconfigure(1, weight=1)
         fields.grid_columnconfigure(2, weight=1)
@@ -473,17 +604,69 @@ class MacroFeature:
         self._button(actions, "下移", lambda: self._move_step(1), width=6).pack(side="right")
         self._button(actions, "上移", lambda: self._move_step(-1), width=6).pack(side="right", padx=(0, 5))
         tree_host.pack(fill="both", expand=True)
+        self._sync_step_editor_state()
 
     def _toggle_advanced_settings(self) -> None:
-        if self.advanced_frame is None or self.advanced_button is None:
+        if self.advanced_button is None or self.window is None:
             return
-        self._advanced_visible = not self._advanced_visible
-        if self._advanced_visible:
-            self.advanced_frame.grid()
-            self.advanced_button.configure(text="隐藏高级设置")
-        else:
-            self.advanced_frame.grid_remove()
-            self.advanced_button.configure(text="显示高级设置")
+        if self.advanced_window is not None:
+            self._close_advanced_settings()
+            return
+        dialog = tk.Toplevel(self.window)
+        self.advanced_window = dialog
+        self._advanced_visible = True
+        self.advanced_button.configure(text="收起")
+        dialog.title("宏高级设置")
+        dialog.configure(bg=BG)
+        dialog.resizable(False, False)
+        dialog.transient(self.window)
+        dialog.geometry(f"360x155+{self.window.winfo_rootx() + 90}+{self.window.winfo_rooty() + 150}")
+        body = tk.Frame(dialog, bg=PANEL, padx=18, pady=16)
+        body.pack(fill="both", expand=True, padx=10, pady=10)
+        tk.Label(
+            body,
+            text="循环间隔",
+            bg=PANEL,
+            fg=TEXT,
+            font=("Microsoft YaHei UI", 10, "bold"),
+        ).grid(row=0, column=0, columnspan=3, sticky="w")
+        tk.Label(
+            body,
+            text="每轮间隔",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 9),
+        ).grid(row=1, column=0, sticky="w", pady=(12, 0))
+        self._entry(body, self.vars["repeat_delay_ms"], width=9).grid(
+            row=1, column=1, sticky="w", padx=(8, 5), pady=(12, 0)
+        )
+        tk.Label(body, text="ms", bg=PANEL, fg=MUTED).grid(
+            row=1, column=2, sticky="w", pady=(12, 0)
+        )
+        tk.Label(
+            body,
+            text="仅循环模式使用；最长运行时间仍由主界面的秒数控制。",
+            bg=PANEL,
+            fg=MUTED,
+            font=("Microsoft YaHei UI", 8),
+        ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        dialog.protocol("WM_DELETE_WINDOW", self._close_advanced_settings)
+        dialog.lift()
+
+    def _close_advanced_settings(self) -> None:
+        dialog = self.advanced_window
+        self.advanced_window = None
+        self._advanced_visible = False
+        if self.advanced_button is not None:
+            try:
+                self.advanced_button.configure(text="更多")
+            except tk.TclError:
+                pass
+        if dialog is not None:
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
 
     def _button(
         self,
@@ -531,6 +714,114 @@ class MacroFeature:
             font=("Microsoft YaHei UI", 9),
         )
 
+    def _key_picker(
+        self,
+        parent: tk.Misc,
+        *,
+        target: str,
+        variable: tk.Variable,
+        values: tuple[str, ...],
+        width: int,
+    ) -> tk.Frame:
+        host = tk.Frame(parent, bg=CONTROL if parent.cget("bg") == CONTROL else PANEL)
+        combo = self._combo(host, variable, values, width=width)
+        combo.pack(side="left", fill="x", expand=True)
+        button = self._button(
+            host,
+            "录入",
+            lambda selected=target: self._toggle_key_capture(selected),
+            width=5,
+        )
+        button.configure(bg=CAPTURE_CONTROL, activebackground=CAPTURE_HOVER)
+        button.pack(side="left", padx=(5, 0))
+        button.bind(
+            "<KeyPress>",
+            lambda event, selected=target: self._capture_keypress(selected, event),
+        )
+        button.bind(
+            "<FocusOut>",
+            lambda _event, selected=target: self._cancel_key_capture(
+                target=selected, silent=True
+            ),
+        )
+        self._key_combos[target] = combo
+        self._capture_buttons[target] = button
+        return host
+
+    def _toggle_key_capture(self, target: str) -> None:
+        if self._capture_target == target:
+            self._cancel_key_capture(target=target, silent=False)
+            return
+        self._cancel_key_capture(silent=True)
+        button = self._capture_buttons.get(target)
+        if button is None:
+            return
+        self.controller.stop_all("capture_key")
+        self._capture_target = target
+        self._capture_release_key = None
+        button.configure(
+            text="等待…",
+            bg="#DDE8E2",
+            activebackground="#D3E1DA",
+            fg=GOOD,
+        )
+        button.focus_set()
+        self._set_runtime("● 正在录入按键", PAUSED)
+        self._set_status(
+            "请直接按下目标键；再次点击“等待…”或移开焦点可取消。",
+            error=False,
+        )
+
+    def _capture_keypress(self, target: str, event: tk.Event[Any]) -> str | None:
+        if self._capture_target != target:
+            return None
+        raw_key = key_from_tk_keysym(str(event.keysym))
+        key = captured_key_for_target(target, str(event.keysym))
+        if key is None:
+            shown = raw_key or str(event.keysym)
+            self._set_status(f"不支持录入“{shown}”；原值未更改，可继续按键或用下拉框。", error=True)
+            return "break"
+        unchanged = str(self.vars[target].get()) == key
+        if not unchanged:
+            self.vars[target].set(key)
+        self._cancel_key_capture(target=target, silent=True, release_key=key)
+        if unchanged:
+            self._set_status(f"按键仍为 {key}；未产生新修改。", error=False)
+        elif target == "step_key":
+            self._set_status(f"已录入 {key}；请添加到末尾或替换所选。", error=False)
+        else:
+            self._set_status(f"已录入 {key}；修改尚未保存。", error=False)
+        return "break"
+
+    def _cancel_key_capture(
+        self,
+        *,
+        target: str | None = None,
+        silent: bool,
+        release_key: str | None = None,
+    ) -> None:
+        if self._capture_target is None:
+            return
+        if target is not None and target != self._capture_target:
+            return
+        active = self._capture_target
+        self._capture_target = None
+        button = self._capture_buttons.get(active)
+        if button is not None:
+            try:
+                button.configure(
+                    text="录入",
+                    bg=CAPTURE_CONTROL,
+                    activebackground=CAPTURE_HOVER,
+                    fg=TEXT,
+                )
+            except tk.TclError:
+                pass
+        self._capture_release_key = release_key
+        self._rearm_required = True
+        if not silent:
+            self._set_status("已取消按键录入；原值未更改。", error=False)
+
     def _combo(
         self, parent: tk.Misc, variable: tk.Variable, values: tuple[str, ...], *, width: int
     ) -> ttk.Combobox:
@@ -557,7 +848,7 @@ class MacroFeature:
             state="readonly",
             width=width,
             style="Macro.TCombobox",
-            font=("Microsoft YaHei UI", 8),
+            font=("Microsoft YaHei UI", 9),
         )
 
     def _tick(self) -> None:
@@ -579,15 +870,35 @@ class MacroFeature:
             and all(_is_key_down(modifier) for modifier in profile.trigger.modifiers)
             for profile in enabled
         }
-        if self.errors or self._rearm_required:
+        captured_key_down = bool(
+            self._capture_release_key and _is_key_down(self._capture_release_key)
+        )
+        if self._capture_target is not None:
             for profile in enabled:
                 self.controller.update_trigger(profile, False)
-            if self._rearm_required and not emergency and not any(chord_states.values()):
+            self._set_runtime("● 正在录入按键", PAUSED)
+        elif self.errors or self._rearm_required:
+            for profile in enabled:
+                self.controller.update_trigger(profile, False)
+            if (
+                self._rearm_required
+                and not emergency
+                and not captured_key_down
+                and not any(chord_states.values())
+            ):
                 self._rearm_required = False
+                self._capture_release_key = None
                 self._set_runtime("● 已重新待命", GOOD)
         else:
             for profile in enabled:
                 self.controller.update_trigger(profile, chord_states[profile.id])
+        if (
+            self._runtime_state is MacroState.BLOCKED_FOCUS
+            and not any(chord_states.values())
+            and self._capture_target is None
+        ):
+            self._runtime_state = None
+            self._set_runtime("● 待命 · 仅在游戏前台执行", MUTED)
         self._after_id = self.root.after(20, self._tick)
 
     def _drain_statuses(self) -> None:
@@ -599,18 +910,8 @@ class MacroFeature:
                 break
         if latest is None:
             return
-        labels = {
-            MacroState.RUNNING: "● 宏运行中",
-            MacroState.BLOCKED_FOCUS: "● 非游戏前台，已拦截",
-            MacroState.TIME_LIMIT: "● 已到最长运行时间",
-            MacroState.ERROR: "● 宏执行错误",
-            MacroState.STOPPING: "● 正在停止",
-            MacroState.STOPPED: "● 已停止",
-            MacroState.COMPLETED: "● 已完成",
-            MacroState.TRIGGER_RELEASED: "● 已松开停止",
-        }
-        text = labels.get(latest.state, "● 待命")
-        color = BAD if latest.state in {MacroState.ERROR, MacroState.BLOCKED_FOCUS} else GOOD
+        self._runtime_state = latest.state
+        text, color = runtime_presentation(latest.state)
         self._set_runtime(text, color)
 
     def _set_runtime(self, text: str, color: str) -> None:
@@ -624,7 +925,50 @@ class MacroFeature:
         if self._loading_form:
             return
         self._dirty = True
-        self._set_status("● 修改未保存", error=False)
+        if self._step_draft_dirty:
+            self._set_status("● 宏有修改；当前步骤草稿还需添加或替换。", error=False)
+        else:
+            self._set_status("● 修改未保存", error=False)
+
+    def _on_step_editor_change(self, *_args: Any) -> None:
+        self._sync_step_editor_state()
+        self._mark_step_draft()
+
+    def _mark_step_draft(self, *_args: Any) -> None:
+        if self._loading_form:
+            return
+        self._step_draft_dirty = True
+        self._set_status("● 当前步骤尚未应用，请点击“添加到末尾”或“替换所选”。", error=False)
+
+    def _sync_step_editor_state(self) -> None:
+        if not self.vars:
+            return
+        action = ACTION_IDS.get(str(self.vars["step_action"].get()), "tap")
+        combo = self._key_combos.get("step_key")
+        capture = self._capture_buttons.get("step_key")
+        if action == "wait" and self._capture_target == "step_key":
+            self._cancel_key_capture(target="step_key", silent=True)
+        if combo is not None:
+            combo.configure(state="disabled" if action == "wait" else "readonly")
+        if capture is not None:
+            capture.configure(state="disabled" if action == "wait" else "normal")
+        if self.step_key_label is not None:
+            self.step_key_label.configure(
+                text="按键（等待时忽略）" if action == "wait" else "按键"
+            )
+        if self.step_ms_label is not None:
+            self.step_ms_label.configure(
+                text={
+                    "tap": "按住时长 (ms)",
+                    "wait": "等待时间 (ms)",
+                    "down": "无需填写时长",
+                    "up": "无需填写时长",
+                }[action]
+            )
+        if self.step_ms_entry is not None:
+            self.step_ms_entry.configure(
+                state="normal" if action in {"tap", "wait"} else "disabled"
+            )
 
     def _set_status(self, text: str, *, error: bool) -> None:
         if self.status_label is not None:
@@ -649,6 +993,7 @@ class MacroFeature:
             self._clear_form()
         self._loading_form = False
         self._dirty = False
+        self._step_draft_dirty = False
 
     def _on_profile_select(self, _event: tk.Event[Any]) -> None:
         if self._loading_form or self.profile_list is None:
@@ -659,7 +1004,7 @@ class MacroFeature:
         next_index = int(selection[0])
         if next_index == self._selected_index:
             return
-        if self._dirty and not messagebox.askyesno(
+        if (self._dirty or self._step_draft_dirty) and not messagebox.askyesno(
             "未保存修改", "当前宏有未保存修改，是否放弃并切换？", parent=self.window
         ):
             self._loading_form = True
@@ -672,12 +1017,15 @@ class MacroFeature:
         self._load_profile(self.profiles[next_index])
 
     def _load_profile(self, profile: MacroProfile) -> None:
+        self._cancel_key_capture(silent=True)
         self._loading_form = True
         self.vars["name"].set(profile.name)
         self.vars["enabled"].set(profile.enabled)
         self.vars["trigger_key"].set(profile.trigger.key)
         self.vars["mode"].set(MODE_LABELS[profile.trigger.mode])
-        self.vars["max_runtime_ms"].set(str(profile.limits.max_runtime_ms))
+        self.vars["max_runtime_seconds"].set(
+            seconds_text_from_milliseconds(profile.limits.max_runtime_ms)
+        )
         self.vars["repeat_delay_ms"].set(str(profile.limits.repeat_delay_ms))
         for modifier, variable in self.modifier_vars.items():
             variable.set(modifier in profile.trigger.modifiers)
@@ -685,23 +1033,31 @@ class MacroFeature:
         self._refresh_steps()
         self._loading_form = False
         self._dirty = False
+        self._step_draft_dirty = False
         self._set_status("已载入；修改后点击“保存当前宏”才会生效。", error=False)
 
     def _clear_form(self) -> None:
         if not self.vars:
             return
+        self._cancel_key_capture(silent=True)
         self._loading_form = True
         self.vars["name"].set("")
         self.vars["enabled"].set(False)
+        self.vars["trigger_key"].set("F5")
+        self.vars["mode"].set(MODE_LABELS["once"])
+        self.vars["max_runtime_seconds"].set("60")
+        self.vars["repeat_delay_ms"].set("80")
         self._editing_steps = []
         self._refresh_steps()
         self._loading_form = False
+        self._dirty = False
+        self._step_draft_dirty = False
 
     def _new_profile(self, mode: str) -> None:
         if self.errors:
             self._set_status("配置文件含错误；为避免覆盖原内容，暂不允许新建。", error=True)
             return
-        if self._dirty and not messagebox.askyesno(
+        if (self._dirty or self._step_draft_dirty) and not messagebox.askyesno(
             "未保存修改", "当前修改尚未保存，是否放弃并新建？", parent=self.window
         ):
             return
@@ -758,6 +1114,12 @@ class MacroFeature:
         if self._selected_index is None:
             self._set_status("请先选择或新建一个宏。", error=True)
             return
+        if self._step_draft_dirty:
+            self._set_status(
+                "当前步骤设置尚未应用；请先点击“添加到末尾”或“替换所选”。",
+                error=True,
+            )
+            return
         original = self.profiles[self._selected_index]
         try:
             data = {
@@ -776,7 +1138,9 @@ class MacroFeature:
                 },
                 "limits": {
                     "foreground_only": True,
-                    "max_runtime_ms": int(str(self.vars["max_runtime_ms"].get())),
+                    "max_runtime_ms": milliseconds_from_seconds_text(
+                        str(self.vars["max_runtime_seconds"].get())
+                    ),
                     "repeat_delay_ms": int(str(self.vars["repeat_delay_ms"].get())),
                 },
                 "steps": deepcopy(self._editing_steps),
@@ -792,6 +1156,7 @@ class MacroFeature:
         self.profiles = tuple(profiles)
         self.errors = []
         self._dirty = False
+        self._step_draft_dirty = False
         self._refresh_profile_list(select=self._selected_index)
         self._set_status("已保存；启用的宏将在游戏前台生效。", error=False)
 
@@ -816,6 +1181,7 @@ class MacroFeature:
             return
         self._editing_steps.append(step)
         self._refresh_steps(select=len(self._editing_steps) - 1)
+        self._step_draft_dirty = False
         self._mark_dirty()
 
     def _replace_step(self) -> None:
@@ -829,6 +1195,7 @@ class MacroFeature:
             self._set_status("时长必须是整数毫秒。", error=True)
             return
         self._refresh_steps(select=index)
+        self._step_draft_dirty = False
         self._mark_dirty()
 
     def _remove_step(self) -> None:
@@ -891,14 +1258,18 @@ class MacroFeature:
             if step["action"] == "tap":
                 self.vars["step_ms"].set(str(step["hold_ms"]))
         self._loading_form = False
+        self._step_draft_dirty = False
+        self._sync_step_editor_state()
 
     def _close_window(self, *, force: bool = False) -> None:
         if self.window is None:
             return
-        if not force and self._dirty and not messagebox.askyesno(
+        if not force and (self._dirty or self._step_draft_dirty) and not messagebox.askyesno(
             "未保存修改", "当前宏有未保存修改，是否放弃并关闭？", parent=self.window
         ):
             return
+        self._cancel_key_capture(silent=True)
+        self._close_advanced_settings()
         try:
             self.window.destroy()
         except tk.TclError:
@@ -908,11 +1279,19 @@ class MacroFeature:
         self.status_label = None
         self.runtime_label = None
         self.step_tree = None
-        self.advanced_frame = None
+        self.advanced_window = None
         self.advanced_button = None
+        self.step_key_label = None
+        self.step_ms_label = None
+        self.step_ms_entry = None
+        self._key_combos.clear()
+        self._capture_buttons.clear()
+        self._capture_target = None
+        self._capture_release_key = None
         self._advanced_visible = False
         self.vars.clear()
         self.modifier_vars.clear()
         self._editing_steps.clear()
         self._selected_index = None
         self._dirty = False
+        self._step_draft_dirty = False

@@ -2,7 +2,7 @@
 
 This project is a compact Windows/Tk toolbox. Keep product work small, reversible,
 and centered on the author's visible and functional request. The workspace-level
-`C:\xiangmuyunxing\biancheng\2026\AGENTS.md` also applies.
+If a parent workspace `AGENTS.md` exists, it also applies.
 
 ## Startup and scope
 

@@ -29,6 +29,27 @@
       "author_source": "随包 MOD使用说明.txt 的作者团队署名；QQ 上传者 rlyons"
     },
     {
+      "id": "monster-treasure",
+      "sort_priority": 165,
+      "source": "怪物宝藏v11（修复了客机不生效bug，更多更新详情且看压缩包内txt文件bug找作者反馈）.rar",
+      "include": ["怪物宝藏v11.dll"],
+      "primary": "怪物宝藏v11.dll",
+      "provides": [
+        "怪物宝藏v11.dll",
+        "怪物宝藏v10.7.dll",
+        "怪物宝藏v10.5.dll",
+        "LostCastle2.MonsterPlusMod.dll"
+      ],
+      "name": "怪物宝藏",
+      "version": "11",
+      "author": "懒虫桑",
+      "summary": "按区域为敌对生物添加宝藏与冰属性附魔，并提供仅对 Boss 生效等设置",
+      "usage_hint": "安装后重启游戏，按 Alt+F 或在工具箱点击“打开 MOD 面板”；来源说明称已修复客机生效问题，但本工具箱尚未实战验证。与关卡动态血量、增强计划等同时启用时可能叠加改动，建议分开使用。",
+      "hotkeys": ["Alt+F"],
+      "panel_hotkey": "Alt+F",
+      "author_source": "DLL 内嵌“作者 懒虫桑”；用户提供的 QQ 上传截图显示上传者懒虫桑（2026-09-01）"
+    },
+    {
       "id": "armor-transmog",
       "sort_priority": 900,
       "source": "LC2ArmorTransmog服装幻化.dll",
@@ -285,6 +306,18 @@
       "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者大萝卜鸡（2026-08-30）"
     },
     {
+      "id": "nightfall-bow-boost",
+      "source": "LC2.NightfallBowBoost噩梦降临强化.dll",
+      "primary": "LC2.NightfallBowBoost噩梦降临强化.dll",
+      "name": "噩梦降临强化",
+      "version": "1.1.0",
+      "author": "兔子王お",
+      "summary": "通过配置调整噩梦降临（Bow_033）的攻击力、召唤物增伤与蓄力速度",
+      "usage_hint": "安装后重启游戏，在生成的配置文件中启用并调整需要的项目；没有独立面板或快捷键，联机时建议各方使用相同配置。",
+      "hotkeys": [],
+      "author_source": "DLL 未见独立作者署名；用户提供的 QQ 上传截图显示上传者兔子王お（2026-09-01）"
+    },
+    {
       "id": "evilstone-power-duration",
       "sort_priority": 260,
       "source": "终始武器(大剑 太刀 单手剑)buff时间改为999秒.zip",
@@ -317,7 +350,7 @@
     },
     {
       "id": "evil-fire-crusher-summon",
-      "source": "召唤大师珀亚2.0 非整合包.rar",
+      "source": "召唤大师珀亚2.1 非整合包.rar",
       "include": ["LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll"],
       "primary": "LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll",
       "name": "召唤邪火粉碎者",
@@ -331,7 +364,7 @@
     {
       "id": "nightmare-doll-skin",
       "sort_priority": 920,
-      "source": "召唤大师珀亚2.0 非整合包.rar",
+      "source": "召唤大师珀亚2.1 非整合包.rar",
       "include": ["LC2.NightmareDollNeedle噩梦娃娃皮肤.dll"],
       "primary": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
       "name": "噩梦娃娃皮肤",
@@ -344,7 +377,7 @@
     },
     {
       "id": "hideyoshi-summon",
-      "source": "召唤大师珀亚2.0 非整合包.rar",
+      "source": "召唤大师珀亚2.1 非整合包.rar",
       "include": ["LC2.HideyoshiSummon召唤狐狸剑姬.dll"],
       "primary": "LC2.HideyoshiSummon召唤狐狸剑姬.dll",
       "name": "召唤狐狸剑姬",
@@ -358,7 +391,7 @@
     {
       "id": "hand-color-white",
       "sort_priority": 930,
-      "source": "召唤大师珀亚2.0 非整合包.rar",
+      "source": "召唤大师珀亚2.1 非整合包.rar",
       "include": ["LC2.HandColorWhite手掌变白.dll"],
       "primary": "LC2.HandColorWhite手掌变白.dll",
       "name": "手掌变白",
@@ -371,21 +404,34 @@
     },
     {
       "id": "reaper-summon",
-      "source": "召唤大师珀亚2.0 非整合包.rar",
+      "source": "召唤大师珀亚2.1 非整合包.rar",
       "include": ["LC2.ReaperSummon召唤行刑者.dll"],
       "primary": "LC2.ReaperSummon召唤行刑者.dll",
       "name": "召唤行刑者",
-      "version": "2.0",
+      "version": "2.1",
       "author": "兔子王お",
-      "summary": "让游荡异灵契约连协召唤行刑者",
-      "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。",
+      "summary": "让游荡异灵契约连协召唤行刑者，并在区域切换后重置召唤状态",
+      "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效；区域切换后会延迟重置并重新召唤。",
       "hotkeys": [],
-      "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
+      "author_source": "作者提供的 QQ 上传列表截图；2.1 来源包（2026-09-01）"
+    },
+    {
+      "id": "reinforce-hideyoshi",
+      "source": "召唤大师珀亚2.1 非整合包.rar",
+      "include": ["LC2.ReinforceHideyoshi真·雷神之锤.dll"],
+      "primary": "LC2.ReinforceHideyoshi真·雷神之锤.dll",
+      "name": "增援发信仪召唤失落剑客幽影",
+      "version": "1.0.0",
+      "author": "兔子王お",
+      "summary": "持有增援发信仪时召唤并维护友方失落剑客幽影",
+      "usage_hint": "安装后重启游戏，在后台自动生效；与“增援发信仪召唤雷精灵”监听同一物品，可能同时召出两种单位，建议二选一。",
+      "hotkeys": [],
+      "author_source": "DLL 未见独立作者署名；2.1 同包及既有 QQ 上传证据显示上传者兔子王お（2026-09-01）"
     },
     {
       "id": "summon-model-swap",
       "sort_priority": 940,
-      "source": "召唤大师珀亚2.0 非整合包.rar",
+      "source": "召唤大师珀亚2.1 非整合包.rar",
       "include": ["LC2.SummonModelSwap召唤物模型替换.dll"],
       "primary": "LC2.SummonModelSwap召唤物模型替换.dll",
       "name": "召唤物模型替换",

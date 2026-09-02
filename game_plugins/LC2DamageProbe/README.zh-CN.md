@@ -22,7 +22,7 @@
 构建：
 
 ```powershell
-$env:LC2_GAME_DIR = "D:\SteamLibrary\steamapps\common\Lost Castle 2"
+$env:LC2_GAME_DIR = "<game>"
 dotnet build .\LC2DamageProbe.csproj -c Release
 ```
 

@@ -11,7 +11,7 @@ Lost Castle 2
   -> schema validation and session ordering
   -> CombatAggregator (pure replayable state)
   -> immutable snapshot
-  -> external HUD / exports
+  -> external HUD
 ```
 
 The key overlay and macro modules stay usable when the bridge is absent.
@@ -21,6 +21,13 @@ only decode bounded JSON lines and publish them to a 512-item inbox. JSON Schema
 validation, session ordering and all `CombatAggregator` mutations run on the Tk
 thread. A malformed line, invalid event, missing heartbeat or queue overflow is
 shown as a distinct connection failure instead of silently dropping totals.
+
+The release does not attach an event-batch disk sink. Accepted events update only
+the in-memory `CombatAggregator`; an explicit `session_started` or `session_ended`
+boundary resets or closes that state. This keeps the live HUD replayable without
+creating per-event journals, partial directories, match ZIP files, or an export
+control during ordinary use. Diagnostic replay/checker tools remain development
+utilities and are not wired into the packaged application.
 
 ## Product shell and window responsibilities
 

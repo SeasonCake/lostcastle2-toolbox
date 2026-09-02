@@ -41,7 +41,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -84,7 +84,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -126,7 +126,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -169,7 +169,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -209,7 +209,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -249,7 +249,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -289,7 +289,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -332,7 +332,53 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
+      }
+    },
+    {
+      "id": "monster-treasure",
+      "display": {
+        "name": "怪物宝藏",
+        "version": "11",
+        "author": "懒虫桑",
+        "summary": "按区域为敌对生物添加宝藏与冰属性附魔，并提供仅对 Boss 生效等设置",
+        "usage_hint": "安装后重启游戏，按 Alt+F 或在工具箱点击“打开 MOD 面板”；来源说明称已修复客机生效问题，但本工具箱尚未实战验证。与关卡动态血量、增强计划等同时启用时可能叠加改动，建议分开使用。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "怪物宝藏v11.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/monster-treasure",
+        "files": [
+          {
+            "path": "怪物宝藏v11.dll",
+            "sha256": "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+            "size_bytes": 86016
+          }
+        ],
+        "provides": [
+          "怪物宝藏v11.dll",
+          "怪物宝藏v10.7.dll",
+          "怪物宝藏v10.5.dll",
+          "LostCastle2.MonsterPlusMod.dll"
+        ],
+        "hotkeys": [
+          "Alt+F"
+        ],
+        "panel_hotkey": "Alt+F"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 11",
+        "author_source": "DLL 内嵌“作者 懒虫桑”；用户提供的 QQ 上传截图显示上传者懒虫桑（2026-09-01）",
+        "author_channel": "local community package",
+        "sha256": "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+        "size_bytes": 86016,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -375,7 +421,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -418,7 +464,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -461,7 +507,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -504,7 +550,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -547,7 +593,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -590,7 +636,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -630,7 +676,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -673,7 +719,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -713,7 +759,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -753,7 +799,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -793,7 +839,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -833,7 +879,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -876,7 +922,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -916,7 +962,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -956,7 +1002,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -996,7 +1042,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1036,7 +1082,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1076,7 +1122,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1116,7 +1162,47 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
+      }
+    },
+    {
+      "id": "nightfall-bow-boost",
+      "display": {
+        "name": "噩梦降临强化",
+        "version": "1.1.0",
+        "author": "兔子王お",
+        "summary": "通过配置调整噩梦降临（Bow_033）的攻击力、召唤物增伤与蓄力速度",
+        "usage_hint": "安装后重启游戏，在生成的配置文件中启用并调整需要的项目；没有独立面板或快捷键，联机时建议各方使用相同配置。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.NightfallBowBoost噩梦降临强化.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/nightfall-bow-boost",
+        "files": [
+          {
+            "path": "LC2.NightfallBowBoost噩梦降临强化.dll",
+            "sha256": "0CE5AB7F2B07ECED9574610168D5524D07E212E39E8E2951AB794600480E5626",
+            "size_bytes": 19968
+          }
+        ],
+        "provides": [
+          "lc2.nightfallbowboost噩梦降临强化.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.1.0",
+        "author_source": "DLL 未见独立作者署名；用户提供的 QQ 上传截图显示上传者兔子王お（2026-09-01）",
+        "author_channel": "local community package",
+        "sha256": "0CE5AB7F2B07ECED9574610168D5524D07E212E39E8E2951AB794600480E5626",
+        "size_bytes": 19968,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1156,7 +1242,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1196,7 +1282,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1236,17 +1322,17 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
       "id": "reaper-summon",
       "display": {
         "name": "召唤行刑者",
-        "version": "2.0",
+        "version": "2.1",
         "author": "兔子王お",
-        "summary": "让游荡异灵契约连协召唤行刑者",
-        "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。"
+        "summary": "让游荡异灵契约连协召唤行刑者，并在区域切换后重置召唤状态",
+        "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效；区域切换后会延迟重置并重新召唤。"
       },
       "operation": {
         "kind": "bepinex_plugin",
@@ -1256,8 +1342,8 @@
         "files": [
           {
             "path": "LC2.ReaperSummon召唤行刑者.dll",
-            "sha256": "4023ABE192F3F6CFFD6E701328558454D28A3DF792844DE7AA39C87519E63118",
-            "size_bytes": 24064
+            "sha256": "DE603EC332109648B8F6B2F5C4E49F5219B6458D4053EC6679DEAFE0588EB07C",
+            "size_bytes": 25600
           }
         ],
         "provides": [
@@ -1266,17 +1352,57 @@
         "hotkeys": []
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 2.0",
-        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "version_note": "curated community bundle 2.1",
+        "author_source": "作者提供的 QQ 上传列表截图；2.1 来源包（2026-09-01）",
         "author_channel": "local community package",
-        "sha256": "4023ABE192F3F6CFFD6E701328558454D28A3DF792844DE7AA39C87519E63118",
-        "size_bytes": 24064,
+        "sha256": "DE603EC332109648B8F6B2F5C4E49F5219B6458D4053EC6679DEAFE0588EB07C",
+        "size_bytes": 25600,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
+      }
+    },
+    {
+      "id": "reinforce-hideyoshi",
+      "display": {
+        "name": "增援发信仪召唤失落剑客幽影",
+        "version": "1.0.0",
+        "author": "兔子王お",
+        "summary": "持有增援发信仪时召唤并维护友方失落剑客幽影",
+        "usage_hint": "安装后重启游戏，在后台自动生效；与“增援发信仪召唤雷精灵”监听同一物品，可能同时召出两种单位，建议二选一。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.ReinforceHideyoshi真·雷神之锤.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/reinforce-hideyoshi",
+        "files": [
+          {
+            "path": "LC2.ReinforceHideyoshi真·雷神之锤.dll",
+            "sha256": "25F1B761DFFBFB4DA48612B84626704E8AA134F60E705BF79683E91C51260A5D",
+            "size_bytes": 23552
+          }
+        ],
+        "provides": [
+          "lc2.reinforcehideyoshi真·雷神之锤.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "DLL 未见独立作者署名；2.1 同包及既有 QQ 上传证据显示上传者兔子王お（2026-09-01）",
+        "author_channel": "local community package",
+        "sha256": "25F1B761DFFBFB4DA48612B84626704E8AA134F60E705BF79683E91C51260A5D",
+        "size_bytes": 23552,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1316,7 +1442,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1356,7 +1482,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1401,7 +1527,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1441,7 +1567,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1481,7 +1607,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1524,7 +1650,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1564,7 +1690,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1604,7 +1730,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1644,7 +1770,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1684,7 +1810,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1727,7 +1853,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1767,7 +1893,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1807,7 +1933,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1850,7 +1976,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1893,7 +2019,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1933,7 +2059,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -1973,7 +2099,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -2016,7 +2142,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -2056,7 +2182,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -2096,7 +2222,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -2136,7 +2262,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     },
     {
@@ -2176,7 +2302,7 @@
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
       }
     }
   ]

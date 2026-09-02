@@ -11,5 +11,5 @@
 - 诊断变化：既有本地玩家 taken 路径记录 `original/real/hp_before/applied/settlement/mitigated/depth`；既有 HP 观察同时记录正负有效变化、`in_map` 与 `inside_damage`。不新增 Hook、玩家身份字段或道具特判。
 - 部署门：`LostCastle2.exe` 与目标测试盒子进程按 exact `ExecutablePath` 连续两次为 0；同名其他路径与未知路径均为 0。
 - 游戏目录、候选目录和测试盒子内置 Bridge 三者回读均为上述 DLL 哈希。
-- 测试盒子仍沿用目录 `C:\Users\shenc\Desktop\失落城堡2工具箱 1.6.0-Bridge0.4.6测试版`，但内部 manifest 已明确更新为 `LC2CombatBridge 0.4.7-test`、48,640 B 与上述哈希；EXE `--self-test` 退出码 0。
+- 测试盒子仍沿用目录 `<desktop>/失落城堡2工具箱 1.6.0-Bridge0.4.6测试版`，但内部 manifest 已明确更新为 `LC2CombatBridge 0.4.7-test`、48,640 B 与上述哈希；EXE `--self-test` 退出码 0。
 - 下一真实正控：普通新局只受击一次，观察 taken 诊断；随后退出回营，恢复数字不得因自动补满突增。真实游戏、回营和受击字段尚未运行，不得发布。

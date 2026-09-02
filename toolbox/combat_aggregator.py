@@ -203,6 +203,16 @@ class PlayerTotals:
     active: bool = False
     damage_dealt: int = 0
     boss_damage: int = 0
+    live_damage: int | None = None
+    live_boss_damage: int | None = None
+    live_observed_damage_anchor: int | None = None
+    live_observed_boss_anchor: int | None = None
+    last_live_damage: int | None = None
+    last_live_boss_damage: int | None = None
+    last_live_observed_damage_anchor: int | None = None
+    last_live_observed_boss_anchor: int | None = None
+    official_damage: int | None = None
+    official_boss_damage: int | None = None
 
 
 @dataclass(frozen=True)
@@ -221,6 +231,10 @@ class CombatSnapshot:
     total_damage: int
     recent_dps: float
     boss_damage: int
+    live_damage_complete: bool
+    live_boss_damage_complete: bool
+    official_damage_complete: bool
+    official_boss_damage_complete: bool
     personal_damage: int
     personal_recent_dps: float
     personal_boss_damage: int
@@ -326,16 +340,21 @@ class CombatAggregator:
         is_session_start = (
             event["event_type"] == "status" and event.get("status") == "session_started"
         )
+        is_session_end = (
+            event["event_type"] == "status" and event.get("status") == "session_ended"
+        )
         if self.session_id is None:
             self.session_id = event_session
         elif event_session != self.session_id:
-            if not is_session_start:
+            if not (is_session_start or is_session_end):
                 raise SessionMismatchError(
                     f"Expected session {self.session_id!r}, got {event_session!r}."
                 )
             self.reset(event_session)
-        elif is_session_start and self.last_sequence is not None:
-            raise SessionMismatchError("A live session cannot start twice with a new event id.")
+        # A same-session start is a transport resume receipt. A foreign terminal
+        # receipt is also an explicit safe boundary: a newly started Bridge can be
+        # idle before the first map and reports session_ended instead of forging a
+        # live session. Other foreign data remains fail closed.
 
         sequence = int(event["sequence"])
         previous_event_id = self._seen_sequences.get(sequence)
@@ -390,23 +409,133 @@ class CombatAggregator:
         local_player_ids = {
             player_id
             for player_id, totals in self._player_totals.items()
-            if totals.is_local
+            if totals.is_local and totals.active
         }
         has_remote_player_history = any(
-            not totals.is_local for totals in self._player_totals.values()
+            totals.active and not totals.is_local
+            for totals in self._player_totals.values()
         )
         use_personal_scope = bool(local_player_ids) and has_remote_player_history
+        rostered_by_slot: dict[int, PlayerTotals] = {}
+        for totals in self._player_totals.values():
+            if not totals.active or totals.player_slot is None:
+                continue
+            previous = rostered_by_slot.get(totals.player_slot)
+            if (
+                previous is None
+                or (totals.active and not previous.active)
+                or (
+                    totals.active == previous.active
+                    and (
+                        totals.official_damage
+                        if totals.official_damage is not None
+                        else totals.live_damage
+                        if totals.live_damage is not None
+                        else -1
+                    )
+                    > (
+                        previous.official_damage
+                        if previous.official_damage is not None
+                        else previous.live_damage
+                        if previous.live_damage is not None
+                        else -1
+                    )
+                )
+            ):
+                rostered_by_slot[totals.player_slot] = totals
+        rostered_player_totals = list(rostered_by_slot.values())
+        official_damage_complete = bool(
+            self._party_roster_seen
+            and rostered_player_totals
+            and all(
+                totals.official_damage is not None
+                for totals in rostered_player_totals
+            )
+        )
+        official_boss_damage_complete = bool(
+            official_damage_complete
+            and all(
+                totals.official_boss_damage is not None
+                for totals in rostered_player_totals
+            )
+        )
+        live_damage_complete = bool(
+            self._party_roster_seen
+            and rostered_player_totals
+            and all(totals.live_damage is not None for totals in rostered_player_totals)
+        )
+        live_boss_damage_complete = bool(
+            live_damage_complete
+            and all(
+                totals.live_boss_damage is not None
+                for totals in rostered_player_totals
+            )
+        )
+
+        def display_player_damage(totals: PlayerTotals) -> int:
+            if totals.official_damage is not None:
+                return totals.official_damage
+            if live_damage_complete and totals.live_damage is not None:
+                observed_anchor = (
+                    totals.live_observed_damage_anchor
+                    if totals.live_observed_damage_anchor is not None
+                    else totals.damage_dealt
+                )
+                return totals.live_damage + max(
+                    0,
+                    totals.damage_dealt - observed_anchor,
+                )
+            return totals.damage_dealt
+
+        def display_player_boss_damage(totals: PlayerTotals) -> int:
+            if totals.official_boss_damage is not None:
+                return totals.official_boss_damage
+            if live_boss_damage_complete and totals.live_boss_damage is not None:
+                observed_anchor = (
+                    totals.live_observed_boss_anchor
+                    if totals.live_observed_boss_anchor is not None
+                    else totals.boss_damage
+                )
+                return totals.live_boss_damage + max(
+                    0,
+                    totals.boss_damage - observed_anchor,
+                )
+            return totals.boss_damage
+
+        display_total_damage = (
+            sum(display_player_damage(totals) for totals in rostered_player_totals)
+            + (
+                0
+                if official_damage_complete or live_damage_complete
+                else self.unattributed_damage
+            )
+            if self._party_roster_seen and rostered_player_totals
+            else self.total_damage
+        )
+        display_boss_damage = (
+            sum(display_player_boss_damage(totals) for totals in rostered_player_totals)
+            + (
+                0
+                if official_boss_damage_complete or live_boss_damage_complete
+                else self.unattributed_boss_damage
+            )
+            if self._party_roster_seen and rostered_player_totals
+            else self.boss_damage
+        )
         recent_damage = sum(value for _, value, _owner in self._recent_damage)
         recent_dps = recent_damage / (self.dps_window_ms / 1000.0)
         personal_damage = (
-            sum(self._player_totals[player_id].damage_dealt for player_id in local_player_ids)
+            sum(display_player_damage(self._player_totals[player_id]) for player_id in local_player_ids)
             if use_personal_scope
-            else self.total_damage
+            else display_total_damage
         )
         personal_boss_damage = (
-            sum(self._player_totals[player_id].boss_damage for player_id in local_player_ids)
+            sum(
+                display_player_boss_damage(self._player_totals[player_id])
+                for player_id in local_player_ids
+            )
             if use_personal_scope
-            else self.boss_damage
+            else display_boss_damage
         )
         personal_recent_damage = (
             sum(
@@ -474,23 +603,44 @@ class CombatAggregator:
         )
         teammate_number = 0
         for player_id, totals in ordered_players:
+            slot_label = (
+                f"P{totals.player_slot + 1}"
+                if totals.player_slot is not None
+                else None
+            )
             if totals.is_local:
-                label = "自己"
+                label = f"自己 · {slot_label}" if slot_label else "自己"
             elif totals.active:
                 teammate_number += 1
-                label = f"队友 {teammate_number}"
+                label = slot_label or f"队友 {teammate_number}"
             else:
-                label = "离队成员"
+                label = f"{slot_label}（离队）" if slot_label else "离队成员"
+            displayed_damage = display_player_damage(totals)
+            displayed_boss_damage = display_player_boss_damage(totals)
             player_breakdown[player_id] = {
                 "label": label,
                 "player_slot": totals.player_slot,
                 "is_local": totals.is_local,
                 "active": totals.active,
-                "damage_dealt": totals.damage_dealt,
-                "boss_damage": totals.boss_damage,
+                "damage_dealt": displayed_damage,
+                "boss_damage": displayed_boss_damage,
+                "observed_damage_dealt": totals.damage_dealt,
+                "observed_boss_damage": totals.boss_damage,
+                "live_damage": totals.live_damage,
+                "live_boss_damage": totals.live_boss_damage,
+                "last_live_damage": totals.last_live_damage,
+                "last_live_boss_damage": totals.last_live_boss_damage,
+                "last_live_observed_damage_anchor": (
+                    totals.last_live_observed_damage_anchor
+                ),
+                "last_live_observed_boss_anchor": (
+                    totals.last_live_observed_boss_anchor
+                ),
+                "official_damage": totals.official_damage,
+                "official_boss_damage": totals.official_boss_damage,
                 "damage_share": (
-                    totals.damage_dealt / self.total_damage
-                    if self.total_damage > 0
+                    displayed_damage / display_total_damage
+                    if display_total_damage > 0
                     else 0.0
                 ),
             }
@@ -512,9 +662,13 @@ class CombatAggregator:
             current_map_file_name=self.current_map_file_name,
             last_sequence=self.last_sequence,
             last_monotonic_ms=self.last_monotonic_ms,
-            total_damage=self.total_damage,
+            total_damage=display_total_damage,
             recent_dps=recent_dps,
-            boss_damage=self.boss_damage,
+            boss_damage=display_boss_damage,
+            live_damage_complete=live_damage_complete,
+            live_boss_damage_complete=live_boss_damage_complete,
+            official_damage_complete=official_damage_complete,
+            official_boss_damage_complete=official_boss_damage_complete,
             personal_damage=personal_damage,
             personal_recent_dps=personal_recent_dps,
             personal_boss_damage=personal_boss_damage,
@@ -594,6 +748,7 @@ class CombatAggregator:
         if not isinstance(members, list) or not 1 <= len(members) <= 16:
             raise CombatEventError("party_updated requires 1 to 16 party members.")
         player_ids: set[str] = set()
+        player_slots: set[int] = set()
         for member in members:
             if not isinstance(member, Mapping):
                 raise CombatEventError("party member must be an object.")
@@ -608,9 +763,27 @@ class CombatAggregator:
                 type(player_slot) is not int or not 0 <= player_slot <= 15
             ):
                 raise CombatEventError("party member has an invalid player_slot.")
+            if player_slot is not None and player_slot in player_slots:
+                raise CombatEventError("party_updated contains a duplicate player_slot.")
             if not isinstance(is_local, bool):
                 raise CombatEventError("party member has an invalid is_local flag.")
+            for field in (
+                "live_damage",
+                "live_boss_damage",
+                "official_damage",
+                "official_boss_damage",
+            ):
+                value = member.get(field)
+                if value is not None and (
+                    type(value) is not int
+                    or not 0 <= value <= 9_007_199_254_740_991
+                ):
+                    raise CombatEventError(
+                        f"party member has an invalid {field}."
+                    )
             player_ids.add(player_id)
+            if player_slot is not None:
+                player_slots.add(player_slot)
 
     def _source_key(self, event: Mapping[str, Any]) -> str:
         token = event.get("source_token")
@@ -737,7 +910,11 @@ class CombatAggregator:
             self.connection_state = status
         detail = event.get("detail")
         if status == "session_started":
-            self.diagnostic_warning = None
+            self.diagnostic_warning = (
+                detail
+                if isinstance(detail, str) and detail.startswith("degraded:")
+                else None
+            )
         elif (
             status == "live"
             and isinstance(detail, str)
@@ -756,12 +933,75 @@ class CombatAggregator:
             self._party_roster_seen = True
             for totals in self._player_totals.values():
                 totals.active = False
+            live_snapshot_changed = any(
+                isinstance(member, Mapping)
+                and (
+                    (
+                        type(member.get("live_damage")) is int
+                        and self._player_totals[str(member["player_id"])].live_damage
+                        != member["live_damage"]
+                    )
+                    or (
+                        type(member.get("live_boss_damage")) is int
+                        and self._player_totals[
+                            str(member["player_id"])
+                        ].live_boss_damage
+                        != member["live_boss_damage"]
+                    )
+                )
+                for member in event["party_members"]
+            )
             for member in event["party_members"]:
                 player_id = str(member["player_id"])
                 totals = self._player_totals[player_id]
                 totals.player_slot = member.get("player_slot")
                 totals.is_local = bool(member["is_local"])
                 totals.active = True
+                live_damage = member.get("live_damage")
+                if type(live_damage) is int:
+                    if (
+                        live_snapshot_changed
+                        or totals.live_observed_damage_anchor is None
+                    ):
+                        totals.live_observed_damage_anchor = totals.damage_dealt
+                        totals.last_live_observed_damage_anchor = totals.damage_dealt
+                    totals.live_damage = live_damage
+                    totals.last_live_damage = live_damage
+                else:
+                    totals.live_damage = None
+                    totals.live_observed_damage_anchor = None
+                live_boss_damage = member.get("live_boss_damage")
+                if type(live_boss_damage) is int:
+                    if (
+                        live_snapshot_changed
+                        or totals.live_observed_boss_anchor is None
+                    ):
+                        totals.live_observed_boss_anchor = totals.boss_damage
+                        totals.last_live_observed_boss_anchor = totals.boss_damage
+                    totals.live_boss_damage = live_boss_damage
+                    totals.last_live_boss_damage = live_boss_damage
+                else:
+                    totals.live_boss_damage = None
+                    totals.live_observed_boss_anchor = None
+                official_damage = member.get("official_damage")
+                if type(official_damage) is int:
+                    totals.official_damage = max(
+                        totals.official_damage or 0,
+                        official_damage,
+                    )
+                official_boss_damage = member.get("official_boss_damage")
+                if type(official_boss_damage) is int:
+                    totals.official_boss_damage = max(
+                        totals.official_boss_damage or 0,
+                        official_boss_damage,
+                    )
+            for totals in self._player_totals.values():
+                if totals.active:
+                    continue
+                totals.live_damage = None
+                totals.live_boss_damage = None
+                totals.live_observed_damage_anchor = None
+                totals.live_observed_boss_anchor = None
 
     def _expire_ended_metrics(self) -> None:
         if (

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import inspect
 import unittest
+import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -9,6 +11,8 @@ from pathlib import Path
 from toolbox.app_shell import (
     COMBAT_ROUNDING_HINT,
     DEFAULT_TOOLBOX_WINDOW_PRESET,
+    GOLD,
+    GREEN,
     TOOLBOX_WINDOW_PRESETS,
     TOOLBOX_UI_SCALES,
     TOOLBOX_REPOSITORY_URL,
@@ -27,6 +31,8 @@ from toolbox.app_shell import (
     combat_hud_size,
     combat_hud_initial_position,
     combat_personal_share,
+    combat_status_presentation,
+    combat_team_grid_layout,
     combat_table_source_width,
     combat_table_numeric_width,
     format_location_label,
@@ -54,6 +60,14 @@ from toolbox.macro_model import parse_macro_profile
 
 
 class AppShellModelTests(unittest.TestCase):
+    def test_header_has_no_test_only_manual_export_control(self) -> None:
+        constructor = inspect.getsource(ToolboxShell.__init__)
+        header_builder = inspect.getsource(ToolboxShell._build)
+        self.assertNotIn("combat_archiver", constructor)
+        self.assertNotIn("archive_button", constructor)
+        self.assertNotIn("手动导出", header_builder)
+        self.assertFalse(hasattr(ToolboxShell, "_manual_export"))
+
     def test_main_combat_page_explains_final_rounding_without_claiming_an_error(self) -> None:
         self.assertIn("底层小数累计", COMBAT_ROUNDING_HINT)
         self.assertIn("界面最终取整", COMBAT_ROUNDING_HINT)
@@ -83,11 +97,13 @@ class AppShellModelTests(unittest.TestCase):
         self.assertNotIn("订阅", SUPPORT_NOTE)
         self.assertNotIn("续费", SUPPORT_NOTE)
         self.assertEqual(SUPPORT_QR_FILENAME, "微信赞助码.png")
-        support_directory = Path(__file__).resolve().parents[1] / "package_assets" / "赞助与投喂"
-        shell = SimpleNamespace(support_directory=support_directory, root=None)
-        with patch("toolbox.app_shell.os.startfile") as starter:
-            ToolboxShell._open_support_directory(shell)
-        starter.assert_called_once_with(str(support_directory.resolve()))
+        with tempfile.TemporaryDirectory() as temp_dir:
+            support_directory = Path(temp_dir) / "赞助与投喂"
+            support_directory.mkdir()
+            shell = SimpleNamespace(support_directory=support_directory, root=None)
+            with patch("toolbox.app_shell.os.startfile") as starter:
+                ToolboxShell._open_support_directory(shell)
+            starter.assert_called_once_with(str(support_directory.resolve()))
 
     def test_game_loaded_mod_launch_reuses_existing_game_launcher(self) -> None:
         actions: list[str] = []
@@ -219,12 +235,12 @@ class AppShellModelTests(unittest.TestCase):
             combat_personal_share(snapshot),
             snapshot.personal_damage / snapshot.total_damage,
         )
-        self.assertEqual([row[0] for row in rows], ["自己", "队友 1", "队友 2", "队友 3"])
+        self.assertEqual([row[0] for row in rows], ["自己 · P1", "P2", "P3", "P4"])
         self.assertEqual(sum(row[1] for row in rows), snapshot.total_damage)
         self.assertAlmostEqual(sum(row[3] for row in rows), 1.0)
         self.assertNotIn("demo-player", str(rows))
         teammates = combat_teammate_rows(snapshot)
-        self.assertEqual([row[0] for row in teammates], ["队友 1", "队友 2", "队友 3"])
+        self.assertEqual([row[0] for row in teammates], ["P2", "P3", "P4"])
 
     def test_demo_client_slot_is_still_rendered_as_self(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -237,7 +253,7 @@ class AppShellModelTests(unittest.TestCase):
         seed_demo_combat(aggregator, party_size=4, local_player_slot=2)
         snapshot = aggregator.snapshot()
         rows = combat_team_rows(snapshot)
-        self.assertEqual(rows[0][0], "自己")
+        self.assertEqual(rows[0][0], "自己 · P3")
         local_rows = [
             values
             for values in snapshot.player_breakdown.values()
@@ -262,10 +278,15 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(snapshot.detected_player_count, 16)
         self.assertEqual(len(teammates), 15)
         self.assertEqual(len(main_rows), 16)
-        self.assertEqual(main_rows[0][0], "自己")
+        self.assertEqual(main_rows[0][0], "自己 · P13")
         self.assertEqual(
             [row[0] for row in teammates],
-            [f"队友 {index}" for index in range(1, 16)],
+            [
+                *[f"P{index}" for index in range(1, 13)],
+                "P14",
+                "P15",
+                "P16",
+            ],
         )
 
     def test_main_team_panel_scrolls_horizontally_after_four_players(self) -> None:
@@ -274,9 +295,25 @@ class AppShellModelTests(unittest.TestCase):
         )
         self.assertIn('orient="horizontal"', source)
         self.assertIn("maximum=MAX_PARTY_MEMBERS", source)
-        self.assertIn("len(team_rows) > 4", source)
         self.assertIn("self.combat_team_canvas.xview", source)
-        self.assertIn("content_width = cell_width * visible_count", source)
+        self.assertIn("needs_scroll = combat_team_grid_layout(", source)
+
+        self.assertEqual(
+            combat_team_grid_layout(4, 560, 1.15),
+            (172, 688, True),
+        )
+        self.assertEqual(
+            combat_team_grid_layout(2, 560, 1.15),
+            (172, 688, False),
+        )
+        self.assertEqual(
+            combat_team_grid_layout(4, 800, 1.15),
+            (200, 800, False),
+        )
+        self.assertEqual(
+            combat_team_grid_layout(5, 800, 1.15),
+            (200, 1_000, True),
+        )
 
     def test_demo_degraded_state_remains_live_and_explicit(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -361,9 +398,139 @@ class AppShellModelTests(unittest.TestCase):
 
     def test_combat_connection_states_remain_distinct(self) -> None:
         self.assertEqual(combat_state_label("live", compact=True), "● 实时")
+        self.assertEqual(combat_state_label("live"), "● 实时估算")
         self.assertEqual(combat_state_label("connecting"), "● 正在连接战斗桥接")
         self.assertIn("异常", combat_state_label("error"))
         self.assertNotEqual(combat_state_label("stale"), combat_state_label("disconnected"))
+
+    @staticmethod
+    def _combat_status_snapshot(
+        *,
+        state: str = "live",
+        damage: int = 0,
+        boss_damage: int = 0,
+        official_damage_complete: bool = False,
+        official_boss_damage_complete: bool = False,
+        degraded: bool = False,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            connection_state=state,
+            diagnostic_warning="degraded:event_gap" if degraded else None,
+            official_damage_complete=official_damage_complete,
+            official_boss_damage_complete=official_boss_damage_complete,
+            personal_damage=damage,
+            personal_boss_damage=boss_damage,
+        )
+
+    def test_live_damage_is_an_amber_estimate_for_zero_and_large_values(self) -> None:
+        for damage, boss_damage in ((0, 0), (11_057_093, 4_000_000)):
+            with self.subTest(damage=damage):
+                snapshot = self._combat_status_snapshot(
+                    damage=damage,
+                    boss_damage=boss_damage,
+                )
+                full = combat_status_presentation(snapshot)
+                compact = combat_status_presentation(snapshot, compact=True)
+                self.assertEqual(full.kind, "estimate")
+                self.assertEqual(full.label, "● 实时估算")
+                self.assertEqual(full.explanation, "结算可能校正")
+                self.assertEqual(full.color, GOLD)
+                self.assertEqual(
+                    format_metric(snapshot.personal_damage),
+                    f"{damage:,}",
+                )
+                self.assertEqual(compact.label, "● 实时")
+                self.assertEqual(compact.explanation, "")
+                self.assertEqual(compact.color, GREEN)
+                self.assertNotIn("结算可能校正", compact.text)
+
+    def test_complete_official_values_win_for_upward_and_downward_finals(self) -> None:
+        corrections = (
+            (11_057_093, 10_440_726),
+            (8_520_510, 8_829_890),
+        )
+        for live_damage, final_damage in corrections:
+            with self.subTest(live=live_damage, final=final_damage):
+                live = self._combat_status_snapshot(damage=live_damage)
+                final = self._combat_status_snapshot(
+                    state="ended",
+                    damage=final_damage,
+                    official_damage_complete=True,
+                    official_boss_damage_complete=True,
+                )
+                self.assertEqual(combat_status_presentation(live).kind, "estimate")
+                official = combat_status_presentation(final)
+                self.assertEqual(official.kind, "official")
+                self.assertEqual(official.text, "● 官方结算")
+                self.assertEqual(official.color, GREEN)
+                self.assertEqual(format_metric(final.personal_damage), f"{final_damage:,}")
+                self.assertEqual(
+                    combat_status_presentation(final, compact=True).text,
+                    "● 官方",
+                )
+
+        partial = self._combat_status_snapshot(
+            damage=10_440_726,
+            official_damage_complete=True,
+            official_boss_damage_complete=False,
+        )
+        self.assertEqual(combat_status_presentation(partial).kind, "estimate")
+
+    def test_degraded_and_transport_states_are_not_hidden_by_estimate_status(self) -> None:
+        degraded = combat_status_presentation(
+            self._combat_status_snapshot(degraded=True)
+        )
+        self.assertEqual(
+            degraded.text,
+            "● 实时估算（有事件跳过） · 结算可能校正",
+        )
+        self.assertEqual(degraded.color, GOLD)
+        self.assertEqual(
+            combat_status_presentation(
+                self._combat_status_snapshot(degraded=True),
+                compact=True,
+            ).text,
+            "● 实时 · 跳过",
+        )
+        self.assertEqual(
+            combat_status_presentation(
+                self._combat_status_snapshot(degraded=True),
+                compact=True,
+            ).color,
+            GOLD,
+        )
+        official_degraded = combat_status_presentation(
+            self._combat_status_snapshot(
+                state="ended",
+                official_damage_complete=True,
+                official_boss_damage_complete=True,
+                degraded=True,
+            )
+        )
+        self.assertEqual(official_degraded.text, "● 官方结算（有事件跳过）")
+        self.assertEqual(official_degraded.color, GREEN)
+
+        expected = {
+            "connecting": "● 正在连接战斗桥接",
+            "stale": "● 战斗桥接响应延迟",
+            "error": "● 战斗数据异常，本轮统计已停止",
+            "disconnected": "● 等待战斗桥接数据",
+        }
+        for state, label in expected.items():
+            with self.subTest(state=state):
+                status = combat_status_presentation(
+                    self._combat_status_snapshot(state=state)
+                )
+                self.assertEqual(status.kind, state)
+                self.assertEqual(status.text, label)
+                self.assertNotIn("估算", status.text)
+
+        ended = combat_status_presentation(
+            self._combat_status_snapshot(state="ended")
+        )
+        self.assertEqual(ended.kind, "ended")
+        self.assertIn("已结束", ended.text)
+        self.assertIn("实时估算", ended.text)
 
     def test_combat_hud_size_adds_only_needed_high_dpi_room(self) -> None:
         self.assertEqual(combat_hud_size(1.5), (350, 474))
@@ -371,20 +538,22 @@ class AppShellModelTests(unittest.TestCase):
         self.assertEqual(combat_hud_size(2.5), (390, 558))
         self.assertEqual(combat_hud_size(1.5, 0.85), (298, 403))
         self.assertEqual(combat_hud_size(1.5, 1.25), (438, 592))
-        self.assertEqual(combat_hud_size(1.5, player_count=2), (580, 474))
-        self.assertEqual(combat_hud_size(2.0, player_count=4), (610, 554))
-        self.assertEqual(combat_hud_size(1.5, player_count=5), (810, 474))
-        self.assertEqual(combat_hud_size(1.5, player_count=8), (1040, 474))
-        self.assertEqual(combat_hud_size(1.5, player_count=11), (1270, 474))
-        self.assertEqual(combat_hud_size(1.5, player_count=16), (1500, 474))
-        self.assertEqual(combat_hud_size(2.0, player_count=16), (1570, 554))
+        self.assertEqual(combat_hud_size(1.25, player_count=2), (580, 484))
+        self.assertEqual(combat_hud_size(1.5, player_count=2), (580, 494))
+        self.assertEqual(combat_hud_size(2.0, player_count=4), (610, 564))
+        self.assertEqual(combat_hud_size(1.5, player_count=5), (810, 494))
+        self.assertEqual(combat_hud_size(1.5, player_count=8), (1040, 494))
+        self.assertEqual(combat_hud_size(1.5, player_count=11), (1270, 494))
+        self.assertEqual(combat_hud_size(1.5, player_count=16), (1500, 494))
+        self.assertEqual(combat_hud_size(2.0, player_count=16), (1570, 564))
         self.assertEqual(hud_panel_height(112, 1.5), 112)
         self.assertEqual(hud_panel_height(112, 2.0), 118)
         self.assertEqual(hud_panel_height(88, 2.0, high_dpi_gain=24), 100)
         self.assertEqual(hud_recent_panel_height(1.5, multiplayer=False), 114)
-        self.assertEqual(hud_recent_panel_height(1.5, multiplayer=True), 114)
+        self.assertEqual(hud_recent_panel_height(1.25, multiplayer=True), 124)
+        self.assertEqual(hud_recent_panel_height(1.5, multiplayer=True), 134)
         self.assertEqual(hud_recent_panel_height(2.0, multiplayer=False), 131)
-        self.assertEqual(hud_recent_panel_height(2.0, multiplayer=True), 160)
+        self.assertEqual(hud_recent_panel_height(2.0, multiplayer=True), 170)
 
     def test_damage_panel_reserves_structural_space_above_composition_bar(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "toolbox" / "app_shell.py").read_text(
@@ -507,8 +676,9 @@ class AppShellModelTests(unittest.TestCase):
         self.assertNotIn('rendered_text = "…"', source)
 
     def test_main_combat_layout_reserves_high_dpi_subtitles_and_numbers(self) -> None:
-        self.assertEqual(main_window_min_size(1.5), (780, 700))
-        self.assertEqual(main_window_min_size(2.0), (1200, 840))
+        self.assertEqual(main_window_min_size(1.25), (780, 710))
+        self.assertEqual(main_window_min_size(1.5), (780, 720))
+        self.assertEqual(main_window_min_size(2.0), (1200, 850))
         self.assertEqual(main_metric_card_height(1.5), 133)
         self.assertEqual(main_metric_card_height(2.0), 151)
         self.assertEqual(main_team_panel_height(1.5), 115)
@@ -551,7 +721,7 @@ class AppShellModelTests(unittest.TestCase):
                 screen_height=1080,
                 tk_scaling=1.5,
             ),
-            (900, 700),
+            (900, 720),
         )
         self.assertEqual(
             clamp_main_window_size(
@@ -561,7 +731,7 @@ class AppShellModelTests(unittest.TestCase):
                 screen_height=1080,
                 tk_scaling=2.0,
             ),
-            (1200, 840),
+            (1200, 850),
         )
         self.assertEqual(
             clamp_main_window_size(

@@ -1,5 +1,7 @@
 # LC2 工作 6 交接
 
+> 历史快照：工作6交接已完成，以下运行身份和开放门不表示当前状态；当前行为以正式 v1.7 源码与发布说明为准。
+
 > 冻结时间：2026-08-30 16:02:51 +08:00。此文件是 successor 的当前短入口；历史细节按链接查阅，不重放长聊天。开始工作前重新读取最近 `AGENTS.md`、`git status`、进程与实时日志，本文中的运行状态是时间点证据，不是永久真相。
 
 ## 1. 角色、目标与当前阶段
@@ -11,7 +13,7 @@
 
 ## 2. 仓库与发布基线
 
-- 项目：`C:\xiangmuyunxing\biancheng\2026\lostcastle2-keyview`。
+- 项目：`<repo>`。
 - 分支：`main`；HEAD `3d6767794be7b88da3e08e7ef62b444b1658a5ee`；`origin/main` 同步；HEAD tag `v1.6.0`；remote `https://github.com/SeasonCake/lostcastle2-toolbox.git`。
 - v1.6.0 是已冻结 Git/Release 基线，但用户尚未向群友分发。当前全部工作是其后的未提交候选，不能回写为“v1.6.0 已含”。
 - 冻结时 tracked 修改 15 个：README EN/ZH、notice、两个社区 MOD JSON、build、三个 docs、Bridge source/README、三个 tests、`toolbox/app_shell.py`。
@@ -27,8 +29,8 @@
 
 ## 3. 当前运行与部署身份（冻结时）
 
-- 游戏正在运行：PID 28116，exact path `C:\xiangmuyunxing\steamapps\common\Lost Castle 2\LostCastle2.exe`。
-- 测试盒子正在运行：PID 22012，exact path `C:\Users\shenc\Desktop\失落城堡2工具箱 1.6.0-Bridge0.4.6测试版\失落城堡2工具箱.exe`。
+- 冻结时游戏正在运行，exact path `<game>/LostCastle2.exe`。
+- 冻结时测试盒子正在运行，exact path `<desktop>/失落城堡2工具箱 1.6.0-Bridge0.4.6测试版/失落城堡2工具箱.exe`。
 - 目录名虽仍写 0.4.6，但内部 manifest 是 `LC2CombatBridge 0.4.7-test`。
 - 游戏目录和测试盒子内置 Bridge 均为 48,640 B / SHA-256 `A917E813DC66D1A2737138905DC324CDF9939C1A5A119556D3442F3ACBC18CA7`。
 - 0.4.6 回滚：47,616 B / `7DFF32538C1D40015912D0D6C07A6EDF11A9D4E1E571EEEAF496ECD1AF5C98B4`，在 `artifacts/runtime-deploy/2026-08-30-bridge-0.4.7/`。
@@ -69,7 +71,7 @@
 - 社区 catalog 当前 dirty 候选：51 条目、52 载荷、3,361,741 B；`build.ps1` 期望载荷52；MOD manager 聚焦20项 PASS。
 - `LC2 增强计划` 优先级已从180提到110，排在玩家实时属性之后；内建灵魂石/金币仍在社区 MOD 前。
 - MOD 表作者列标题/内容已居中；app shell 聚焦28项此前 PASS，尚未启动 actual UI 验收。
-- 待加入的新 DLL 位于正确路径 `C:\Users\shenc\Desktop\LC2_versions\LCMods`：
+- 待加入的新 DLL 位于 `<local-mod-library>`：
   - `LC2PurpleDamage暴击字体红色改紫色.dll`：13,824 B / SHA-256 `5863D6A9346304C418C731F73AF0E0413AAAE1FEBD569065697B9CBDC035EECB`；截图上传者“兔子王お”。预期纯视觉，通常排功能 MOD 后，仍需静态确认版本/作者/载荷/冲突。
   - `LC2HexAugment.dll`：40,960 B / SHA-256 `50CEB677DE7AB88D8E4E4FD8059CEA5FBC440D709DAA7E4A215B059938E04ECC`；截图上传者“笑”。需要优先确认具体功能、面板按键及与现有 F1/Hex 类 MOD 冲突，再决定实战排序。
 - 第三方 DLL 不进入 Git；只进入本地打包 payload，Git 只记录 catalog/source identity/notice。不要执行新 DLL 来猜功能，先静态检查。

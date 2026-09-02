@@ -1,7 +1,7 @@
 # “模组前置 BepInEx”静态分析
 
 - 用户文件：`模组前置BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.785+6abdba4.zip`。
-- 实际定位：`C:\Users\shenc\Desktop\LC2_versions\LCMods\`；用户消息中的 `LC2\_versions` 路径不存在。
+- 实际定位：`<local-mod-library>`；最初提供的候选路径存在转义差异，已在只读清点时纠正。
 - 文件：34,335,572 B / SHA-256 `2A7CBF74D26ABE4765C3E662DB1721B923BAC39849EBFEF2CA5DC7DE7E2D9B7F`。
 - ZIP 完整性：7-Zip PASS；228 个文件、解压 75,665,788 B。
 - 生命周期：`STATIC IDENTITY PASS / NOT A GAMEPLAY MOD / EXECUTION NOT RUN`。

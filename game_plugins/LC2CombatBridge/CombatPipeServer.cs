@@ -18,6 +18,7 @@ internal sealed class RoomLocation
     public int RoomIndex { get; init; }
     public string MapFileName { get; init; }
     public string RoomId => $"L{StageLevel}:{ScenarioId}:{RoomIndex}";
+    public string Fingerprint => $"{RoomId}:{MapFileName}";
 }
 
 internal sealed class PartyMemberSnapshot
@@ -25,16 +26,44 @@ internal sealed class PartyMemberSnapshot
     public string PlayerId { get; init; }
     public int? PlayerSlot { get; init; }
     public bool IsLocal { get; init; }
+    public long? LiveDamage { get; init; }
+    public long? LiveBossDamage { get; init; }
+    public long? OfficialDamage { get; init; }
+    public long? OfficialBossDamage { get; init; }
 
-    public Dictionary<string, object> ToPayload() => new()
+    public Dictionary<string, object> ToPayload()
     {
-        ["player_id"] = PlayerId,
-        ["player_slot"] = PlayerSlot,
-        ["is_local"] = IsLocal,
-    };
+        var payload = new Dictionary<string, object>
+        {
+            ["player_id"] = PlayerId,
+            ["player_slot"] = PlayerSlot,
+            ["is_local"] = IsLocal,
+        };
+        if (LiveDamage is not null)
+        {
+            payload["live_damage"] = LiveDamage.Value;
+        }
+        if (LiveBossDamage is not null)
+        {
+            payload["live_boss_damage"] = LiveBossDamage.Value;
+        }
+        if (OfficialDamage is not null)
+        {
+            payload["official_damage"] = OfficialDamage.Value;
+        }
+        if (OfficialBossDamage is not null)
+        {
+            payload["official_boss_damage"] = OfficialBossDamage.Value;
+        }
+        return payload;
+    }
 
     public string Fingerprint =>
-        $"{PlayerId}:{(PlayerSlot is null ? "null" : PlayerSlot.Value)}:{IsLocal}";
+        $"{PlayerId}:{(PlayerSlot is null ? "null" : PlayerSlot.Value)}:{IsLocal}:" +
+        $"{(LiveDamage is null ? "null" : LiveDamage.Value)}:" +
+        $"{(LiveBossDamage is null ? "null" : LiveBossDamage.Value)}:" +
+        $"{(OfficialDamage is null ? "null" : OfficialDamage.Value)}:" +
+        $"{(OfficialBossDamage is null ? "null" : OfficialBossDamage.Value)}";
 }
 
 internal sealed class CombatPipeServer : IDisposable
@@ -60,9 +89,10 @@ internal sealed class CombatPipeServer : IDisposable
     private bool _connected;
     private bool _failed;
     private bool _sessionActive;
-    private bool _roundActive = true;
+    private bool _roundActive;
     private string _sessionId = Guid.NewGuid().ToString("N");
     private long _sequence;
+    private int _sessionConnectionCount;
     private RoomLocation _room;
     private readonly Dictionary<string, string> _playerTokens = new();
     private readonly HashSet<string> _recoverableIssues = new(StringComparer.Ordinal);
@@ -93,12 +123,11 @@ internal sealed class CombatPipeServer : IDisposable
             _nextPlayerToken = 0;
             _partyMembers = new List<PartyMemberSnapshot>();
             _partyFingerprint = string.Empty;
-            if (!_connected)
+            if (_connected)
             {
-                return;
+                ClearOutboundLocked();
             }
-            ClearOutboundLocked();
-            StartSessionLocked();
+            StartNewSessionLocked(enqueueStart: _connected);
         }
     }
 
@@ -186,6 +215,18 @@ internal sealed class CombatPipeServer : IDisposable
                     ? member.PlayerSlot
                     : null,
                 IsLocal = member.IsLocal,
+                LiveDamage = member.LiveDamage is >= 0
+                    ? member.LiveDamage
+                    : null,
+                LiveBossDamage = member.LiveBossDamage is >= 0
+                    ? member.LiveBossDamage
+                    : null,
+                OfficialDamage = member.OfficialDamage is >= 0
+                    ? member.OfficialDamage
+                    : null,
+                OfficialBossDamage = member.OfficialBossDamage is >= 0
+                    ? member.OfficialBossDamage
+                    : null,
             });
         }
         if (bounded.Count == 0)
@@ -406,7 +447,7 @@ internal sealed class CombatPipeServer : IDisposable
             _failed = false;
             if (_roundActive)
             {
-                StartSessionLocked();
+                ResumeSessionLocked();
                 if (_room is not null)
                 {
                     EnqueueRoomStartedLocked(_room);
@@ -440,18 +481,39 @@ internal sealed class CombatPipeServer : IDisposable
         }
     }
 
-    private void StartSessionLocked()
+    private void StartNewSessionLocked(bool enqueueStart)
     {
         _sessionId = Guid.NewGuid().ToString("N");
         _sequence = 0;
+        _sessionConnectionCount = 0;
         _failed = false;
         _recoverableIssues.Clear();
         _sessionActive = true;
+        if (enqueueStart)
+        {
+            EnqueueSessionStartedLocked(reconnected: false);
+        }
+    }
+
+    private void ResumeSessionLocked()
+    {
+        _failed = false;
+        _sessionActive = true;
+        EnqueueSessionStartedLocked(reconnected: _sessionConnectionCount > 0);
+    }
+
+    private void EnqueueSessionStartedLocked(bool reconnected)
+    {
+        _sessionConnectionCount += 1;
         EnqueueLocked(CreateEventLocked(
             "status",
             aggregate: false,
-            "bridge.session_start",
-            new Dictionary<string, object> { ["status"] = "session_started" }));
+            reconnected ? "bridge.session_resume" : "bridge.session_start",
+            new Dictionary<string, object>
+            {
+                ["status"] = "session_started",
+                ["detail"] = reconnected ? "degraded:transport_reconnected" : null,
+            }));
     }
 
     private void EnqueueRoomStartedLocked(RoomLocation room)
