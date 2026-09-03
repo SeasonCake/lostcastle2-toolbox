@@ -69,7 +69,7 @@
 - 1.7.4只在本机单人、HMAC身份/槽位一致且三值合法时冻结官方伤害/Boss/承伤；承伤只在final覆盖，不做实时累计。可信UI结束回调即使缺record也结束session并保留live估算，不伪造“官方”。
 - 当前源码338项测试通过；双构建档C# Release 0 warning/0 error，Diagnostic初次构建327项产品门通过，新增群友文案门后的最终Distribution原生重构建328项通过；public-core实际构建重新运行338项并self-test exit0。
 - Distribution为1,770文件/167,021,045 B，EXE `F881D798…28660`、Bridge `190B8B4A…7DED`，诊断/默认记录关闭、exports不存在、维护者精确个人目录与测试数据扫描0命中；同名桌面目录逐文件一致。UTF-8分享ZIP为137,406,593 B，逐文件内容一致，SHA-256 `8905A9DE…CF7C5`。
-- 群分享说明只保留用户操作和不落对局明细的边界，诊断演进留在GitHub文档。public-core为1,712文件/84,931,341 B，EXE `1C6DB28B…364C9`；只带公开catalog、官方固定运行时和Distribution Bridge，不带本地第三方MOD载荷。所有产物仅本地准备，未提交、推送或发布。
+- 群分享说明只保留用户操作和不落对局明细的边界，诊断演进留在GitHub文档。public-core为1,712文件/84,931,341 B，EXE `1C6DB28B…364C9`；只带公开catalog、官方固定运行时和Distribution Bridge，不带本地第三方MOD载荷。`v1.7.4`标签与发布提交均为`be1f1ba115…`，58,012,289 B公开资产的服务器digest、Draft与正式下载回读均为`B68160E1…D2A4C4`，GitHub Release已发布为Latest。
 
 ## 明确不外推
 

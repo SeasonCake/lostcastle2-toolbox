@@ -1,6 +1,6 @@
 # 失落城堡2工具箱 1.7.4 结算、承伤与发布准备回执
 
-> lifecycle: `source-and-package-pass / real-1.7.4-final-not-run / local-share-ready / github-release-prepared`
+> lifecycle: `source-and-package-pass / real-1.7.4-final-not-run / local-share-ready / github-release-published-readback-verified`
 >
 > recorded: `2026-09-03 Asia/Shanghai`
 
@@ -8,7 +8,7 @@
 
 - 1.7.4 源码、双构建档、public-core、隐私边界、空白运行时安装和本地分享包均通过离线/包形门。
 - 1.7.4 的单人结算 UI 显式 record、最终承伤覆盖和 `session_ended` 组合路径已由源码链、互操作类型与合成端到端归档正控闭合；本版本尚未再跑真实游戏终局，因此真实运行状态明确为 `NOT RUN`，不冒充实战 PASS。
-- 正式群分享目录与 UTF-8 ZIP 已准备在 `<desktop>`；GitHub public-core 资产已完成本地冻结，外部 commit、push、tag、Release 与上传将在独立发布阶段记录。
+- 正式群分享目录与 UTF-8 ZIP 已准备在 `<desktop>`；GitHub public-core 已在 `v1.7.4` 正式发布并完成服务器 digest、Draft 下载与公开下载三重回读。
 
 ## 源码身份
 
@@ -53,10 +53,10 @@
 - 群分享根说明仅保留启动、HUD含义、重进、MOD安装和“不保存逐事件对局明细”等用户操作；`rxx`、探针、导出按钮与记录上限只留在仓库维护文档。
 - `<desktop>/失落城堡2工具箱1.7.4-实时数值监测+一键MOD安装` 与冻结 Distribution 逐文件 SHA-256 一致。
 - `<desktop>/失落城堡2工具箱1.7.4-实时数值监测+一键MOD安装.zip`：1,770 文件，未压缩 167,021,045 B，ZIP 137,406,593 B，所有条目位于同名顶层目录且中文名为 UTF-8；逐文件 SHA-256 与同名目录一致，ZIP SHA-256 `8905A9DE49215B65E42F750DE396853C79A067D33696F343410C1140962CF7C5`。
-- GitHub public-core 资产 `LostCastle2Toolbox-v1.7.4-public-core-windows-x64.zip`：58,012,289 B，1,712 文件逐文件一致，SHA-256 `B68160E15EB917E14B9C448B2F82C678005D6E493978DCD799A6ECB5A0D2A4C4`；外部上传/下载回读在发布后补记。
+- GitHub public-core 资产 `LostCastle2Toolbox-v1.7.4-public-core-windows-x64.zip`：58,012,289 B，1,712 文件逐文件一致，SHA-256 `B68160E15EB917E14B9C448B2F82C678005D6E493978DCD799A6ECB5A0D2A4C4`；服务器 digest、Draft 下载和正式公开下载均一致，7-Zip 完整性 exit 0。标签与发布提交为`v1.7.4` / `be1f1ba115a7fa59c5aa5720914283b0e72a1b39`。
 
 ## 仍未运行
 
 - 1.7.4 的单人自然胜利、最终死亡、主动结束和 Alt+F4 后终局实测；所以 `official_taken_damage`、真实 `session_ended` 与 automatic ZIP 的同局闭环仍是 `NOT RUN`。
 - 1.7.4 真实多人结算、再次跨进程重进、下一局清理，以及新增/更新 MOD 的真实游戏效果和组合兼容。
-- commit、push、tag、GitHub Release、远端下载回读与群分享。
+- 群友端下载、解压、首次运行及真实玩法反馈；维护者的群分享动作不由仓库发布回执代替。
