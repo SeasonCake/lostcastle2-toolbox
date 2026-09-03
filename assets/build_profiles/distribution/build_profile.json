@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "profile_id": "distribution",
+  "combat_diagnostics_available": false,
+  "bridge_diagnostics_enabled": false,
+  "default_recording_enabled": false
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 from ctypes import wintypes
+from dataclasses import dataclass
 import hashlib
 import json
 import os
@@ -26,6 +27,7 @@ from toolbox.app_shell import (
     seed_demo_combat,
 )
 from toolbox.combat_aggregator import CombatAggregator, ScenarioRegistry, SourceRegistry
+from toolbox.combat_archive import CombatDiagnosticsController, CombatMatchArchiver
 from toolbox.combat_transport import (
     CombatBridgeClient,
     CombatEventPump,
@@ -46,7 +48,7 @@ from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, se
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.7.1"
+APP_VERSION = "1.7.4"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -80,6 +82,74 @@ LEGACY_TOOLBOX_DEFAULT_PROFILES = (
     (900, 650, 1.0),
     (1160, 840, 1.15),
 )
+
+
+class BuildProfileError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class BuildProfile:
+    profile_id: str
+    combat_diagnostics_available: bool
+    bridge_diagnostics_enabled: bool
+    default_recording_enabled: bool
+
+
+def load_build_profile(
+    resource_dir: Path = RESOURCE_DIR,
+    *,
+    packaged: bool | None = None,
+) -> BuildProfile:
+    is_packaged = getattr(sys, "frozen", False) if packaged is None else packaged
+    assets = Path(resource_dir) / "assets"
+    path = (
+        assets / "build_profile.json"
+        if is_packaged
+        else assets / "build_profiles" / "diagnostic" / "build_profile.json"
+    )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        raise BuildProfileError("构建配置缺失或无法读取。") from error
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise BuildProfileError("构建配置版本无效。")
+    profile_id = payload.get("profile_id")
+    if profile_id not in {"diagnostic", "distribution"}:
+        raise BuildProfileError("构建配置名称无效。")
+    fields = (
+        payload.get("combat_diagnostics_available"),
+        payload.get("bridge_diagnostics_enabled"),
+        payload.get("default_recording_enabled"),
+    )
+    if any(not isinstance(value, bool) for value in fields):
+        raise BuildProfileError("构建配置开关无效。")
+    expected = profile_id == "diagnostic"
+    if fields != (expected, expected, expected):
+        raise BuildProfileError("构建配置开关与名称不一致。")
+    return BuildProfile(profile_id, *fields)
+
+
+def validate_packaged_build_profile(
+    profile: BuildProfile,
+    manifest_path: Path,
+    *,
+    packaged: bool | None = None,
+) -> None:
+    is_packaged = getattr(sys, "frozen", False) if packaged is None else packaged
+    if not is_packaged:
+        return
+    try:
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        raise BuildProfileError("运行环境清单无法读取。") from error
+    bridge = manifest.get("bridge") if isinstance(manifest, dict) else None
+    if (
+        not isinstance(bridge, dict)
+        or manifest.get("build_profile") != profile.profile_id
+        or bridge.get("diagnostics_enabled") is not profile.bridge_diagnostics_enabled
+    ):
+        raise BuildProfileError("构建配置与 Bridge 运行环境身份不一致。")
 
 DEFAULT_KEY_LAYOUT = {
     "W": (127, 84, 66, 64),
@@ -732,6 +802,7 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
         "toolbox_ui_scale": DEFAULT_TOOLBOX_UI_SCALE,
         "hud_ui_scale": 1.0,
         "always_on_top": True,
+        "candidate_diagnostics_enabled": True,
         "game_path": str(DEFAULT_GAME_EXE),
     }
     source_path = path
@@ -804,6 +875,9 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
     defaults["hud_ui_scale"] = bounded_float("hud_ui_scale", 1.0, 0.85, 1.25)
     defaults["show_background"] = bool(defaults.get("show_background", True))
     defaults["key_only"] = bool(defaults.get("key_only", False))
+    defaults["candidate_diagnostics_enabled"] = bool(
+        defaults.get("candidate_diagnostics_enabled", True)
+    )
     return defaults
 
 
@@ -2864,6 +2938,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def self_test() -> int:
+    build_profile = load_build_profile(RESOURCE_DIR)
     assert set(LOST_CASTLE_KEYS) == set(DEFAULT_KEY_LAYOUT)
     assert len({definition[1] for definition in KEY_DEFINITIONS.values()}) == len(
         KEY_DEFINITIONS
@@ -2884,6 +2959,7 @@ def self_test() -> int:
             assert y + key_height <= pad_height
     game_exe = resolve_game_exe(DEFAULT_GAME_EXE)
     runtime_manifest = RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json"
+    validate_packaged_build_profile(build_profile, runtime_manifest)
     runtime_bundle = RESOURCE_DIR / "third_party" / "lc2_runtime"
     if runtime_bundle.is_dir():
         RuntimeSetupManager(
@@ -2912,6 +2988,8 @@ def self_test() -> int:
                 "default_key_count": len(LOST_CASTLE_KEYS),
                 "game_exe_found": game_exe is not None,
                 "runtime_bundle": runtime_bundle_status,
+                "build_profile": build_profile.profile_id,
+                "combat_diagnostics": build_profile.combat_diagnostics_available,
             },
             ensure_ascii=False,
         )
@@ -2923,6 +3001,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     if args.self_test:
         return self_test()
+    build_profile = load_build_profile()
+    validate_packaged_build_profile(
+        build_profile,
+        RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json",
+    )
     enable_dpi_awareness()
     enable_windows_app_identity()
     mutex = ensure_single_instance()
@@ -3044,6 +3127,29 @@ def main(argv: list[str] | None = None) -> int:
         registry=registry,
         scenario_registry=scenario_registry,
     )
+    combat_diagnostics: CombatDiagnosticsController | None = None
+    if build_profile.combat_diagnostics_available:
+        diagnostics_root = Path(
+            os.environ.get(
+                "KEYVIEW_DIAGNOSTICS_DIR",
+                APP_DIR / "exports" / "对局诊断",
+            )
+        )
+
+        def persist_diagnostics_enabled(enabled: bool) -> None:
+            keyboard_app.settings["candidate_diagnostics_enabled"] = bool(enabled)
+            save_settings(keyboard_app.settings)
+
+        combat_diagnostics = CombatDiagnosticsController(
+            CombatMatchArchiver(
+                diagnostics_root,
+                app_version=APP_VERSION,
+                snapshot_provider=combat_aggregator.snapshot,
+            ),
+            enabled=bool(keyboard_app.settings.get("candidate_diagnostics_enabled", True))
+            and build_profile.default_recording_enabled,
+            on_enabled_changed=persist_diagnostics_enabled,
+        )
     combat_client: CombatBridgeClient | None = None
     combat_pump: CombatEventPump | None = None
     if args.demo or args.demo_large_values:
@@ -3066,6 +3172,9 @@ def main(argv: list[str] | None = None) -> int:
                 RESOURCE_DIR / "contracts" / "combat_event.schema.json"
             ),
             combat_aggregator,
+            event_batch_sink=combat_diagnostics.record_events
+            if combat_diagnostics is not None
+            else None,
         )
         combat_client = CombatBridgeClient(combat_inbox)
     shell: ToolboxShell | None = None
@@ -3080,6 +3189,8 @@ def main(argv: list[str] | None = None) -> int:
             combat_client.stop()
         if combat_pump is not None:
             combat_pump.drain()
+        if combat_diagnostics is not None:
+            combat_diagnostics.checkpoint()
         if shell is not None:
             shell.close()
         keyboard_app.shutdown()
@@ -3112,6 +3223,7 @@ def main(argv: list[str] | None = None) -> int:
         support_directory=support_directory,
         combat_aggregator=combat_aggregator,
         combat_event_pump=combat_pump,
+        combat_diagnostics=combat_diagnostics,
         keyboard_preview_provider=keyboard_preview,
         launch_game=keyboard_app.launch_game,
         ensure_game_runtime=ensure_game_runtime,

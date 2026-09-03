@@ -10,6 +10,7 @@ from typing import Any, Callable, Mapping
 
 SCHEMA_VERSION = 2
 DEFAULT_DPS_WINDOW_MS = 10_000
+MIN_DPS_INTERVAL_MS = 1_000
 DEFAULT_ENDED_RETENTION_MS: int | None = None
 VALID_ROOM_INDICES = frozenset((*range(0, 11), 99, 100, 101))
 VALID_TRANSPORT_STATES = frozenset({"connecting", "disconnected", "stale", "error"})
@@ -213,6 +214,7 @@ class PlayerTotals:
     last_live_observed_boss_anchor: int | None = None
     official_damage: int | None = None
     official_boss_damage: int | None = None
+    official_taken_damage: int | None = None
 
 
 @dataclass(frozen=True)
@@ -235,6 +237,7 @@ class CombatSnapshot:
     live_boss_damage_complete: bool
     official_damage_complete: bool
     official_boss_damage_complete: bool
+    official_taken_damage_complete: bool
     personal_damage: int
     personal_recent_dps: float
     personal_boss_damage: int
@@ -289,6 +292,7 @@ class CombatAggregator:
         self.connection_state = "disconnected"
         self.last_sequence: int | None = None
         self.last_monotonic_ms: int | None = None
+        self._last_event_received_clock_ms: int | None = None
         self._seen_event_ids: set[str] = set()
         self._seen_sequences: dict[int, str] = {}
         self._ended_at_clock_ms: int | None = None
@@ -298,12 +302,21 @@ class CombatAggregator:
     def _clear_session_metrics(self) -> None:
         self.current_room_id: str | None = None
         self.diagnostic_warning: str | None = None
+        self._diagnostic_warning_rooms_remaining = 0
         self.current_stage_level: int | None = None
         self.current_scenario_id: str | None = None
         self.current_scenario_label: str | None = None
         self.current_room_index: int | None = None
         self.current_map_file_name: str | None = None
         self._recent_damage: deque[tuple[int, int, str | None]] = deque()
+        self._observed_dps_started_ms: int | None = None
+        self._observed_player_dps_started_ms: dict[str, int] = {}
+        self._recent_live_damage: defaultdict[
+            str, deque[tuple[int, int]]
+        ] = defaultdict(deque)
+        self._live_damage_baselines: dict[str, tuple[int, int]] = {}
+        self._live_damage_ready: set[str] = set()
+        self._live_dps_started_ms: dict[str, int] = {}
         self._source_totals: defaultdict[str, SourceTotals] = defaultdict(SourceTotals)
         self._player_totals: defaultdict[str, PlayerTotals] = defaultdict(PlayerTotals)
         self._player_source_totals: defaultdict[
@@ -377,6 +390,7 @@ class CombatAggregator:
         self._seen_sequences[sequence] = event_id
         self.last_sequence = sequence
         self.last_monotonic_ms = monotonic_ms
+        self._last_event_received_clock_ms = self.clock_ms()
 
         event_type = str(event["event_type"])
         if event_type == "status":
@@ -405,6 +419,11 @@ class CombatAggregator:
         now = self.last_monotonic_ms if monotonic_ms is None else monotonic_ms
         if now is None:
             now = 0
+        elif (
+            monotonic_ms is None
+            and self._last_event_received_clock_ms is not None
+        ):
+            now += max(0, self.clock_ms() - self._last_event_received_clock_ms)
         self._prune_recent_damage(now)
         local_player_ids = {
             player_id
@@ -444,6 +463,15 @@ class CombatAggregator:
             ):
                 rostered_by_slot[totals.player_slot] = totals
         rostered_player_totals = list(rostered_by_slot.values())
+        rostered_player_ids = {
+            player_id
+            for player_id, totals in self._player_totals.items()
+            if (
+                totals.active
+                and totals.player_slot is not None
+                and rostered_by_slot.get(totals.player_slot) is totals
+            )
+        }
         official_damage_complete = bool(
             self._party_roster_seen
             and rostered_player_totals
@@ -470,6 +498,13 @@ class CombatAggregator:
                 totals.live_boss_damage is not None
                 for totals in rostered_player_totals
             )
+        )
+        local_player_totals = [
+            self._player_totals[player_id] for player_id in local_player_ids
+        ]
+        official_taken_damage_complete = bool(
+            len(local_player_totals) == 1
+            and local_player_totals[0].official_taken_damage is not None
         )
 
         def display_player_damage(totals: PlayerTotals) -> int:
@@ -522,8 +557,27 @@ class CombatAggregator:
             if self._party_roster_seen and rostered_player_totals
             else self.boss_damage
         )
+        display_taken_damage = self.taken_settlement_damage
+        if len(local_player_totals) == 1:
+            local_totals = local_player_totals[0]
+            if local_totals.official_taken_damage is not None:
+                display_taken_damage = local_totals.official_taken_damage
         recent_damage = sum(value for _, value, _owner in self._recent_damage)
-        recent_dps = recent_damage / (self.dps_window_ms / 1000.0)
+        observed_recent_dps = self._damage_rate(
+            recent_damage,
+            self._observed_dps_started_ms,
+            now,
+        )
+        live_recent_dps = (
+            self._live_damage_rate(rostered_player_ids, now)
+            if live_damage_complete
+            else None
+        )
+        recent_dps = (
+            live_recent_dps
+            if live_recent_dps is not None
+            else observed_recent_dps
+        )
         personal_damage = (
             sum(display_player_damage(self._player_totals[player_id]) for player_id in local_player_ids)
             if use_personal_scope
@@ -546,7 +600,33 @@ class CombatAggregator:
             if use_personal_scope
             else recent_damage
         )
-        personal_recent_dps = personal_recent_damage / (self.dps_window_ms / 1000.0)
+        personal_observed_started_ms = (
+            min(
+                (
+                    self._observed_player_dps_started_ms[player_id]
+                    for player_id in local_player_ids
+                    if player_id in self._observed_player_dps_started_ms
+                ),
+                default=None,
+            )
+            if use_personal_scope
+            else self._observed_dps_started_ms
+        )
+        observed_personal_recent_dps = self._damage_rate(
+            personal_recent_damage,
+            personal_observed_started_ms,
+            now,
+        )
+        live_personal_recent_dps = (
+            self._live_damage_rate(local_player_ids, now)
+            if use_personal_scope and live_damage_complete
+            else live_recent_dps if not use_personal_scope else None
+        )
+        personal_recent_dps = (
+            live_personal_recent_dps
+            if live_personal_recent_dps is not None
+            else observed_personal_recent_dps
+        )
 
         breakdown: dict[str, dict[str, Any]] = {}
         for token, totals in sorted(self._source_totals.items()):
@@ -638,6 +718,7 @@ class CombatAggregator:
                 ),
                 "official_damage": totals.official_damage,
                 "official_boss_damage": totals.official_boss_damage,
+                "official_taken_damage": totals.official_taken_damage,
                 "damage_share": (
                     displayed_damage / display_total_damage
                     if display_total_damage > 0
@@ -669,10 +750,11 @@ class CombatAggregator:
             live_boss_damage_complete=live_boss_damage_complete,
             official_damage_complete=official_damage_complete,
             official_boss_damage_complete=official_boss_damage_complete,
+            official_taken_damage_complete=official_taken_damage_complete,
             personal_damage=personal_damage,
             personal_recent_dps=personal_recent_dps,
             personal_boss_damage=personal_boss_damage,
-            taken_settlement_damage=self.taken_settlement_damage,
+            taken_settlement_damage=display_taken_damage,
             hp_damage_taken=self.hp_damage_taken,
             mitigated_damage=self.mitigated_damage,
             overkill_damage=self.overkill_damage,
@@ -772,6 +854,7 @@ class CombatAggregator:
                 "live_boss_damage",
                 "official_damage",
                 "official_boss_damage",
+                "official_taken_damage",
             ):
                 value = member.get(field)
                 if value is not None and (
@@ -821,15 +904,25 @@ class CombatAggregator:
                     player_source_totals.boss_damage += settlement
                 else:
                     self.unattributed_boss_damage += settlement
-            self._recent_damage.append(
-                (
-                    int(event["monotonic_ms"]),
-                    settlement,
-                    owner_player_id
-                    if isinstance(owner_player_id, str) and owner_player_id
-                    else None,
+            if settlement > 0:
+                damage_time = int(event["monotonic_ms"])
+                if self._observed_dps_started_ms is None:
+                    self._observed_dps_started_ms = damage_time
+                if (
+                    isinstance(owner_player_id, str)
+                    and owner_player_id
+                    and owner_player_id not in self._observed_player_dps_started_ms
+                ):
+                    self._observed_player_dps_started_ms[owner_player_id] = damage_time
+                self._recent_damage.append(
+                    (
+                        damage_time,
+                        settlement,
+                        owner_player_id
+                        if isinstance(owner_player_id, str) and owner_player_id
+                        else None,
+                    )
                 )
-            )
         elif direction == "taken":
             self.taken_settlement_damage += settlement
             self.hp_damage_taken += applied
@@ -910,19 +1003,31 @@ class CombatAggregator:
             self.connection_state = status
         detail = event.get("detail")
         if status == "session_started":
-            self.diagnostic_warning = (
-                detail
-                if isinstance(detail, str) and detail.startswith("degraded:")
-                else None
-            )
+            if isinstance(detail, str) and detail.startswith("degraded:"):
+                self._set_diagnostic_warning(detail)
+            else:
+                self.diagnostic_warning = None
+                self._diagnostic_warning_rooms_remaining = 0
+            if detail == "degraded:transport_reconnected":
+                self._clear_recent_dps_tracking()
         elif (
             status == "live"
             and isinstance(detail, str)
             and detail.startswith("degraded:")
         ):
-            self.diagnostic_warning = detail
+            self._set_diagnostic_warning(detail)
         if status == "room_started":
-            self.current_room_id = str(event["room_id"])
+            next_room_id = str(event["room_id"])
+            if (
+                self.diagnostic_warning is not None
+                and self.current_room_id is not None
+                and next_room_id != self.current_room_id
+            ):
+                self._diagnostic_warning_rooms_remaining -= 1
+                if self._diagnostic_warning_rooms_remaining <= 0:
+                    self.diagnostic_warning = None
+                    self._diagnostic_warning_rooms_remaining = 0
+            self.current_room_id = next_room_id
             self.current_stage_level = int(event["stage_level"])
             self.current_room_index = int(event["room_index"])
             self.current_scenario_id = str(event["scenario_id"])
@@ -959,6 +1064,11 @@ class CombatAggregator:
                 totals.active = True
                 live_damage = member.get("live_damage")
                 if type(live_damage) is int:
+                    self._record_live_damage_sample(
+                        player_id,
+                        int(event["monotonic_ms"]),
+                        live_damage,
+                    )
                     if (
                         live_snapshot_changed
                         or totals.live_observed_damage_anchor is None
@@ -968,6 +1078,7 @@ class CombatAggregator:
                     totals.live_damage = live_damage
                     totals.last_live_damage = live_damage
                 else:
+                    self._clear_player_live_dps(player_id)
                     totals.live_damage = None
                     totals.live_observed_damage_anchor = None
                 live_boss_damage = member.get("live_boss_damage")
@@ -995,13 +1106,21 @@ class CombatAggregator:
                         totals.official_boss_damage or 0,
                         official_boss_damage,
                     )
-            for totals in self._player_totals.values():
+                official_taken_damage = member.get("official_taken_damage")
+                if totals.is_local and type(official_taken_damage) is int:
+                    totals.official_taken_damage = official_taken_damage
+            for player_id, totals in self._player_totals.items():
                 if totals.active:
                     continue
+                self._clear_player_live_dps(player_id)
                 totals.live_damage = None
                 totals.live_boss_damage = None
                 totals.live_observed_damage_anchor = None
                 totals.live_observed_boss_anchor = None
+
+    def _set_diagnostic_warning(self, detail: str) -> None:
+        self.diagnostic_warning = detail
+        self._diagnostic_warning_rooms_remaining = 2
 
     def _expire_ended_metrics(self) -> None:
         if (
@@ -1020,3 +1139,108 @@ class CombatAggregator:
         cutoff = now_ms - self.dps_window_ms
         while self._recent_damage and self._recent_damage[0][0] < cutoff:
             self._recent_damage.popleft()
+        for player_id, recent in tuple(self._recent_live_damage.items()):
+            while recent and recent[0][0] < cutoff:
+                recent.popleft()
+            if not recent:
+                self._recent_live_damage.pop(player_id, None)
+
+    def _damage_rate(
+        self,
+        damage: int,
+        started_ms: int | None,
+        now_ms: int,
+    ) -> float:
+        if damage <= 0 or started_ms is None:
+            return 0.0
+        elapsed_ms = min(
+            self.dps_window_ms,
+            max(MIN_DPS_INTERVAL_MS, now_ms - started_ms),
+        )
+        return damage / (elapsed_ms / 1000.0)
+
+    def _record_live_damage_sample(
+        self,
+        player_id: str,
+        monotonic_ms: int,
+        cumulative_damage: int,
+    ) -> None:
+        previous = self._live_damage_baselines.get(player_id)
+        self._live_damage_baselines[player_id] = (
+            monotonic_ms,
+            cumulative_damage,
+        )
+        if previous is None:
+            self._live_damage_ready.discard(player_id)
+            return
+        previous_ms, previous_damage = previous
+        if monotonic_ms < previous_ms or cumulative_damage < previous_damage:
+            self._clear_player_live_dps(player_id)
+            self._live_damage_baselines[player_id] = (
+                monotonic_ms,
+                cumulative_damage,
+            )
+            return
+        self._live_damage_ready.add(player_id)
+        delta = cumulative_damage - previous_damage
+        if delta <= 0:
+            return
+        if player_id not in self._live_dps_started_ms:
+            self._live_dps_started_ms[player_id] = previous_ms
+        self._recent_live_damage[player_id].append((monotonic_ms, delta))
+
+    def _live_damage_rate(
+        self,
+        player_ids: set[str],
+        now_ms: int,
+    ) -> float | None:
+        if not player_ids or not player_ids.issubset(self._live_damage_ready):
+            return None
+        damage = sum(
+            value
+            for player_id in player_ids
+            for _monotonic_ms, value in self._recent_live_damage.get(player_id, ())
+        )
+        damage += self._live_observed_tail_damage(player_ids)
+        started_ms = min(
+            (
+                self._live_dps_started_ms[player_id]
+                for player_id in player_ids
+                if player_id in self._live_dps_started_ms
+            ),
+            default=None,
+        )
+        if started_ms is None:
+            return None
+        return self._damage_rate(damage, started_ms, now_ms)
+
+    def _live_observed_tail_damage(self, player_ids: set[str]) -> int:
+        damage = 0
+        for player_id in player_ids:
+            totals = self._player_totals[player_id]
+            anchor = totals.live_observed_damage_anchor
+            if anchor is None:
+                continue
+            observed_tail = max(0, totals.damage_dealt - anchor)
+            recent_observed = sum(
+                value
+                for _monotonic_ms, value, owner_player_id in self._recent_damage
+                if owner_player_id == player_id
+            )
+            damage += min(observed_tail, recent_observed)
+        return damage
+
+    def _clear_player_live_dps(self, player_id: str) -> None:
+        self._recent_live_damage.pop(player_id, None)
+        self._live_damage_baselines.pop(player_id, None)
+        self._live_damage_ready.discard(player_id)
+        self._live_dps_started_ms.pop(player_id, None)
+
+    def _clear_recent_dps_tracking(self) -> None:
+        self._recent_damage.clear()
+        self._observed_dps_started_ms = None
+        self._observed_player_dps_started_ms.clear()
+        self._recent_live_damage.clear()
+        self._live_damage_baselines.clear()
+        self._live_damage_ready.clear()
+        self._live_dps_started_ms.clear()

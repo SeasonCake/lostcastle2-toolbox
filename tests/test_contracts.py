@@ -113,11 +113,16 @@ class ContractTests(unittest.TestCase):
                         "player_id": "player-1",
                         "player_slot": 0,
                         "is_local": True,
+                        "live_damage": 120,
+                        "live_boss_damage": 30,
                     },
                     {
                         "player_id": "player-2",
                         "player_slot": 1,
                         "is_local": False,
+                        "official_damage": 210,
+                        "official_boss_damage": 80,
+                        "official_taken_damage": 41,
                     },
                 ],
             }

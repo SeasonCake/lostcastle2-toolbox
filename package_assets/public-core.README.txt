@@ -1,0 +1,29 @@
+失落城堡2工具箱 1.7.4 · public-core 公开分享版
+
+启动：双击“失落城堡2工具箱.exe”。请保留整个文件夹，不要单独移动 EXE 或删除 `_internal` 目录。
+
+本包的边界：
+- 包含工具箱本体、官方 BepInEx build 785 原始 ZIP、项目自有 LC2 Combat Bridge 1.7.4，以及带完整许可证的 7-Zip 命令行组件。
+- 不包含灵魂石修改器、金币编辑器 DLL，也不包含任何社区 MOD DLL、资源载荷、来源压缩包、游戏日志、截图、用户配置或历史对局导出。
+- MOD 列表仍会显示可识别项目，但全部是“用户自行提供原包”模式。安装时需选择自己取得的文件、压缩包或解压目录；工具箱会按登记的文件大小和 SHA-256 校验，不会联网代下 MOD。
+
+首次运行与目录：
+- `config` 初始为空，用于本机窗口、宏和受管 MOD 设置。
+- `用户MOD` 用于放入自己取得的 DLL、ZIP、7Z、RAR 或文件夹。
+- 正式分享档不启用逐事件对局归档，也不创建 `exports` 或提供手动导出入口。
+- `运行环境\public-core` 保存 BepInEx 及其精确构建依赖的许可证和来源说明。
+- `赞助与投喂` 是自愿赞助素材，不影响任何功能。
+
+战斗统计口径：
+- Mini HUD局中逐玩家与团队数值标为“实时”；详细页说明“实时估算/结算可能校正”，过程值可能与稍后的游戏结算不同。
+- 多人 SyncEnd 或单人结算UI的逐玩家记录通过身份门后才标为“官方结算”，并以造成伤害、Boss伤害和承伤最终值原样覆盖估算；修正可能向上，也可能向下。
+- 结算record暂不可用时，可信单人结算UI仍会结束当前估算session，避免下一局继承旧活动状态；不会伪造官方值或写入对局归档。
+
+公开运行环境身份：
+- BepInEx 官方文件：`BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.785+6abdba4.zip`
+- 大小：34,335,572 bytes
+- SHA-256：`2A7CBF74D26ABE4765C3E662DB1721B923BAC39849EBFEF2CA5DC7DE7E2D9B7F`
+- 官方来源：https://builds.bepinex.dev/projects/bepinex_be/785/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.785+6abdba4.zip
+- LC2 Combat Bridge 1.7.4 SHA-256：`190B8B4A8C661C73A32ADF15DF56487E57473E591BFA25520D172A7E188E7DED`
+
+许可证与第三方来源见根目录 `LICENSE`、`THIRD_PARTY_NOTICES.md`、内置 7-Zip 的 `License.txt`，以及 `运行环境\public-core`。

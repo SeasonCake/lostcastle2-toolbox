@@ -20,8 +20,14 @@ public sealed class Plugin : BasePlugin
 {
     public const string PluginGuid = "io.github.seasoncake.lc2.combatbridge";
     public const string PluginName = "LC2 Combat Bridge";
-    public const string PluginVersion = "1.7.0";
-    internal static readonly bool ReleaseDiagnosticsEnabled = false;
+    public const string PluginVersion = "1.7.4";
+#if LC2_COMBAT_DIAGNOSTICS
+    internal static readonly bool DetailedDiagnosticsEnabled = true;
+    internal const string BridgeBuildProfile = "diagnostic";
+#else
+    internal static readonly bool DetailedDiagnosticsEnabled = false;
+    internal const string BridgeBuildProfile = "distribution";
+#endif
     internal const int MaxHpSnapshots = 8192;
     internal const int MaxAttackerDiagnosticHits = 131072;
     internal const int MaxSettlementCacheProbeOrdinarySamples = 4096;
@@ -106,7 +112,9 @@ public sealed class Plugin : BasePlugin
     private static readonly Dictionary<int, KnownPartyIdentity> FinalPartyBySlot = new();
     private static readonly Dictionary<int, OfficialDamageTotals> FinalOfficialBySlot = new();
     private static readonly Dictionary<int, OfficialDamageTotals> LastLiveOfficialBySlot = new();
+    private static bool _hasActivatedSessionInProcess;
     private static bool _liveOfficialBaselineReady;
+    private static bool _liveOfficialNonZeroSeedAllowed;
     private static int _settlementCacheProbeRunEpoch;
     private static int _settlementCacheProbeRoomEpoch;
     private static int _settlementCacheProbeCalls;
@@ -158,6 +166,7 @@ public sealed class Plugin : BasePlugin
     {
         public long Damage { get; set; }
         public long BossDamage { get; set; }
+        public long TakenDamage { get; set; }
     }
 
     private sealed class KnownPartyIdentity
@@ -214,11 +223,13 @@ public sealed class Plugin : BasePlugin
         Bridge.Start();
         _harmony = new Harmony(PluginGuid);
         _harmony.PatchAll(Assembly.GetExecutingAssembly());
-        if (ReleaseDiagnosticsEnabled)
+        if (DetailedDiagnosticsEnabled)
         {
             InstallOptionalSettlementNetworkProbeHooks();
         }
-        Log.LogInfo($"{PluginName} {PluginVersion} loaded; read-only local bridge active");
+        Log.LogInfo(
+            $"{PluginName} {PluginVersion} loaded; read-only local bridge active; " +
+            $"profile={BridgeBuildProfile}");
     }
 
     private void InstallOptionalSettlementNetworkProbeHooks()
@@ -373,6 +384,157 @@ public sealed class Plugin : BasePlugin
         CaptureSettlementCacheProbe("final_sync", force: true);
     }
 
+    internal static void BeginStatisticsOfficialDamageSync()
+    {
+        BeginLocalOfficialDamageSync();
+    }
+
+    internal static void BeginSettlementUiOfficialDamage()
+    {
+        BeginLocalOfficialDamageSync();
+    }
+
+    private static void BeginLocalOfficialDamageSync()
+    {
+        if (Bridge?.IsRoundActive is not true || KnownPartyBySlot.Count != 1)
+        {
+            return;
+        }
+        CaptureSettlementFinalProbeSnapshot("prefix");
+    }
+
+    internal static void FinalizeStatisticsOfficialDamageSync()
+    {
+        TryFinalizeLocalOfficialDamage(
+            "statistics_sync_end",
+            uiRecord: null,
+            endOnIncompleteUiRecord: false);
+    }
+
+    internal static void FinalizeSettlementUiOfficialDamage(
+        string surface,
+        LC2.Statistics.AdventureRecordPlayerData uiRecord = null)
+    {
+        TryFinalizeLocalOfficialDamage(
+            surface,
+            uiRecord,
+            endOnIncompleteUiRecord: true);
+    }
+
+    private static void TryFinalizeLocalOfficialDamage(
+        string surface,
+        LC2.Statistics.AdventureRecordPlayerData uiRecord,
+        bool endOnIncompleteUiRecord)
+    {
+        var bridge = Bridge;
+        if (bridge?.IsRoundActive is not true)
+        {
+            return;
+        }
+        // Multiplayer keeps its network SyncEnd owner. These UI callbacks are
+        // a narrow fallback for the one-player local flow that never invokes it.
+        if (KnownPartyBySlot.Count != 1)
+        {
+            return;
+        }
+        CaptureSettlementFinalProbeSnapshot("postfix");
+        _finalOfficialReady = true;
+        RefreshPartyRoster(force: true);
+        if (!_finalOfficialAccepted && uiRecord is not null)
+        {
+            TryAcceptSoloSettlementUiRecord(uiRecord);
+            if (_finalOfficialAccepted)
+            {
+                RefreshPartyRoster(force: true);
+            }
+        }
+        var accepted = _finalOfficialAccepted;
+        LogDiagnosticInfo(
+            $"[LC2CB-LOCAL-FINAL] kind={surface} " +
+            $"accepted={accepted.ToString().ToLowerInvariant()} " +
+            $"known_players={KnownPartyBySlot.Count} " +
+            $"ui_record={(uiRecord is null ? "missing" : "present")} " +
+            $"in_active_map={_inActiveMap.ToString().ToLowerInvariant()}");
+        if (!accepted)
+        {
+            // Do not let a local settlement callback with an unavailable or
+            // inconsistent record erase the last trustworthy live values.
+            // The UI boundary itself is still a trustworthy one-player end
+            // signal, so close the session as an estimate and let the desktop
+            // archive it instead of leaving a phantom live match behind.
+            _finalOfficialReady = false;
+            RefreshPartyRoster(force: true);
+            if (endOnIncompleteUiRecord)
+            {
+                bridge.EndGameSession();
+            }
+            return;
+        }
+        bridge.EndGameSession();
+    }
+
+    private static void TryAcceptSoloSettlementUiRecord(
+        LC2.Statistics.AdventureRecordPlayerData record)
+    {
+        if (record is null || KnownPartyBySlot.Count != 1)
+        {
+            return;
+        }
+        try
+        {
+            var (slot, known) = KnownPartyBySlot.Single();
+            var fingerprint = OfficialIdentityFingerprint(record);
+            var damage = (long)record.mDamageValue;
+            var bossDamage = (long)record.mBossDamageValue;
+            var takenDamage = (long)record.mTakeDamageValue;
+            if (!known.IsLocal
+                || fingerprint is null
+                || !string.Equals(
+                    fingerprint,
+                    known.OfficialIdentityFingerprint,
+                    StringComparison.Ordinal)
+                || record.mIndex != slot
+                || damage < 0
+                || bossDamage < 0
+                || bossDamage > damage
+                || takenDamage < 0)
+            {
+                return;
+            }
+            FinalPartyBySlot.Clear();
+            FinalOfficialBySlot.Clear();
+            FinalPartyBySlot[slot] = new KnownPartyIdentity
+            {
+                PlayerId = known.PlayerId,
+                IsLocal = known.IsLocal,
+                OfficialIdentityFingerprint = known.OfficialIdentityFingerprint,
+            };
+            FinalOfficialBySlot[slot] = new OfficialDamageTotals
+            {
+                Damage = damage,
+                BossDamage = bossDamage,
+                TakenDamage = takenDamage,
+            };
+            _diagnosticFinalOfficialRecords = 1;
+            _diagnosticFinalOfficialExpectedSlots = 1;
+            _diagnosticFinalOfficialPublishedSlots = 1;
+            _diagnosticFinalOfficialIdentityMatches = 1;
+            _diagnosticFinalOfficialIdentityUnmatched = 0;
+            _diagnosticFinalOfficialIdentityCollisions = 0;
+            _diagnosticFinalOfficialInvalidSlots = 0;
+            _diagnosticFinalOfficialDuplicateSlots = 0;
+            _diagnosticFinalOfficialIndexMismatches = record.mIndex == slot ? 0 : 1;
+            _diagnosticFinalOfficialRawIndices =
+                record.mIndex.ToString(CultureInfo.InvariantCulture);
+            _finalOfficialAccepted = true;
+        }
+        catch (Exception exception)
+        {
+            RuntimeLog?.LogWarning(
+                $"Settlement UI record unavailable: {exception.GetType().Name}");
+        }
+    }
+
     internal static void BeginRoom()
     {
         EnsureRecoverManaCallback();
@@ -419,6 +581,8 @@ public sealed class Plugin : BasePlugin
                 StringComparison.Ordinal);
         if (beginsNewSession)
         {
+            var allowNonZeroLiveSeed = !_hasActivatedSessionInProcess;
+            _hasActivatedSessionInProcess = true;
             _awaitingMapEntry = false;
             _manaRecoveryArmed = false;
             ResetOfficialManaRecoveryCoverage();
@@ -427,7 +591,7 @@ public sealed class Plugin : BasePlugin
             ResetHitSnapshots();
             ResetDiagnosticManaTotals();
             ResetDiagnosticDamageOwnerTotals();
-            ResetOfficialDamageState();
+            ResetOfficialDamageState(allowNonZeroLiveSeed);
             LogManaSummary("session_start");
             LogDamageOwnerSummary("session_start");
             Bridge?.BeginGameSession();
@@ -801,7 +965,7 @@ public sealed class Plugin : BasePlugin
 
     private static void LogRegisteredAttackerSummary(string point)
     {
-        if (!ReleaseDiagnosticsEnabled)
+        if (!DetailedDiagnosticsEnabled)
         {
             return;
         }
@@ -1587,7 +1751,7 @@ public sealed class Plugin : BasePlugin
         _diagnosticFinalFallbackUnattributedDamage = 0;
     }
 
-    private static void ResetOfficialDamageState()
+    private static void ResetOfficialDamageState(bool allowNonZeroLiveSeed)
     {
         UnregisterAllRegisteredAttackerCallbacks();
         ResetRegisteredAttackerDiagnostics();
@@ -1608,6 +1772,7 @@ public sealed class Plugin : BasePlugin
         FinalOfficialBySlot.Clear();
         LastLiveOfficialBySlot.Clear();
         _liveOfficialBaselineReady = false;
+        _liveOfficialNonZeroSeedAllowed = allowNonZeroLiveSeed;
         _settlementCacheProbeRunEpoch += 1;
         _settlementCacheProbeRoomEpoch = 0;
         _settlementCacheProbeCalls = 0;
@@ -1687,7 +1852,7 @@ public sealed class Plugin : BasePlugin
 
     private static void LogDamageOwnerSummary(string point)
     {
-        if (!ReleaseDiagnosticsEnabled)
+        if (!DetailedDiagnosticsEnabled)
         {
             return;
         }
@@ -1835,7 +2000,7 @@ public sealed class Plugin : BasePlugin
 
     private static void LogManaSummary(string point)
     {
-        if (!ReleaseDiagnosticsEnabled)
+        if (!DetailedDiagnosticsEnabled)
         {
             return;
         }
@@ -1849,7 +2014,7 @@ public sealed class Plugin : BasePlugin
 
     private static void LogRoomDiagnostic(string callback, RoomLocation room = null)
     {
-        if (!ReleaseDiagnosticsEnabled)
+        if (!DetailedDiagnosticsEnabled)
         {
             return;
         }
@@ -1876,7 +2041,7 @@ public sealed class Plugin : BasePlugin
 
     private static void LogDiagnosticInfo(string message)
     {
-        if (ReleaseDiagnosticsEnabled)
+        if (DetailedDiagnosticsEnabled)
         {
             RuntimeLog?.LogInfo(message);
         }
@@ -2071,7 +2236,7 @@ public sealed class Plugin : BasePlugin
     private static void LogOfficialDamageSummary(
         IReadOnlyList<PartyMemberSnapshot> members)
     {
-        if (!ReleaseDiagnosticsEnabled)
+        if (!DetailedDiagnosticsEnabled)
         {
             return;
         }
@@ -2082,7 +2247,8 @@ public sealed class Plugin : BasePlugin
             .Select(member =>
                 $"slot={(member.PlayerSlot is null ? "null" : member.PlayerSlot.Value)}:" +
                 $"damage={(member.OfficialDamage is null ? "null" : member.OfficialDamage.Value)}:" +
-                $"boss={(member.OfficialBossDamage is null ? "null" : member.OfficialBossDamage.Value)}")
+                $"boss={(member.OfficialBossDamage is null ? "null" : member.OfficialBossDamage.Value)}:" +
+                $"taken={(member.OfficialTakenDamage is null ? "null" : member.OfficialTakenDamage.Value)}")
             .ToArray();
         LogDiagnosticInfo(
             $"[LC2CB-OFFICIAL] kind=summary members={members.Count} " +
@@ -2119,7 +2285,7 @@ public sealed class Plugin : BasePlugin
         string surface,
         LC2.Statistics.AdventureRecordPlayerData record)
     {
-        if (!ReleaseDiagnosticsEnabled)
+        if (!DetailedDiagnosticsEnabled)
         {
             return;
         }
@@ -2207,7 +2373,7 @@ public sealed class Plugin : BasePlugin
 
     private static void CaptureSettlementFinalProbeSnapshot(string phase)
     {
-        if (!ReleaseDiagnosticsEnabled)
+        if (!DetailedDiagnosticsEnabled)
         {
             return;
         }
@@ -2447,7 +2613,7 @@ public sealed class Plugin : BasePlugin
         bool force = false,
         int? triggerSlot = null)
     {
-        if (!ReleaseDiagnosticsEnabled || !_inActiveMap || RuntimeLog is null)
+        if (!DetailedDiagnosticsEnabled || !_inActiveMap || RuntimeLog is null)
         {
             return;
         }
@@ -3013,7 +3179,8 @@ public sealed class Plugin : BasePlugin
                     result,
                     slot,
                     Math.Max(0, record.mDamageValue),
-                    Math.Max(0, record.mBossDamageValue));
+                    Math.Max(0, record.mBossDamageValue),
+                    taken: 0);
             }
             catch
             {
@@ -3080,7 +3247,9 @@ public sealed class Plugin : BasePlugin
                 var damage = checked(activeValue.Damage + cacheValue.Damage);
                 var bossDamage = checked(
                     activeValue.BossDamage + cacheValue.BossDamage);
-                if (damage < 0 || bossDamage < 0 || bossDamage > damage)
+                if (damage < 0
+                    || bossDamage < 0
+                    || bossDamage > damage)
                 {
                     return empty;
                 }
@@ -3093,11 +3262,21 @@ public sealed class Plugin : BasePlugin
 
             if (!_liveOfficialBaselineReady)
             {
-                if (result.Values.Any(value => value.Damage != 0 || value.BossDamage != 0))
+                var hasNonZeroSeed = result.Values.Any(
+                    value => value.Damage != 0
+                        || value.BossDamage != 0);
+                if (hasNonZeroSeed && !_liveOfficialNonZeroSeedAllowed)
                 {
                     return empty;
                 }
                 _liveOfficialBaselineReady = true;
+                _liveOfficialNonZeroSeedAllowed = false;
+                if (hasNonZeroSeed)
+                {
+                    LogDiagnosticInfo(
+                        "[LC2CB-LIVE-SEED] kind=process_start_nonzero " +
+                        $"slots={FormatOfficialDamageTotals(result)}");
+                }
             }
             else if (LastLiveOfficialBySlot.Count > 0
                 && !LastLiveOfficialBySlot.Keys.ToHashSet().SetEquals(expectedSlots))
@@ -3169,7 +3348,9 @@ public sealed class Plugin : BasePlugin
             }
             var damage = (long)record.mDamageValue;
             var bossDamage = (long)record.mBossDamageValue;
-            if (damage < 0 || bossDamage < 0 || bossDamage > damage)
+            if (damage < 0
+                || bossDamage < 0
+                || bossDamage > damage)
             {
                 return new Dictionary<int, OfficialDamageTotals>();
             }
@@ -3263,6 +3444,7 @@ public sealed class Plugin : BasePlugin
                         LiveBossDamage = live?.BossDamage,
                         OfficialDamage = official?.Damage,
                         OfficialBossDamage = official?.BossDamage,
+                        OfficialTakenDamage = official?.TakenDamage,
                     });
                 }
             }
@@ -3297,6 +3479,7 @@ public sealed class Plugin : BasePlugin
                         LiveBossDamage = live?.BossDamage,
                         OfficialDamage = official?.Damage,
                         OfficialBossDamage = official?.BossDamage,
+                        OfficialTakenDamage = official?.TakenDamage,
                     });
                 }
             }
@@ -3320,6 +3503,7 @@ public sealed class Plugin : BasePlugin
                         IsLocal = known.IsLocal,
                         OfficialDamage = official.Damage,
                         OfficialBossDamage = official.BossDamage,
+                        OfficialTakenDamage = official.TakenDamage,
                     });
                 }
             }
@@ -3349,6 +3533,7 @@ public sealed class Plugin : BasePlugin
                 IsLocal = known.IsLocal,
                 OfficialDamage = official.Damage,
                 OfficialBossDamage = official.BossDamage,
+                OfficialTakenDamage = official.TakenDamage,
             });
         }
         return result;
@@ -3401,7 +3586,8 @@ public sealed class Plugin : BasePlugin
                     result,
                     slot,
                     official.Damage,
-                    official.BossDamage);
+                    official.BossDamage,
+                    official.TakenDamage);
             }
             _diagnosticFinalOfficialPublishedSlots = result.Count;
             return;
@@ -3484,7 +3670,8 @@ public sealed class Plugin : BasePlugin
                     result,
                     slot,
                     Math.Max(0, record.mDamageValue),
-                    Math.Max(0, record.mBossDamageValue));
+                    Math.Max(0, record.mBossDamageValue),
+                    Math.Max(0, record.mTakeDamageValue));
             }
             _diagnosticFinalOfficialDuplicateSlots = duplicateSlots.Count;
             _diagnosticFinalOfficialRawIndices = string.Join(",", rawIndices.OrderBy(value => value));
@@ -3519,6 +3706,7 @@ public sealed class Plugin : BasePlugin
                 {
                     Damage = official.Damage,
                     BossDamage = official.BossDamage,
+                    TakenDamage = official.TakenDamage,
                 };
             }
         }
@@ -3569,7 +3757,8 @@ public sealed class Plugin : BasePlugin
         Dictionary<int, OfficialDamageTotals> result,
         int? slot,
         long damage,
-        long boss)
+        long boss,
+        long taken)
     {
         if (slot is not >= 0 or > 15)
         {
@@ -3582,6 +3771,7 @@ public sealed class Plugin : BasePlugin
         }
         totals.Damage = Math.Max(totals.Damage, Math.Max(0, damage));
         totals.BossDamage = Math.Max(totals.BossDamage, Math.Max(0, boss));
+        totals.TakenDamage = Math.Max(totals.TakenDamage, Math.Max(0, taken));
     }
 
     private static Player OwnerPlayer(DisposeHitInfo hit)
@@ -4040,6 +4230,47 @@ internal static class FinalOfficialDamageSyncPatch
 
     [HarmonyPostfix]
     private static void Postfix() => Plugin.FinalizeOfficialDamageSync();
+}
+
+[HarmonyPatch(typeof(StatisticsMgr), nameof(StatisticsMgr.OnGameSettlementSyncEnd))]
+internal static class StatisticsFinalOfficialDamageSyncPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => Plugin.BeginStatisticsOfficialDamageSync();
+
+    [HarmonyPostfix]
+    private static void Postfix() => Plugin.FinalizeStatisticsOfficialDamageSync();
+}
+
+[HarmonyPatch(typeof(GameSettlementUI), nameof(GameSettlementUI.SetSettlementData))]
+internal static class LocalSettlementUiDataPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => Plugin.BeginSettlementUiOfficialDamage();
+
+    [HarmonyPostfix]
+    private static void Postfix(GameSettlementUI __instance) =>
+        Plugin.FinalizeSettlementUiOfficialDamage(
+            "ui_settlement_data",
+            __instance?._selfPlayerData);
+}
+
+[HarmonyPatch(typeof(GameSettlementUI), nameof(GameSettlementUI.UpdateSettlementInfo))]
+internal static class LocalSettlementUiInfoPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => Plugin.BeginSettlementUiOfficialDamage();
+
+    [HarmonyPostfix]
+    private static void Postfix(LC2.Statistics.AdventureRecordPlayerData __0) =>
+        Plugin.FinalizeSettlementUiOfficialDamage("ui_settlement_info", __0);
+}
+
+[HarmonyPatch(typeof(GameSettlementUI), nameof(GameSettlementUI.GameOverEnd_Offline))]
+internal static class LocalSettlementUiOfflineEndPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => Plugin.BeginSettlementUiOfficialDamage();
 }
 
 internal static class SettlementNetworkProbePatchMethods

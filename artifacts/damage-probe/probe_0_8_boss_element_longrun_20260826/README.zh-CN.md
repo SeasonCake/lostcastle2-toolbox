@@ -15,13 +15,13 @@
 - 最终日志：`probe_0.8.0_boss_element_20260826-235646_final.log`
   - 大小：`1,534,423` 字节。
   - SHA-256：`38CE0D199B8DE5FE6C6D83588303C880A3B6433CB96BA09F1678DADFF6FE9441`。
-- 营地木桩截图：`codex-clipboard-e3c76908-9d49-46e4-9a42-cc2ceff0faa8.png`
+- 营地木桩截图：`<local-screenshot>`
   - SHA-256：`7F4A8AB9360225C457DFF9236FF27973EF674E39CE43DDADC8EEF2BAECFC638C`。
-- 蓄雷戒指截图：`codex-clipboard-8f4dc79d-9b9c-4e2b-aef5-bab52d12ce6c.png`
+- 蓄雷戒指截图：`<local-screenshot>`
   - SHA-256：`F7FAD6E7CD240937329635AC8BA06EDDCDC79C69579084D733E0D8DAD4DC90AB`。
-- 魔导师之靴截图：`codex-clipboard-4be75eb1-bbc2-43c2-be10-e3cc7a080fdb.png`
+- 魔导师之靴截图：`<local-screenshot>`
   - SHA-256：`6E0CA1E72AD296719C6354EC74FCC62C7EDD48CACED14F476CBE6269D3A4C2D8`。
-- 结算截图：`codex-clipboard-06ce3b10-6e3d-447e-97b4-be62e8ab530a.png`
+- 结算截图：`<local-screenshot>`
   - SHA-256：`5816D5EC0FA40A11BE4126770B7D0FBC26FEA73374D132E94F46376C149731AD`。
 - 探针：`LC2DamageProbe 0.8.0`，SHA-256 `9F05C42F08AF4100877FB3186E1E67FD67B5636CD28D4333E213A58F9F4E8841`。
 - 冻结时游戏已退出；工具箱仍运行但不会修改 BepInEx 日志。7 个观察目标加载成功，没有 probe error、HP 栈错误、元素读取错误、事件上限或 BepInEx/Harmony 错误。

@@ -59,3 +59,30 @@
 - 通过插件 GUID、程序集、大小和 SHA-256 区分真实升级、字节相同的来源迁移、独立旧功能与应排除的重复输入。
 - 海克斯强化药水作者由早期误录更正为繁体 `時間與你`，并沿来源、catalog、包和 UI 全链核对。
 - 啵啵法杖作者按维护者确认的 QQ 昵称记录为 `啊 这`；最终分享包与截图均重新生成，没有沿用“社区未署名”的旧候选。
+
+## 2026-09-03：v1.7.2 DPS 维护候选
+
+- v1.7.1 发布后，群友确认启动、MOD 添加和基本运行链可用；第三方 MOD 实战效果仍不外推。
+- 单人反馈暴露 DPS 与总伤害的数据源不一致：总伤害能由 live 累计恢复，DPS 仅依赖逐击且首段固定除以 10。
+- 早期 v1.7.2 四人房中两名路人逐渐离开，最终活动分母正确收缩；低频日志只确认一次 `damage_snapshot_missing`，不足以反推具体漏击或漏量。
+- v1.7.2 桌面端改用 live 正差分优先、逐击尾段/回退、首段实际分母和重连重建；总伤害/final 与 MOD 合同不变。
+- 未明确发布时默认构建 `Diagnostic`：匿名逐事件记录可暂停并手动导出；只有明确分享时才构建无归档、无诊断控件的 `Distribution`。Bridge 1.7.1 从同一源码生成互斥档位，缺失或交叉不一致会拒绝启动。
+- “有事件跳过”从 Mini HUD 移除，只在详细页保留当前区与紧接的下一区。首轮诊断控件占高挤压明细表，最终移入明细标题栏并完成最小/常用尺寸像素验收。
+- r2单人实测中途退出前全程skip/fatal/reset为0；最终4,935条匿名事件全部可重放且关键摘要差异0，DPS无负值/非有限值。退出回营没有`session_ended`，需manual export或下次启动恢复partial，记录为`MIDRUN-END-01`而不冒充自然结算PASS。
+- r2随后明确出现单人结算界面：官方伤害860,235、Boss 139,339、承伤409与盒子live三项差异0；死亡过程玩家token/slot稳定，7,584条事件全回放且DPS无非法值。但network SyncEnd与三个结算探针命中均为0，official/session-ended缺失，确认`SOLO-FINAL-01`并收窄到单人本地结算入口。
+- r3保留多人network SyncEnd，并以active-session门接入`StatisticsMgr.OnGameSettlementSyncEnd`；完整final才发布official并结束session，失败恢复live。Bridge 1.7.2两档已通过源码门和Release双编译，等待再次单人自然结算。
+- r4保持Bridge 1.7.2 diagnostic字节不变，刷新为60条/61文件社区目录：新增雷击强化1.0.1，升级增强计划、怪物宝藏、行刑者、雷神之锤与啵啵法杖。插件身份、依赖面、包内哈希、隔离安装/卸载和无BepInEx初始化通过；真实游戏加载仍留给下一轮实测。
+- r4随后完成一次单人跨重启续玩：游戏Statistics在重进时已有完整非零累计，但Bridge的“首个live必须全零”门使该向量永远无法发布，盒子从逐击重新累计，确认`REJOIN-SEED-01`。最终截图与游戏live均为10,619,575/Boss3,466,900，盒子为6,964,256/Boss3,945,311；承伤前后段757+805精确闭合官方1,562。
+- 同局明确出现结算卡和回营边界，r3新增local settlement sync-end仍0命中，official/session-ended与自动归档缺失，`SOLO-FINAL-01`继续为FAIL；r5须同时修复重进live种子和真实单人结算入口。
+- r5 Bridge1.7.3允许插件进程首个session用完整非零live恢复续玩总量，首样本只作DPS基线；同进程后续新局仍要求零基线。单人final改接结算UI数据、显示与offline-end三个实际阶段，仍由活动session、单人party和完整身份记录三重门控制。双档编译、324项产品门、诊断包与部署均完成，等待真实重进及自然结算。
+- r5同局完成真实重进正控：退出前HUD22,466，重进首个官方live22,430立即恢复且DPS为0；下一live正差分后DPS才启动。作者观察与匿名事件重放一致，`REJOIN-SEED-01`关闭为PASS；继续等待同局单人自然结算入口。
+- r5后续独立单人局在同一房间第一次受伤后Alt+F4，游戏回滚整房，再次游玩后主动结束。造成伤害/Boss与官方结算1,451,098/240,540逐字一致；承伤因两次尝试不同而不具可比性。UI prefix/postfix均命中；当时最终save-list尚不可用，r5又未采用UI显式record，所以info/data入口均未接受，`SOLO-UI-POSTROUND-01`确认FAIL；自然胜利/最终死亡仍未测试。
+
+## 2026-09-03：v1.7.4 结算字段与发布包收口
+
+- 多路检索确认结算record的三个确定字段为`mDamageValue`、`mBossDamageValue`、`mTakeDamageValue`，并从原生调用链定位到`UpdateSettlementInfo(__0)`及同链`SetSettlementData._selfPlayerData`；这解释了r5“UI已显示、save-list仍空”的失败。
+- 92个历史诊断ZIP没有一份同时覆盖官方三字段、`session_ended`和automatic归档，故真实完整终局仍留作后续验证；字段接入与合成正负控制不替代实战。
+- 1.7.4将UI显式record纳入本机单人final门，最终承伤可以覆盖逐击估算；承伤不做实时累计，offline prefix不提前final。可信UI结束回调可结束session，但只有三字段身份完整时才显示“官方”。
+- 当前源码338项、最终Distribution构建328项产品门、C#双编译、public-core实际构建、60项MOD包形和空白运行时初始化通过。Distribution关闭诊断/默认记录且无exports，包内维护者精确个人路径与测试数据扫描0命中。
+- 正式名称冻结为`失落城堡2工具箱1.7.4-实时数值监测+一键MOD安装`；同名目录与UTF-8 ZIP已在`<desktop>`逐文件/条目复核。该节点只完成本地分享准备，commit、push、tag、Release和实际发送均未执行。
+- 群分享根说明最终只保留启动、HUD含义、重进、MOD安装与“不保存逐事件对局明细”等实际使用内容；rxx、探针、记录上限与失败演进继续保留在GitHub维护文档。

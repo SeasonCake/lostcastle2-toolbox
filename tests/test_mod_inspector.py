@@ -111,22 +111,22 @@ class ModInspectorTests(unittest.TestCase):
         LOCAL_COMMUNITY_PAYLOAD_ROOT.is_dir(),
         "local third-party community payloads are not in source checkout",
     )
-    def test_monster_v116_filename_and_embedded_author_beat_feedback_wording(self) -> None:
+    def test_monster_v117_filename_and_embedded_author_beat_feedback_wording(self) -> None:
         payload = (
             PROJECT_ROOT
             / "third_party"
             / "community_mods"
             / "monster-treasure"
-            / "怪物宝藏v11.6.dll"
+            / "怪物v11.7.dll"
         )
         with tempfile.TemporaryDirectory() as temp_dir:
             source = (
                 Path(temp_dir)
-                / "怪物宝藏v11.6（更新内容，bug找作者反馈）.dll"
+                / "怪物宝藏v11.7（更新内容，bug找作者反馈）.dll"
             )
             source.write_bytes(payload.read_bytes())
             draft = self.make_inspector().inspect(source)
-        self.assertEqual(draft.version, "11.6")
+        self.assertEqual(draft.version, "11.7")
         self.assertEqual(draft.author, "懒虫桑")
         self.assertNotEqual(draft.author, "反馈")
 

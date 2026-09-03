@@ -26,7 +26,7 @@ class CombatBridgeSourceTests(unittest.TestCase):
             PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('public const string PluginVersion = "1.7.0";', source)
+        self.assertIn('public const string PluginVersion = "1.7.4";', source)
         self.assertIn("var aggregate = ShouldAggregateDamage(direction);", source)
         self.assertIn('Bridge?.Emit(\n                "damage_resolution",\n                aggregate,', source)
         self.assertIn('StageMgr.Instance?.IsNonBattleRoom() is not true', source)
@@ -308,6 +308,8 @@ class CombatBridgeSourceTests(unittest.TestCase):
         self.assertNotIn("record.mID", plugin_source)
         self.assertIn("record.mDamageValue", plugin_source)
         self.assertIn("record.mBossDamageValue", plugin_source)
+        self.assertIn("record.mTakeDamageValue", plugin_source)
+        self.assertIn('payload["official_taken_damage"]', pipe_source)
         self.assertIn("SyncAdventureRecordDataEnd", plugin_source)
         self.assertIn("Plugin.FinalizeOfficialDamageSync();", plugin_source)
         self.assertNotIn("LiveDamage = settlement", plugin_source)
@@ -402,12 +404,19 @@ class CombatBridgeSourceTests(unittest.TestCase):
             PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
         ).read_text(encoding="utf-8")
 
+        self.assertIn("#if LC2_COMBAT_DIAGNOSTICS", source)
         self.assertIn(
-            "internal static readonly bool ReleaseDiagnosticsEnabled = false;",
+            "internal static readonly bool DetailedDiagnosticsEnabled = true;",
             source,
         )
         self.assertIn(
-            "if (ReleaseDiagnosticsEnabled)\n"
+            "internal static readonly bool DetailedDiagnosticsEnabled = false;",
+            source,
+        )
+        self.assertIn('internal const string BridgeBuildProfile = "diagnostic";', source)
+        self.assertIn('internal const string BridgeBuildProfile = "distribution";', source)
+        self.assertIn(
+            "if (DetailedDiagnosticsEnabled)\n"
             "        {\n"
             "            InstallOptionalSettlementNetworkProbeHooks();\n"
             "        }",
@@ -455,10 +464,17 @@ class CombatBridgeSourceTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn(
-            "if (!ReleaseDiagnosticsEnabled || !_inActiveMap || RuntimeLog is null)",
+            "if (!DetailedDiagnosticsEnabled || !_inActiveMap || RuntimeLog is null)",
             plugin_source,
         )
-        self.assertIn("if (!ReleaseDiagnosticsEnabled)", plugin_source)
+        self.assertIn("if (!DetailedDiagnosticsEnabled)", plugin_source)
+        self.assertIn("profile={BridgeBuildProfile}", plugin_source)
+        self.assertIn("<CombatDiagnostics Condition=", (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "LC2CombatBridge.csproj"
+        ).read_text(encoding="utf-8"))
+        self.assertIn("LC2_COMBAT_DIAGNOSTICS", (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "LC2CombatBridge.csproj"
+        ).read_text(encoding="utf-8"))
         self.assertIn("loaded; read-only local bridge active", plugin_source)
         self.assertIn("Combat bridge client connected; local stream active", pipe_source)
         self.assertIn("Combat bridge transport reset:", pipe_source)
@@ -512,6 +528,119 @@ class CombatBridgeSourceTests(unittest.TestCase):
         self.assertNotIn("Publish", probe_source)
         self.assertNotIn("Emit", probe_source)
         self.assertNotIn("LC2CB-SETTLEMENT-FINAL-PROBE", pipe_source)
+
+    def test_local_settlement_callbacks_close_solo_only_after_official_final_is_accepted(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+        pipe_source = (
+            PROJECT_ROOT
+            / "game_plugins"
+            / "LC2CombatBridge"
+            / "CombatPipeServer.cs"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "[HarmonyPatch(typeof(StatisticsMgr), "
+            "nameof(StatisticsMgr.OnGameSettlementSyncEnd))]",
+            source,
+        )
+        self.assertIn(
+            "[HarmonyPatch(typeof(GameSettlementUI), "
+            "nameof(GameSettlementUI.SetSettlementData))]",
+            source,
+        )
+        self.assertIn(
+            "[HarmonyPatch(typeof(GameSettlementUI), "
+            "nameof(GameSettlementUI.UpdateSettlementInfo))]",
+            source,
+        )
+        self.assertIn(
+            "[HarmonyPatch(typeof(GameSettlementUI), "
+            "nameof(GameSettlementUI.GameOverEnd_Offline))]",
+            source,
+        )
+        self.assertIn('"ui_settlement_data",\n            __instance?._selfPlayerData', source)
+        self.assertIn('FinalizeSettlementUiOfficialDamage("ui_settlement_info", __0)', source)
+        offline_start = source.index(
+            "internal static class LocalSettlementUiOfflineEndPatch"
+        )
+        offline_end = source.index(
+            "internal static class SettlementNetworkProbePatchMethods"
+        )
+        offline_patch = source[offline_start:offline_end]
+        self.assertIn("Plugin.BeginSettlementUiOfficialDamage();", offline_patch)
+        self.assertNotIn("FinalizeSettlementUiOfficialDamage", offline_patch)
+        self.assertGreaterEqual(
+            source.count("Plugin.BeginSettlementUiOfficialDamage();"),
+            3,
+        )
+        self.assertIn("public bool IsRoundActive", pipe_source)
+        start = source.index("private static void TryFinalizeLocalOfficialDamage(")
+        end = source.index("internal static void BeginRoom()", start)
+        finalizer = source[start:end]
+        self.assertIn("bridge?.IsRoundActive is not true", finalizer)
+        self.assertNotIn("if (!_inActiveMap)", finalizer)
+        self.assertIn("KnownPartyBySlot.Count != 1", finalizer)
+        self.assertIn('CaptureSettlementFinalProbeSnapshot("postfix")', finalizer)
+        self.assertIn("_finalOfficialReady = true;", finalizer)
+        self.assertIn("RefreshPartyRoster(force: true);", finalizer)
+        self.assertIn("TryAcceptSoloSettlementUiRecord(uiRecord);", finalizer)
+        self.assertIn("if (endOnIncompleteUiRecord)", finalizer)
+        self.assertIn("var accepted = _finalOfficialAccepted;", finalizer)
+        self.assertIn("if (!accepted)", finalizer)
+        self.assertIn("_finalOfficialReady = false;", finalizer)
+        self.assertEqual(finalizer.count("bridge.EndGameSession();"), 2)
+        self.assertLess(
+            finalizer.index("var accepted = _finalOfficialAccepted;"),
+            finalizer.index("bridge.EndGameSession();"),
+        )
+        self.assertIn("[LC2CB-LOCAL-FINAL] kind={surface}", finalizer)
+        ui_accept_start = source.index(
+            "private static void TryAcceptSoloSettlementUiRecord("
+        )
+        ui_accept_end = source.index("internal static void BeginRoom()", ui_accept_start)
+        ui_accept = source[ui_accept_start:ui_accept_end]
+        self.assertIn("OfficialIdentityFingerprint(record)", ui_accept)
+        self.assertIn("!known.IsLocal", ui_accept)
+        self.assertIn("record.mIndex != slot", ui_accept)
+        self.assertIn("record.mTakeDamageValue", ui_accept)
+        self.assertIn("FinalOfficialBySlot[slot]", ui_accept)
+        self.assertIn("_finalOfficialAccepted = true;", ui_accept)
+
+    def test_process_first_session_accepts_a_complete_nonzero_live_seed_only_once(self) -> None:
+        source = (
+            PROJECT_ROOT / "game_plugins" / "LC2CombatBridge" / "Plugin.cs"
+        ).read_text(encoding="utf-8")
+
+        activate_start = source.index("private static void ActivateMapSession(")
+        activate_end = source.index("private static RoomLocation CaptureActiveMapLocation(")
+        activate = source[activate_start:activate_end]
+        self.assertIn(
+            "var allowNonZeroLiveSeed = !_hasActivatedSessionInProcess;",
+            activate,
+        )
+        self.assertIn("_hasActivatedSessionInProcess = true;", activate)
+        self.assertIn("ResetOfficialDamageState(allowNonZeroLiveSeed);", activate)
+
+        capture_start = source.index(
+            "private static Dictionary<int, OfficialDamageTotals> "
+            "CaptureLiveOfficialDamageTotals()"
+        )
+        capture_end = source.index(
+            "private static Dictionary<int, OfficialDamageTotals>\n"
+            "        CaptureLiveOfficialListByIdentity(",
+            capture_start,
+        )
+        capture = source[capture_start:capture_end]
+        self.assertIn("hasNonZeroSeed && !_liveOfficialNonZeroSeedAllowed", capture)
+        self.assertIn("_liveOfficialBaselineReady = true;", capture)
+        self.assertIn("_liveOfficialNonZeroSeedAllowed = false;", capture)
+        self.assertIn("[LC2CB-LIVE-SEED] kind=process_start_nonzero", capture)
+        self.assertLess(
+            capture.index("hasNonZeroSeed && !_liveOfficialNonZeroSeedAllowed"),
+            capture.index("_liveOfficialBaselineReady = true;"),
+        )
 
     def test_settlement_round_cache_probe_is_read_only_anonymous_and_post_hit(self) -> None:
         plugin_source = (

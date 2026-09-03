@@ -72,10 +72,10 @@
 | 用户指标 | 游戏源字段/事件 | Bridge 计算与单位 | v2 字段 | 聚合字段 | UI | 证据/风险 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 本局总伤害 | `OnAfterHit_All_Damage_Atker` + `mRealHPDamage` + 命中前 `CurHP` | `applied=min(max(0, real), hp_before)`；逐击 `ceil(applied)` | `damage_direction=dealt`, `settlement_damage` | `total_damage += settlement_damage` | HUD“伤害”、主窗口“总伤害” | `R-PASS` 多样本 |
-| 最近 10 秒 DPS | 同上 | 只使用可聚合的 `settlement_damage` 和事件 `monotonic_ms` | 同上 | 窗口内伤害和 / `10s` | HUD“近 10 秒平均秒伤”，保留一位小数 | `T/R`；作者选择保留 DPS，不改成十秒总伤害 |
+| 最近 10 秒 DPS | 完整 `party_updated.live_damage` 累计值；不可用时回退可聚合 `settlement_damage` | live 累计做正差分；只补最近 live 锚点后的逐击尾段，不双计；重连/计数回退重建基线 | `live_damage` + `damage_resolution` | 10 秒窗内正差分 / `min(10s, 首个可信正差分后的实际时长)`，最短 1s | HUD“近 10 秒平均秒伤”，保留一位小数 | v1.7.2 `T`；旧真实 r23 事件回放通过，v1.7.2 实机待测 |
 | Boss 伤害 | defender `MonsterRuntimeData.IsBoss` | `IsBoss=true` 的造成伤害逐击值 | `is_boss=true` | `boss_damage` | HUD/主窗口 Boss | `R-PASS 24271` |
 | Boss 占比 | 无新增游戏字段 | `clamp(boss_damage / total_damage, 0, 1)` | 无 | UI 派生 | HUD 比例条 | `T` |
-| 官方承伤 | 玩家根 defender 的 `OnAfterHit_All_Damage_BeAtker` + `mOriFinalDamage` | 先排除召唤物/非玩家 defender，再逐击 `ceil(max(0, original))` | `damage_direction=taken`, `target_kind=player`, `settlement_damage` | `taken_settlement_damage` | “承伤/官方承伤” | `R-PASS` 0.3.7：召唤物先、玩家后，仅保留玩家 `35`；召唤物造成伤害仍正常 |
+| 官方承伤 | 最终`AdventureRecordPlayerData.mTakeDamageValue`；局中使用玩家根 defender 的 `OnAfterHit_All_Damage_BeAtker` + `mOriFinalDamage` | final官方累计替换显示；逐击先排除召唤物/非玩家 defender，再取`ceil(max(0, original))` | `official_taken_damage`；局中为`damage_direction=taken` | `taken_settlement_damage` | “受击承伤” | 逐击口径`R-PASS`；record字段存在为`S`、结算卡为`R`，record→HUD端到端仍`T` |
 | 实际战斗掉血 | `mRealHPDamage` + 命中前 HP | `min(real, hp_before)` | `applied_hp_damage` | `hp_damage_taken` | 主窗口详情 | `R-PASS`，不得与官方承伤合并 |
 | 减伤量 | 原始伤害与结算后伤害 | `max(0, original-real)` | `mitigated_damage` | `mitigated_damage` | 主窗口详情 | `R-PASS` 总量语义；具体乘加顺序 `U` |
 | 过量伤害 | 结算后伤害与实际可扣 HP | `max(0, real-applied)` | `overkill_damage` | `overkill_damage` | 当前未单独突出 | `R-PASS` |
@@ -177,7 +177,7 @@
 | MP 显示单位 | `ToCurMPInt(event_value)`；最终以实际前后 MP 差交叉验证 | 对齐真实扣除，不把长按技能面板参考值当固定单次成本 | `R-PASS`：短按 `12`、另一武器 `48` |
 | MP 官方/底层去重 | 官方 `OnUseMana aggregate=true`；`ChangeCurrentMp aggregate=false` | 同次施法两条路径只计官方值，底层保留前后值诊断 | `R-PASS`：所有配对事件均未双计 |
 | MP 恢复差值 | `max(0, current-last_observed)`；每次运行时变化后刷新 cache | 同时排除已满初始化并精确计算系统回满 | `R-PASS` 0.3.6：`66→120`,`22→120`,`20→120`,`116→120` |
-| 最近 DPS | 10 秒内 `settlement_damage` 和 / 10 | 与总伤害同口径 | `T` |
+| 最近 DPS | 完整且单调时：10 秒内 `live_damage` 正差分 + 最新 live 锚点后仍在窗内的 observed 尾段；否则回退逐击。未满窗按首个可信正差分后的实际时长，最短 1s；满窗固定 10s | 与过程总伤害优先采用同一 live 来源；不把未观测时间算入首段，也不在 live 追平时双计 | v1.7.2 `T`，真实候选待测 |
 | Boss 占比 | `clamp(boss/total,0,1)` | 防空值和不一致数据 | `T` |
 | checkpoint | 保存但不覆盖事件累计 | 差异应显式诊断 | `S/T` |
 
@@ -453,6 +453,30 @@
 - 0.4.15仅在最终record slot集合与本局历史roster完全一致、无非法/重复slot时发布整组official，否则整组拒绝。房内实时仍用逐击观察；registered-player attacker callback只输出覆盖、转发和slot冲突诊断，未经短房证明不改变`owner_player_id`。
 - Python可见团队分母仅使用active roster，duplicate slot拒绝，本机token替换只使用active local；同run pipe重连保持GUID/累计并标`degraded:transport_reconnected`。
 - `tools/check_lc2_multiplayer_probe.py`要求至少两个远端slot、registered/Settlement hit完整重合、至少一个远端转发样本且冲突为0，并拒绝退局phantom session。0.4.15短房owner子门208/208通过，但整体仅因`phantom_session_after_round_start`失败；退出后单卡7,453可能是团队/当前缓存折叠，个人口径UNKNOWN。0.4.16离线全量200项、SDK6.0.428 Release 0 warning/0 error；最终四P、包/UI和发布仍`NOT RUN`。
+
+## 26. v1.7.2 四人退出样本、DPS 窗与双构建档
+
+- 早期 v1.7.2 实测是四人房，不是目录名最初推测的单人样本；两名路人中途逐渐退出，作者打到城堡后离开。结束界面只保留两名活动玩家参与可见团队分母，历史离队值没有继续占活动比例。
+- 该局低频 BepInEx 日志只有一次 `damage_snapshot_missing`，没有 queue overflow、schema/session failure 或 transport reset。它证明一条可恢复事件被跳过，但没有逐事件归档，不能据此唯一确定漏的是哪次命中、少算多少或是否正是作者体感 DPS 偏低的来源。
+- v1.7.2 DPS 以完整单调的 `live_damage` 正差分为主，逐击只补最近 live 锚点后的尾段或在 live 不可用时回退；首个可信正值起按 1—10 秒真实窗口计时。live 回退、计数下降、重连和墙钟衰减均有正负控制，避免双计、负值、追赶尖峰与跨进程单调时钟混用。
+- 可恢复跳过告警以房间生命周期计数：告警发生的当前区为2，进入紧接的下一区减为1并继续显示，再进入下一区时清除；同房重复 `room_started` 不递减，新告警重置为2。详细页显示，Mini HUD 无条件省略。
+- 维护默认构建 `Diagnostic`，同时打开 Bridge 高频观测与匿名桌面对局记录；可暂停/继续、点击导出，单局事件预算上限128 MiB。明确分享时才构建 `Distribution`，其 Bridge 高频开关、桌面归档实例和控件均为false/不存在。包内 `build_profile.json`、runtime manifest 与 Bridge profile 字符串必须相互一致，否则fail closed。
+- Bridge 1.7.1 两档均为98,304 B：diagnostic `401D6FD0…E5BD69B`，distribution `5261B844…1390AF`；两者均无PDB或本机绝对路径。数值路径相同，档位只控制诊断面。
+- r2单人自然结算明确显示官方伤害860,235、Boss 139,339、承伤409；盒子live三项差异0。两次死亡叙述下只有1个本机匿名player、slot0不变、live累计回退0；7,584条事件全部重放，摘要差异0，DPS负值/NaN/无穷为0。
+- 同局结算界面确实出现，但三个network settlement probe只有安装日志、record/boundary均0，`official_*`仍false且`session_ended=0`。对照两人自然局会进入`StageNetworkCtrl.SyncAdventureRecordDataEnd` prefix/postfix并`final_accepted=true`，确认单人终局不能只依赖network SyncEnd。
+- 当前元数据提供`StatisticsMgr.OnGameSettlementSyncEnd(1参数)`、`OnGameSettlementSyncStart(1参数)`、`SetAdventureRecordSaveData(1参数)`和`SaveAdventureRecordData()`本地入口。排名第一是假设“单人绕过network SyncEnd”；备选是假设“SyncEnd在camp preload清除`_inActiveMap`后才到达并被guard静默丢弃”。下一候选须先记录本地sync-end与network hook入口命中，再选择统一final/session-end发布点。
+- r3 Bridge 1.7.2接入带`IsRoundActive`门的`StatisticsMgr.OnGameSettlementSyncEnd`前后缀，不依赖`_inActiveMap`；postfix设置final-ready并复用既有HMAC身份完整性门。只有final accepted才结束session；失败会撤回final-ready、重新发布最后可信live并保留session，禁止假官方或过早收尾。两档99,328 B、66项聚焦与Release双编译通过，真实单人结算仍`NOT RUN`。
+- r4跨进程续玩实测确认`REJOIN-SEED-01`：第二次重进时Statistics首个完整active/cache合计已为3,662,617/Boss684,177，身份匹配2、碰撞/未匹配/读取失败0，但`_liveOfficialBaselineReady`只接受全零首值，导致C段唯一一次party更新没有`live_damage`且全程`live_damage_complete=false`。最终游戏live与截图同为10,619,575/Boss3,466,900，盒子逐击fallback为6,964,256/Boss3,945,311；承伤前段757加后段805精确闭合官方1,562。
+- 同一r4样本出现明确结算卡及`round_end_preload_camp → camp`，三个network探针、Statistics local-final、`final_accepted`与`session_ended`仍全0，证明r3目标不是实际单人路径。当前interop确认`GameSettlementUI.SetSettlementData()`、`UpdateSettlementInfo(1参数)`与`GameOverEnd_Offline()`均为公开唯一方法。
+- r5 Bridge 1.7.3候选将非零首值授权收窄为“插件进程内第一次激活的session”；完整唯一身份向量可恢复续玩总量，后续同进程新局仍拒绝非零初值。聚合器把该首值只作DPS基线，下一正差分才计速。单人final改由上述结算UI数据/显示入口与offline-end兜底调用同一幂等终局函数；只有`IsRoundActive`、历史party恰1人与既有final身份门全部通过才`EndGameSession`。每个UI入口保留标准prefix/postfix边界供checker判定，失败撤回final-ready并恢复live。两档100,352 B、SHA分别`DF02CD2B…DA719D`/`81252C4B…DB82E4`，0 warning/0 error、127项相关及324项产品测试通过；真实运行仍`NOT RUN`。
+
+## 27. v1.7.4 官方承伤与单人UI终局
+
+- r5真实主动结束样本命中两次prefix与两次postfix；active record已为官方卡相同的1,451,098/Boss240,540，但`save_available=false`，所以r5只读最终save-list时无法接受final。`in_active_map=false`是post-round时序旁证，不是finalizer的直接门。
+- 当前interop `AdventureRecordPlayerData`明确并列提供`mDamageValue/mBossDamageValue/mTakeDamageValue`。历史归档只序列化前两项，未留下任何record级官方承伤值；旧“承伤PASS”均为逐击`settlement_display`与结算卡对账，不能冒充record读取正控。
+- Bridge 1.7.4只把最终`mTakeDamageValue`作为`official_taken_damage`加入匿名party快照；active+cache承伤的房内更新与rollover没有历史正控，暂不接入live。局中继续使用已验证逐击承伤，最终official taken可向上或向下校正。
+- 单人`UpdateSettlementInfo`直接传入的record以及同一调用链的`GameSettlementUI._selfPlayerData`必须通过历史party唯一本机身份、slot一致、非负Damage/Boss/Taken与Boss≤Damage门，才冻结为official。更早的`GameOverEnd_Offline`只保留入口探针，不读取可能为空或陈旧的record。可信单人结算UI即使record仍不可用，也保留最后live值并发送`session_ended`，以估算状态自动收尾；不伪造官方值。
+- 92个历史ZIP中，official Damage/Boss完整样本2个，含`session_ended`/automatic的包77个，但三者交集为0；因此历史只分别证明了官方值与自动归档。v1.7.4新增合成端到端正控闭合三项official→`session_ended`→automatic ZIP，真实自然结算仍待后续维护复核，不阻断本次“中间过程+正常结算收尾”的发布准备。
 
 主要维护入口：
 

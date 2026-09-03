@@ -1,0 +1,9 @@
+# 自动归档+手动导出 r9精确包UI/E2E验收
+
+- 精确EXE：`AC96FB7D990A05984B121234A8DAD657BBDDC410CCA63BCAB5AAEE0AAF175D5B`。
+- 主窗口：1223×896；截图 `B4BAF0FBFE7325A9A6F064BE41BE4AEC4260FFBF4B844C647A010A85826A0569`；receipt `F8A96E5F…B4200`。
+- 顶栏手动导出按钮：actual/requested 130/130 px，x=841；版本号x=979。顺序、间距、字号和主次层级与源码候选一致，无截断/重叠。
+- 包形自动归档ZIP：`55EB1E76C9F7D1D6E8CC7FA66DC26E2F2219A398BDBEA0CD160B55EF48919E74`；固定成员manifest/summary/events，2条匿名事件，ended摘要，partial=0。
+- UI与归档均使用隔离config/archive目录；未启动游戏、未写桌面候选config、未连接外网。
+
+VisualIssueLedger `UI-A01/A02/A03`保持CLOSED。判定：`EXACT PACKAGE UI + ARCHIVE E2E VERIFIED`。

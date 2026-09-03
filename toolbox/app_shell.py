@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterable, Mapping, Protocol
 import webbrowser
 
 from .combat_aggregator import CombatAggregator, CombatSnapshot
+from .combat_archive import CombatArchiveError, CombatDiagnosticsController
 from .combat_transport import CombatEventPump
 from .macro_model import MacroProfile
 from .mod_manager import (
@@ -197,6 +198,7 @@ def combat_status_presentation(
     official_complete = bool(
         snapshot.official_damage_complete
         and snapshot.official_boss_damage_complete
+        and snapshot.official_taken_damage_complete
     )
 
     # Transport failures and wait states stay primary. A missing final must not
@@ -211,8 +213,8 @@ def combat_status_presentation(
 
     if official_complete:
         label = "● 官方" if compact else "● 官方结算"
-        if degraded:
-            label += " · 跳过" if compact else "（有事件跳过）"
+        if degraded and not compact:
+            label += "（有事件跳过）"
         return CombatStatusPresentation(
             kind="official",
             label=label,
@@ -221,23 +223,23 @@ def combat_status_presentation(
 
     if state == "live":
         label = combat_state_label(state, compact=compact)
-        if degraded:
-            label += " · 跳过" if compact else "（有事件跳过）"
+        if degraded and not compact:
+            label += "（有事件跳过）"
         return CombatStatusPresentation(
             kind="estimate",
             label=label,
-            color=GOLD if degraded or not compact else GREEN,
+            color=GOLD if not compact else GREEN,
             explanation="" if compact else "结算可能校正",
         )
 
     if state == "ended":
         label = combat_state_label(state, compact=compact)
-        if degraded:
-            label += " · 跳过" if compact else "（有事件跳过）"
+        if degraded and not compact:
+            label += "（有事件跳过）"
         return CombatStatusPresentation(
             kind="ended",
             label=label,
-            color=GOLD if degraded else MUTED,
+            color=GOLD if degraded and not compact else MUTED,
             explanation="" if compact else "实时估算 · 结算可能校正",
         )
 
@@ -1719,6 +1721,7 @@ class ToolboxShell:
         support_directory: Path | None = None,
         combat_aggregator: CombatAggregator,
         combat_event_pump: CombatEventPump | None,
+        combat_diagnostics: CombatDiagnosticsController | None,
         keyboard_preview_provider: Callable[
             [], Iterable[tuple[str, str, tuple[int, int, int, int]]]
         ],
@@ -1742,6 +1745,7 @@ class ToolboxShell:
         )
         self.combat_aggregator = combat_aggregator
         self.combat_event_pump = combat_event_pump
+        self.combat_diagnostics = combat_diagnostics
         self.keyboard_preview_provider = keyboard_preview_provider
         self.launch_game = launch_game
         self.ensure_game_runtime = ensure_game_runtime
@@ -1773,6 +1777,8 @@ class ToolboxShell:
         self._combat_team_grid_window: int | None = None
         self._combat_team_visible_count = 0
         self.combat_detail_panel: RoundedPanel | None = None
+        self.diagnostics_toggle_button: tk.Button | None = None
+        self.diagnostics_export_button: tk.Button | None = None
         self.combat_team_cells: list[tk.Frame] = []
         self.combat_team_labels: list[tuple[tk.Label, tk.Label, tk.Label]] = []
         self.combat_team_bars: list[tk.Canvas] = []
@@ -2376,6 +2382,32 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 10, "bold"),
         )
         self.labels["combat_detail_title"].pack(side="left")
+        if self.combat_diagnostics is not None:
+            self.diagnostics_export_button = self._button(
+                heading,
+                "导出诊断",
+                self._export_candidate_diagnostics,
+                compact=True,
+                width=9,
+            )
+            self.diagnostics_export_button.pack(side="right")
+            self.diagnostics_toggle_button = self._button(
+                heading,
+                "暂停记录",
+                self._toggle_candidate_diagnostics,
+                compact=True,
+                width=9,
+            )
+            self.diagnostics_toggle_button.pack(side="right", padx=(0, 5))
+            self.labels["combat_diagnostics"] = tk.Label(
+                heading,
+                text="候选诊断 · 正在读取状态",
+                bg=SURFACE,
+                fg=MUTED,
+                anchor="e",
+                font=("Microsoft YaHei UI", 7, "bold"),
+            )
+            self.labels["combat_diagnostics"].pack(side="right", padx=(0, 8))
         self.labels["combat_detail_hint"] = tk.Label(
             heading,
             text="尚无事件；连接后按来源显示有效值",
@@ -2383,7 +2415,7 @@ class ToolboxShell:
             fg=MUTED,
             font=("Microsoft YaHei UI", 8),
         )
-        self.labels["combat_detail_hint"].pack(side="right")
+        self.labels["combat_detail_hint"].pack(side="right", padx=(0, 8))
         tree_host = tk.Frame(detail, bg=SURFACE)
         self.combat_tree = ttk.Treeview(
             tree_host,
@@ -3799,6 +3831,7 @@ class ToolboxShell:
         command: Callable[[], None],
         *,
         accent: bool = False,
+        compact: bool = False,
         width: int = 10,
     ) -> tk.Button:
         return tk.Button(
@@ -3812,10 +3845,10 @@ class ToolboxShell:
             activeforeground="#FFFAF5" if accent else TEXT,
             relief="flat",
             bd=0,
-            padx=8,
-            pady=7,
+            padx=5 if compact else 8,
+            pady=2 if compact else 7,
             cursor="hand2",
-            font=("Microsoft YaHei UI", 8, "bold"),
+            font=("Microsoft YaHei UI", 7 if compact else 8, "bold"),
         )
 
     def show_page(self, page_id: str) -> None:
@@ -4061,6 +4094,68 @@ class ToolboxShell:
                 f"治疗溢出 {format_whole_metric(snapshot.resource_overflow)}"
             )
         )
+        self._refresh_candidate_diagnostics()
+
+    def _refresh_candidate_diagnostics(self) -> None:
+        controller = self.combat_diagnostics
+        label = self.labels.get("combat_diagnostics")
+        button = self.diagnostics_toggle_button
+        if controller is None or label is None or button is None:
+            return
+        if controller.last_error:
+            label.configure(
+                text="候选诊断 · 写入异常",
+                fg=RED,
+            )
+        elif controller.enabled:
+            label.configure(
+                text="候选诊断 · 记录中 · 上限 128 MiB",
+                fg=GREEN,
+            )
+        else:
+            label.configure(text="候选诊断 · 已暂停", fg=MUTED)
+        button.configure(text="暂停记录" if controller.enabled else "开始记录")
+
+    def _toggle_candidate_diagnostics(self) -> None:
+        controller = self.combat_diagnostics
+        if controller is None:
+            return
+        try:
+            controller.set_enabled(not controller.enabled)
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "候选诊断",
+                f"无法切换诊断记录。\n\n{error}",
+                parent=self.root,
+            )
+        self._refresh_candidate_diagnostics()
+
+    def _export_candidate_diagnostics(self) -> None:
+        controller = self.combat_diagnostics
+        button = self.diagnostics_export_button
+        if controller is None:
+            return
+        if button is not None:
+            button.configure(state="disabled", text="正在导出…")
+            self.root.update_idletasks()
+        try:
+            path = controller.export_manual()
+        except (CombatArchiveError, OSError, ValueError) as error:
+            messagebox.showerror(
+                "导出诊断失败",
+                f"诊断数据没有导出。\n\n{error}",
+                parent=self.root,
+            )
+        else:
+            messagebox.showinfo(
+                "诊断已导出",
+                f"已保存：{path.name}\n\n目录：{path.parent}",
+                parent=self.root,
+            )
+        finally:
+            if button is not None:
+                button.configure(state="normal", text="导出诊断")
+            self._refresh_candidate_diagnostics()
 
     def _resize_combat_team_grid(self, _event: tk.Event[Any] | None = None) -> None:
         canvas = self.combat_team_canvas

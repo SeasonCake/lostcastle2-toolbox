@@ -30,10 +30,30 @@ def main() -> int:
     package = parse_args().package.resolve()
     internal = package / "_internal"
     manifest = internal / "assets" / "lc2_runtime_manifest.json"
+    profile_path = internal / "assets" / "build_profile.json"
     bundle = internal / "third_party" / "lc2_runtime"
-    if not manifest.is_file() or not bundle.is_dir():
+    if not manifest.is_file() or not profile_path.is_file() or not bundle.is_dir():
         raise RuntimeError("Packaged runtime resources are missing.")
     manifest_payload = json.loads(manifest.read_text(encoding="utf-8"))
+    profile_payload = json.loads(profile_path.read_text(encoding="utf-8"))
+    profile_id = profile_payload.get("profile_id")
+    expected_diagnostics = profile_id == "diagnostic"
+    profile_fields = (
+        profile_payload.get("combat_diagnostics_available"),
+        profile_payload.get("bridge_diagnostics_enabled"),
+        profile_payload.get("default_recording_enabled"),
+    )
+    if (
+        profile_payload.get("schema_version") != 1
+        or profile_id not in {"diagnostic", "distribution"}
+        or any(not isinstance(value, bool) for value in profile_fields)
+        or profile_fields
+        != (expected_diagnostics, expected_diagnostics, expected_diagnostics)
+        or manifest_payload.get("build_profile") != profile_id
+        or (manifest_payload.get("bridge") or {}).get("diagnostics_enabled")
+        is not expected_diagnostics
+    ):
+        raise RuntimeError("Packaged build profile is missing or inconsistent.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
@@ -90,6 +110,8 @@ def main() -> int:
             raise RuntimeError("Conflicting runtime did not fail before writes.")
 
         report = {
+            "build_profile": profile_id,
+            "combat_diagnostics_available": expected_diagnostics,
             "runtime_version": manifest_payload["runtime_version"],
             "runtime_archive_sha256": manifest_payload["runtime_archive"]["sha256"],
             "runtime_files": manifest_payload["runtime_file_count"],

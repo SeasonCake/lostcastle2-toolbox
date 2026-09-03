@@ -1,3 +1,10 @@
+param(
+    [ValidateSet('Diagnostic', 'Distribution')]
+    [string]$BuildProfile = 'Diagnostic',
+    [string]$GameDir = '',
+    [string]$DotNetPath = ''
+)
+
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $projectRoot
@@ -34,7 +41,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $goldEditorPath).Hash -ne $gold
 if (-not (Test-Path -LiteralPath $communityModsPath -PathType Container)) {
     throw 'Missing prepared community MOD payloads.'
 }
-if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 60) {
+if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 61) {
     throw 'Prepared community MOD payload file count mismatch.'
 }
 $runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
@@ -116,6 +123,122 @@ py -3 .\keyview.py --self-test
 if ($LASTEXITCODE -ne 0) {
     throw "Source self-test failed with exit code $LASTEXITCODE."
 }
+$profileId = $BuildProfile.ToLowerInvariant()
+$profileDefinition = Join-Path $projectRoot "assets\build_profiles\$profileId\build_profile.json"
+if (-not (Test-Path -LiteralPath $profileDefinition -PathType Leaf)) {
+    throw "Build profile definition is missing: $BuildProfile"
+}
+$profilePayload = Get-Content -LiteralPath $profileDefinition -Raw | ConvertFrom-Json
+$diagnosticsExpected = $BuildProfile -eq 'Diagnostic'
+$profileBooleanFields = @(
+    'combat_diagnostics_available',
+    'bridge_diagnostics_enabled',
+    'default_recording_enabled'
+)
+foreach ($fieldName in $profileBooleanFields) {
+    $fieldProperty = $profilePayload.PSObject.Properties[$fieldName]
+    if ($null -eq $fieldProperty -or $fieldProperty.Value -isnot [bool]) {
+        throw "Build profile boolean field is invalid: $BuildProfile/$fieldName"
+    }
+}
+if ([int]$profilePayload.schema_version -ne 1 -or
+    $profilePayload.profile_id -ne $profileId -or
+    $profilePayload.combat_diagnostics_available -ne $diagnosticsExpected -or
+    $profilePayload.bridge_diagnostics_enabled -ne $diagnosticsExpected -or
+    $profilePayload.default_recording_enabled -ne $diagnosticsExpected) {
+    throw "Build profile definition is inconsistent: $BuildProfile"
+}
+
+$resolvedDotNetPath = $DotNetPath
+if ([string]::IsNullOrWhiteSpace($resolvedDotNetPath)) {
+    $bundledDotNet = Join-Path $projectRoot 'artifacts\toolchains\dotnet-sdk-6.0.428\dotnet.exe'
+    if (Test-Path -LiteralPath $bundledDotNet -PathType Leaf) {
+        $resolvedDotNetPath = $bundledDotNet
+    } else {
+        $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
+        if ($null -ne $dotnetCommand) {
+            $resolvedDotNetPath = $dotnetCommand.Source
+        }
+    }
+}
+if ([string]::IsNullOrWhiteSpace($resolvedDotNetPath) -or
+    -not (Test-Path -LiteralPath $resolvedDotNetPath -PathType Leaf) -or
+    -not @(& $resolvedDotNetPath --list-sdks)) {
+    throw 'A .NET 6 SDK is required to build the selected Bridge profile.'
+}
+
+$resolvedGameDir = $GameDir
+if ([string]::IsNullOrWhiteSpace($resolvedGameDir)) {
+    $resolvedGameDir = $env:LC2_GAME_DIR
+}
+if ([string]::IsNullOrWhiteSpace($resolvedGameDir)) {
+    $localSettingsPath = Join-Path $projectRoot 'config\settings.json'
+    if (Test-Path -LiteralPath $localSettingsPath -PathType Leaf) {
+        $localSettings = Get-Content -LiteralPath $localSettingsPath -Raw | ConvertFrom-Json
+        $resolvedGameDir = [string]$localSettings.game_path
+    }
+}
+if (-not [string]::IsNullOrWhiteSpace($resolvedGameDir) -and
+    [System.IO.Path]::GetExtension($resolvedGameDir)) {
+    $resolvedGameDir = Split-Path -Parent $resolvedGameDir
+}
+if ([string]::IsNullOrWhiteSpace($resolvedGameDir) -or
+    -not (Test-Path -LiteralPath (Join-Path $resolvedGameDir 'BepInEx\core\BepInEx.Core.dll') -PathType Leaf) -or
+    -not (Test-Path -LiteralPath (Join-Path $resolvedGameDir 'BepInEx\interop\LC2.Core.dll') -PathType Leaf)) {
+    throw 'A validated Lost Castle 2 BepInEx/interop directory is required to build Bridge.'
+}
+
+$profileStageParent = Join-Path $projectRoot 'build\profile-stage'
+$profileStageRoot = Join-Path $profileStageParent $profileId
+if (Test-Path -LiteralPath $profileStageRoot) {
+    $resolvedStageRoot = (Resolve-Path -LiteralPath $profileStageRoot).Path
+    if ([System.IO.Path]::GetDirectoryName($resolvedStageRoot) -ne
+        [System.IO.Path]::GetFullPath($profileStageParent)) {
+        throw "Refusing to remove unexpected profile stage: $resolvedStageRoot"
+    }
+    Remove-Item -LiteralPath $resolvedStageRoot -Recurse -Force
+}
+$stagedAssetsPath = Join-Path $profileStageRoot 'assets'
+$stagedRuntimeBundlePath = Join-Path $profileStageRoot 'third_party\lc2_runtime'
+$stagedBridgeOutput = Join-Path $profileStageRoot 'bridge'
+foreach ($directory in @($stagedAssetsPath, $stagedRuntimeBundlePath, $stagedBridgeOutput)) {
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+}
+$bridgeDiagnostics = if ($diagnosticsExpected) { 'true' } else { 'false' }
+& $resolvedDotNetPath build '.\game_plugins\LC2CombatBridge\LC2CombatBridge.csproj' `
+    -t:Rebuild `
+    -c Release `
+    "-p:GameDir=$resolvedGameDir" `
+    "-p:CombatDiagnostics=$bridgeDiagnostics" `
+    --output $stagedBridgeOutput `
+    --nologo
+if ($LASTEXITCODE -ne 0) {
+    throw "Bridge $BuildProfile build failed with exit code $LASTEXITCODE."
+}
+$stagedBridgeSource = Join-Path $stagedBridgeOutput 'LC2CombatBridge.dll'
+py -3 .\tools\verify_lc2_bridge_profile.py `
+    --bridge $stagedBridgeSource `
+    --profile $profileId
+if ($LASTEXITCODE -ne 0) {
+    throw "Bridge $BuildProfile profile verification failed with exit code $LASTEXITCODE."
+}
+
+Copy-Item -LiteralPath $runtimeArchivePath -Destination $stagedRuntimeBundlePath
+$stagedBridgePath = Join-Path $stagedRuntimeBundlePath 'LC2CombatBridge.dll'
+Copy-Item -LiteralPath $stagedBridgeSource -Destination $stagedBridgePath
+$stagedManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
+$stagedManifest.runtime_version = 'BepInEx 6.0.0-be.785 + LC2CombatBridge 1.7.4'
+$stagedManifest.bridge.size_bytes = (Get-Item -LiteralPath $stagedBridgePath).Length
+$stagedManifest.bridge.sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $stagedBridgePath).Hash
+$stagedManifest | Add-Member -NotePropertyName build_profile -NotePropertyValue $profileId
+$stagedManifest.bridge | Add-Member `
+    -NotePropertyName diagnostics_enabled `
+    -NotePropertyValue $diagnosticsExpected
+$stagedManifestPath = Join-Path $stagedAssetsPath 'lc2_runtime_manifest.json'
+$stagedManifest | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $stagedManifestPath -Encoding utf8
+$stagedProfilePath = Join-Path $stagedAssetsPath 'build_profile.json'
+Copy-Item -LiteralPath $profileDefinition -Destination $stagedProfilePath
+
 py -3 -m PyInstaller `
     --noconfirm `
     --clean `
@@ -129,13 +252,14 @@ py -3 -m PyInstaller `
     --add-data '.\assets\game_locations.json;assets' `
     --add-data '.\assets\mod_catalog.json;assets' `
     --add-data '.\assets\community_mod_catalog.json;assets' `
-    --add-data '.\assets\lc2_runtime_manifest.json;assets' `
+    --add-data "$stagedManifestPath;assets" `
     --add-data '.\assets\keyview.ico;assets' `
+    --add-data "$stagedProfilePath;assets" `
     --add-data '.\contracts\combat_event.schema.json;contracts' `
     --add-data "$trainerPath;third_party" `
     --add-data "$goldEditorPath;third_party" `
     --add-data "$communityModsPath;third_party/community_mods" `
-    --add-data "$runtimeBundlePath;third_party/lc2_runtime" `
+    --add-data "$stagedRuntimeBundlePath;third_party/lc2_runtime" `
     --add-data "$sevenZipPath;third_party/7zip" `
     '.\keyview.py'
 if ($LASTEXITCODE -ne 0) {
@@ -143,7 +267,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $packageParent = Join-Path $projectRoot 'package'
-$packageRoot = Join-Path $packageParent '失落城堡2工具箱1.7.1-实时数值监测+一键MOD安装'
+$packageName = if ($BuildProfile -eq 'Diagnostic') {
+    '失落城堡2工具箱1.7.4-诊断候选-结算与承伤-r6'
+} else {
+    '失落城堡2工具箱1.7.4-实时数值监测+一键MOD安装'
+}
+$packageRoot = Join-Path $packageParent $packageName
 if (Test-Path -LiteralPath $packageRoot) {
     $resolvedPackageRoot = (Resolve-Path -LiteralPath $packageRoot).Path
     $expectedPackageRoot = [System.IO.Path]::GetFullPath($packageRoot)
@@ -176,6 +305,10 @@ Get-ChildItem -LiteralPath $runtimeNoticesPath -File | Copy-Item -Destination $p
 if (-not (Test-Path -LiteralPath (Join-Path $packageRoot 'LICENSE') -PathType Leaf) -or
     -not (Test-Path -LiteralPath (Join-Path $packageRoot 'THIRD_PARTY_NOTICES.md') -PathType Leaf)) {
     throw 'Packaged license or third-party notices are missing.'
+}
+py -3 .\tools\verify_packaged_runtime.py --package $packageRoot
+if ($LASTEXITCODE -ne 0) {
+    throw "Packaged runtime/profile verification failed with exit code $LASTEXITCODE."
 }
 
 Write-Output $packageRoot

@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "profile_id": "diagnostic",
+  "combat_diagnostics_available": true,
+  "bridge_diagnostics_enabled": true,
+  "default_recording_enabled": true
+}

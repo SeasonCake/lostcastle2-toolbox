@@ -60,13 +60,22 @@ from toolbox.macro_model import parse_macro_profile
 
 
 class AppShellModelTests(unittest.TestCase):
-    def test_header_has_no_test_only_manual_export_control(self) -> None:
+    def test_candidate_diagnostics_controls_are_optional_and_stay_on_detail_page(self) -> None:
         constructor = inspect.getsource(ToolboxShell.__init__)
         header_builder = inspect.getsource(ToolboxShell._build)
-        self.assertNotIn("combat_archiver", constructor)
-        self.assertNotIn("archive_button", constructor)
-        self.assertNotIn("手动导出", header_builder)
-        self.assertFalse(hasattr(ToolboxShell, "_manual_export"))
+        combat_builder = inspect.getsource(ToolboxShell._build_combat_page)
+        self.assertIn("combat_diagnostics", constructor)
+        self.assertNotIn("导出诊断", header_builder)
+        self.assertIn("if self.combat_diagnostics is not None", combat_builder)
+        self.assertIn("暂停记录", combat_builder)
+        self.assertIn("导出诊断", combat_builder)
+        self.assertEqual(combat_builder.count("compact=True"), 2)
+        self.assertNotIn("diagnostics = tk.Frame(page", combat_builder)
+        self.assertLess(
+            combat_builder.index('self.labels["combat_detail_title"]'),
+            combat_builder.index('self.labels["combat_diagnostics"]'),
+        )
+        self.assertTrue(hasattr(ToolboxShell, "_export_candidate_diagnostics"))
 
     def test_main_combat_page_explains_final_rounding_without_claiming_an_error(self) -> None:
         self.assertIn("底层小数累计", COMBAT_ROUNDING_HINT)
@@ -411,6 +420,7 @@ class AppShellModelTests(unittest.TestCase):
         boss_damage: int = 0,
         official_damage_complete: bool = False,
         official_boss_damage_complete: bool = False,
+        official_taken_damage_complete: bool = False,
         degraded: bool = False,
     ) -> SimpleNamespace:
         return SimpleNamespace(
@@ -418,6 +428,7 @@ class AppShellModelTests(unittest.TestCase):
             diagnostic_warning="degraded:event_gap" if degraded else None,
             official_damage_complete=official_damage_complete,
             official_boss_damage_complete=official_boss_damage_complete,
+            official_taken_damage_complete=official_taken_damage_complete,
             personal_damage=damage,
             personal_boss_damage=boss_damage,
         )
@@ -457,6 +468,7 @@ class AppShellModelTests(unittest.TestCase):
                     damage=final_damage,
                     official_damage_complete=True,
                     official_boss_damage_complete=True,
+                    official_taken_damage_complete=True,
                 )
                 self.assertEqual(combat_status_presentation(live).kind, "estimate")
                 official = combat_status_presentation(final)
@@ -475,6 +487,13 @@ class AppShellModelTests(unittest.TestCase):
             official_boss_damage_complete=False,
         )
         self.assertEqual(combat_status_presentation(partial).kind, "estimate")
+        missing_taken = self._combat_status_snapshot(
+            damage=10_440_726,
+            official_damage_complete=True,
+            official_boss_damage_complete=True,
+            official_taken_damage_complete=False,
+        )
+        self.assertEqual(combat_status_presentation(missing_taken).kind, "estimate")
 
     def test_degraded_and_transport_states_are_not_hidden_by_estimate_status(self) -> None:
         degraded = combat_status_presentation(
@@ -490,25 +509,39 @@ class AppShellModelTests(unittest.TestCase):
                 self._combat_status_snapshot(degraded=True),
                 compact=True,
             ).text,
-            "● 实时 · 跳过",
+            "● 实时",
         )
         self.assertEqual(
             combat_status_presentation(
                 self._combat_status_snapshot(degraded=True),
                 compact=True,
             ).color,
-            GOLD,
+            GREEN,
         )
         official_degraded = combat_status_presentation(
             self._combat_status_snapshot(
                 state="ended",
                 official_damage_complete=True,
                 official_boss_damage_complete=True,
+                official_taken_damage_complete=True,
                 degraded=True,
             )
         )
         self.assertEqual(official_degraded.text, "● 官方结算（有事件跳过）")
         self.assertEqual(official_degraded.color, GREEN)
+        self.assertEqual(
+            combat_status_presentation(
+                self._combat_status_snapshot(
+                    state="ended",
+                    official_damage_complete=True,
+                    official_boss_damage_complete=True,
+                    official_taken_damage_complete=True,
+                    degraded=True,
+                ),
+                compact=True,
+            ).text,
+            "● 官方",
+        )
 
         expected = {
             "connecting": "● 正在连接战斗桥接",

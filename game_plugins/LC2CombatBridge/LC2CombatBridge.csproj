@@ -11,6 +11,8 @@
     <GameDir Condition="'$(GameDir)' == ''">$(LC2_GAME_DIR)</GameDir>
     <BepInExCoreDir>$(GameDir)\BepInEx\core</BepInExCoreDir>
     <InteropDir>$(GameDir)\BepInEx\interop</InteropDir>
+    <CombatDiagnostics Condition="'$(CombatDiagnostics)' == ''">false</CombatDiagnostics>
+    <DefineConstants Condition="'$(CombatDiagnostics)' == 'true'">$(DefineConstants);LC2_COMBAT_DIAGNOSTICS</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
@@ -70,6 +72,12 @@
     <Error
       Condition="'$(GameDir)' == '' or !Exists('$(GameDir)')"
       Text="Set -p:GameDir=&quot;...\Lost Castle 2&quot; or the LC2_GAME_DIR environment variable." />
+  </Target>
+
+  <Target Name="ValidateCombatDiagnostics" BeforeTargets="CoreCompile">
+    <Error
+      Condition="'$(CombatDiagnostics)' != 'true' and '$(CombatDiagnostics)' != 'false'"
+      Text="Set CombatDiagnostics to exactly true or false." />
   </Target>
 
 </Project>

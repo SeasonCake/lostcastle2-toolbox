@@ -16,6 +16,7 @@ from toolbox.mod_manager import (
     ModManagerError,
     ModSourceRequired,
 )
+from toolbox.mod_inspector import _bepin_plugin_metadata
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -344,10 +345,10 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 59)
+        self.assertEqual(len(catalog.entries), 60)
         self.assertEqual(
             sum(len(descriptor.operation.files) for descriptor in catalog.entries),
-            60,
+            61,
         )
         self.assertEqual(
             sum(
@@ -355,7 +356,7 @@ class ModManagerTests(unittest.TestCase):
                 for descriptor in catalog.entries
                 for spec in descriptor.operation.files
             ),
-            3_619_277,
+            3_665_869,
         )
         self.assertTrue(
             all(
@@ -365,7 +366,7 @@ class ModManagerTests(unittest.TestCase):
             )
         )
         self.assertIn(
-            "Count -ne 60",
+            "Count -ne 61",
             (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8"),
         )
         self.require_local_community_payloads()
@@ -398,6 +399,8 @@ class ModManagerTests(unittest.TestCase):
         self.require_local_community_payloads()
         catalog = ModCatalog.from_file(catalog_path)
         for mod_id in (
+            "enhancement-plan",
+            "lightning-enhance-plate",
             "monster-treasure",
             "nightfall-bow-boost",
             "reinforce-hideyoshi",
@@ -436,6 +439,67 @@ class ModManagerTests(unittest.TestCase):
                 with self.assertRaises(ModIntegrityError):
                     manager.install(mod_id)
 
+    def test_community_plugin_guids_are_present_unique_and_refreshed(self) -> None:
+        self.require_local_community_payloads()
+        catalog = ModCatalog.from_file(
+            PROJECT_ROOT / "assets" / "community_mod_catalog.json"
+        )
+        metadata_by_id: dict[str, tuple[str, str, str]] = {}
+        ids_by_guid: dict[str, list[str]] = {}
+        for descriptor in catalog.entries:
+            filename = descriptor.operation.expected_filename
+            self.assertTrue(filename.lower().endswith(".dll"), descriptor.mod_id)
+            assert descriptor.operation.bundle_dir is not None
+            payload = (
+                PROJECT_ROOT
+                / "third_party"
+                / descriptor.operation.bundle_dir
+                / filename
+            )
+            metadata = _bepin_plugin_metadata(payload.read_bytes())
+            self.assertIsNotNone(metadata, descriptor.mod_id)
+            assert metadata is not None
+            metadata_by_id[descriptor.mod_id] = metadata
+            ids_by_guid.setdefault(metadata[0].casefold(), []).append(descriptor.mod_id)
+
+        self.assertEqual(len(metadata_by_id), 60)
+        self.assertEqual(
+            {guid: ids for guid, ids in ids_by_guid.items() if len(ids) > 1},
+            {},
+        )
+        self.assertEqual(
+            metadata_by_id["enhancement-plan"],
+            ("local.lc2.enhancementplan", "LC2 增强计划", "5.0.0"),
+        )
+        self.assertEqual(
+            metadata_by_id["lightning-enhance-plate"],
+            (
+                "local.lc2.lightningenhanceplatev1.0.1",
+                "LC2LightningEnhancePlatev1.0.1",
+                "1.0.1",
+            ),
+        )
+        self.assertEqual(
+            metadata_by_id["monster-treasure"][0],
+            "local.lc2.monsterplusmod",
+        )
+        self.assertEqual(
+            metadata_by_id["reaper-summon"][0],
+            "local.lc2.reaper",
+        )
+        self.assertEqual(
+            metadata_by_id["thunder-hammer-summon"],
+            (
+                "local.lc2.phantomlantern028",
+                "雷神之锤-愤怒雷精灵",
+                "1.5.1",
+            ),
+        )
+        self.assertEqual(
+            metadata_by_id["bobo-staff"],
+            ("local.lc2.summoncombo", "终始之视·召唤啵啵", "1.9.6"),
+        )
+
     def test_latest_mod_family_versions_and_new_payload_identities_are_frozen(self) -> None:
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
@@ -446,7 +510,21 @@ class ModManagerTests(unittest.TestCase):
 
         self.assertEqual(loot.display.version, "2.5.3")
         self.assertEqual(loot.display.author, "茶橘柚、空容、刺心")
-        self.assertEqual(catalog.get("enhancement-plan").display.author, "茶橘柚、空容、刺心")
+        enhancement = catalog.get("enhancement-plan")
+        self.assertEqual(enhancement.display.version, "5.0.0")
+        self.assertEqual(enhancement.display.author, "茶橘柚、空容、刺心、木亦")
+        self.assertEqual(
+            enhancement.operation.expected_filename,
+            "LC2EnhancementPlan_v5.0.0.dll",
+        )
+        self.assertEqual(enhancement.operation.hotkeys, ("F3", "Shift+Q"))
+        self.assertEqual(enhancement.operation.panel_hotkey, "F3")
+        self.assertIn("Shift+Q", enhancement.display.usage_hint)
+        self.assertEqual(
+            enhancement.integrity_policy.sha256,
+            "0B4CEC387EA2634AA8F96E78CDD5E214B5A00629F81CB4181F5B2C67AEEA5899",
+        )
+        self.assertEqual(enhancement.integrity_policy.size_bytes, 331_264)
         self.assertEqual(catalog.get("dynamic-hp").display.author, "刺心")
         self.assertEqual(catalog.get("demon-invasion").display.author, "墨河以轩")
         self.assertEqual(staff.display.version, "1.5")
@@ -572,19 +650,20 @@ class ModManagerTests(unittest.TestCase):
 
         monster = catalog.get("monster-treasure")
         self.assertEqual(monster.display.name, "怪物宝藏")
-        self.assertEqual(monster.display.version, "11.6")
+        self.assertEqual(monster.display.version, "11.7")
         self.assertEqual(monster.display.author, "懒虫桑")
-        self.assertEqual(monster.operation.expected_filename, "怪物宝藏v11.6.dll")
+        self.assertEqual(monster.operation.expected_filename, "怪物v11.7.dll")
         self.assertEqual(monster.operation.hotkeys, ("Alt+F",))
         self.assertEqual(monster.operation.panel_hotkey, "ALT+F")
         self.assertIn("尚未实战验证", monster.display.usage_hint)
         self.assertEqual(
             monster.integrity_policy.sha256,
-            "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
+            "EBCA68273D10C3385C5B4EFE351CB94E1836F6B5465195FA176FC83D6D31F1D9",
         )
-        self.assertEqual(monster.integrity_policy.size_bytes, 107_008)
+        self.assertEqual(monster.integrity_policy.size_bytes, 107_520)
         self.assertTrue(
             {
+                "怪物v11.7.dll",
                 "怪物宝藏v11.6.dll",
                 "怪物宝藏v11.dll",
                 "怪物宝藏v10.7.dll",
@@ -626,13 +705,14 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(reinforce.integrity_policy.size_bytes, 23_552)
 
         reaper = catalog.get("reaper-summon")
-        self.assertEqual(reaper.display.version, "2.5")
+        self.assertEqual(reaper.display.version, "2.6")
         self.assertIn("蓄力攻击红圈", reaper.display.summary)
+        self.assertIn("修复行刑者导致游戏卡顿", reaper.display.usage_hint)
         self.assertEqual(
             reaper.integrity_policy.sha256,
-            "E750A179AFFB0E111BD3B3C7EF691D9EC33BC2E06C6F515BAF0DF8DF09566A1C",
+            "E4E1A0A95EDB423B16D4E7B855658BF48CA11CC325C1D91287A91129B971DAB9",
         )
-        self.assertEqual(reaper.integrity_policy.size_bytes, 29_184)
+        self.assertEqual(reaper.integrity_policy.size_bytes, 32_768)
 
         coil = catalog.get("coil-summon-bobo")
         self.assertEqual(coil.display.version, "1.0.0")
@@ -644,22 +724,44 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(coil.integrity_policy.size_bytes, 12_800)
 
         thunder = catalog.get("thunder-hammer-summon")
-        self.assertEqual(thunder.display.version, "1.5.0")
+        self.assertEqual(thunder.display.version, "1.5.1")
         self.assertEqual(thunder.display.author, "兔子王お")
         self.assertEqual(
+            thunder.operation.expected_filename,
+            "LC2.ThunderHammer真·雷神之锤.dll",
+        )
+        self.assertEqual(
             thunder.integrity_policy.sha256,
-            "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
+            "9A4DA44DA2B97E96FD6662F8230934BE62C4AA3ED70181ED47613F57D335181A",
         )
         self.assertEqual(thunder.integrity_policy.size_bytes, 31_744)
 
         bobo_staff = catalog.get("bobo-staff")
-        self.assertEqual(bobo_staff.display.version, "1.9.2")
+        self.assertEqual(bobo_staff.display.version, "1.9.6")
         self.assertEqual(bobo_staff.display.author, "啊 这")
+        self.assertEqual(bobo_staff.operation.expected_filename, "ComboContract.dll")
         self.assertEqual(
             bobo_staff.integrity_policy.sha256,
-            "D916BA3AC999B1BEE4249184159729B7D860413B031CFBEF49D6A1085E7036C7",
+            "ACC96A4EF24C6B8E4FB56F51163CC07FD8DB736C957EF2DE6ED3502C6DDE9C85",
         )
-        self.assertEqual(bobo_staff.integrity_policy.size_bytes, 27_648)
+        self.assertEqual(bobo_staff.integrity_policy.size_bytes, 31_744)
+
+        lightning = catalog.get("lightning-enhance-plate")
+        self.assertEqual(lightning.display.name, "雷击与轰雷强化")
+        self.assertEqual(lightning.display.version, "1.0.1")
+        self.assertEqual(lightning.display.author, "脆毛肚")
+        self.assertEqual(
+            lightning.operation.expected_filename,
+            "LC2LightningEnhancePlatev1.0.1.dll",
+        )
+        self.assertEqual(lightning.operation.hotkeys, ())
+        self.assertIsNone(lightning.operation.panel_hotkey)
+        self.assertIn("仅客机安装时不生效", lightning.display.usage_hint)
+        self.assertEqual(
+            lightning.integrity_policy.sha256,
+            "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
+        )
+        self.assertEqual(lightning.integrity_policy.size_bytes, 35_328)
 
         unchanged_summon_payloads = {
             "evil-fire-crusher-summon": (
@@ -677,6 +779,10 @@ class ModManagerTests(unittest.TestCase):
             "hand-color-white": (
                 "2.0",
                 "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
+            ),
+            "coil-summon-bobo": (
+                "1.0.0",
+                "E39B6ADA289999DE721B6AAE84BF4EF8BFC123758A959848810FAE2F89C70AC2",
             ),
             "summon-model-swap": (
                 "2.0",
@@ -696,7 +802,7 @@ class ModManagerTests(unittest.TestCase):
                 self.assertEqual(descriptor.integrity_policy.sha256, sha256)
                 self.assertEqual(
                     source_entries[mod_id]["source"],
-                    "召唤大师珀亚V2.5 非整合包.rar",
+                    "召唤大师珀亚V2.6 非整合包.rar",
                 )
 
     def test_community_catalog_prioritizes_practical_mods_over_cosmetics(self) -> None:

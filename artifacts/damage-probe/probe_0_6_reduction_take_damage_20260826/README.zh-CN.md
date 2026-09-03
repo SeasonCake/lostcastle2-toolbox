@@ -14,15 +14,15 @@
 - 最终日志：`probe_0.6.0_reduction_20260826-231310_final.log`
   - 大小：`39,693` 字节。
   - SHA-256：`A6A1E0C37ACFE48FB8A42933FAC0299D595681F908B153BA6B1510CF1FAD3718`。
-- 减伤 `5%` 截图：`codex-clipboard-d9b0264d-b25c-4723-a87b-16f65cbf3919.png`
+- 减伤 `5%` 截图：`<local-screenshot>`
   - SHA-256：`7D2B337181FE42B8FA3239C4CC1CCAC43FF8D69E3A22B3B846E6627118D9B7E0`。
-- 炼金护符固定减伤截图：`codex-clipboard-fba62064-a214-4833-a9a2-d773c8e93517.png`
+- 炼金护符固定减伤截图：`<local-screenshot>`
   - SHA-256：`25FEEBB9A73C1735502022B009B464AD6A6C1347DAAACEE1FF90DAA50FE7E445`。
-- 防御配置截图：`codex-clipboard-2b6bd6a0-4e64-433a-94de-299745f28ecf.png`
+- 防御配置截图：`<local-screenshot>`
   - SHA-256：`FB8E1E907DD00D6D6FBD67F4E43F1029BA2D18A36748711C60C4F194892860E3`。
-- 角色面板截图：`codex-clipboard-fcf08520-855c-49d8-aea9-83ba18edab57.png`
+- 角色面板截图：`<local-screenshot>`
   - SHA-256：`5CB0D36B4060A8468159BF0B3D8D6E9258B1B55448EA43B451A44E26CA176DC5`。
-- 结算截图：`codex-clipboard-b358aa4a-fa9c-47f1-ba85-c1626d6607ce.png`
+- 结算截图：`<local-screenshot>`
   - SHA-256：`B9D4243389B4E02C9CDCEF2E5DB91E019FB95361C239B68FBA3A9541D670ED97`。
 - 探针：`LC2DamageProbe 0.6.0`，SHA-256 `58B26D29CE0FC28AFEDFCC774386B30DDA1D034D8C48D79E36B17E761D694516`。
 - 冻结时游戏和工具均已退出，日志为 final；7 个观察目标加载成功，没有 probe error、HP 栈错误、Harmony 异常或 BepInEx 错误。

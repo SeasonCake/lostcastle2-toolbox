@@ -1,0 +1,79 @@
+{
+  "schema_version": 2,
+  "entries": [
+    {
+      "id": "soul-stone-trainer",
+      "display": {
+        "name": "灵魂石修改器",
+        "version": "1.2",
+        "author": "恨你不见",
+        "summary": "生成和管理灵魂石"
+      },
+      "operation": {
+        "kind": "external_trainer",
+        "expected_filename": "LostCastle2SoulStoneTrainer v1.2.exe",
+        "bundled": false
+      },
+      "integrity_policy": {
+        "version_note": "文件/标题 1.2；内嵌核心 v5.0；以 SHA-256 识别",
+        "author_source": "程序内标题与用户提供信息",
+        "author_channel": "bilibili / QQ 昵称",
+        "sha256": "025FB6CD01E79F9F2D8018BA9BF4FF592DE43EF2A7EDFD2E7A22F3C1842DF645",
+        "size_bytes": 72428059,
+        "signature_status": "unsigned",
+        "risk_level": "high",
+        "capabilities": [
+          "Frida IL2CPP 注入",
+          "灵魂石与成就写入",
+          "游戏资源替换"
+        ],
+        "redistribution_status": "public_core_user_supplied_required",
+        "source_redistribution_status": "author_approved_for_free_bundle_via_maintainer_2026-08-27"
+      }
+    },
+    {
+      "id": "gold-editor-f5",
+      "display": {
+        "name": "金币编辑器",
+        "version": "1.0",
+        "author": "刺心",
+        "summary": "在游戏内读取、修改并保存金币",
+        "usage_hint": "安装后启动游戏，按 F5 打开窗口；输入数量并保存，返回主菜单再进入游戏生效。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2GoldFree.dll",
+        "bundled": false,
+        "provides": [
+          "lc2goldfree.dll"
+        ],
+        "hotkeys": [
+          "F5"
+        ],
+        "panel_hotkey": "F5",
+        "archive_source": {
+          "expected_filename": "F5金币编辑器.7z",
+          "member": "LC2GoldFree.dll",
+          "sha256": "7DFB39A521C1135584D9D88FC6138CFA0F8AF017F952924C141F189EDA7A294B",
+          "size_bytes": 4136
+        }
+      },
+      "integrity_policy": {
+        "version_note": "程序集与内嵌标题 1.0；以 SHA-256 识别",
+        "author_source": "DLL 内嵌窗口标题与加载日志",
+        "author_channel": "程序集元数据",
+        "sha256": "BB6FF96AA4AF9BB3521ED93C3A5582E48D5D9CB8C7BAAF5291FA4C3E57647B56",
+        "size_bytes": 9216,
+        "signature_status": "unsigned",
+        "risk_level": "medium",
+        "capabilities": [
+          "BepInEx IL2CPP 插件",
+          "金币读取与写入",
+          "游戏存档保存"
+        ],
+        "redistribution_status": "public_core_user_supplied_required",
+        "source_redistribution_status": "maintainer_selected_for_local_bundle_2026-08-28"
+      }
+    }
+  ]
+}

@@ -48,37 +48,38 @@
       "id": "enhancement-plan",
       "display": {
         "name": "LC2 增强计划",
-        "version": "4.8",
-        "author": "茶橘柚、空容、刺心",
+        "version": "5.0.0",
+        "author": "茶橘柚、空容、刺心、木亦",
         "summary": "提供多项战斗、掉落与便利功能调节",
-        "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，首次启动会生成默认配置。"
+        "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 F3 或 Shift+Q，首次启动会生成默认配置。F3 与动态血量等 MOD 冲突时可改用 Shift+Q。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "LC2EnhancementPlan_v4.8.dll",
+        "expected_filename": "LC2EnhancementPlan_v5.0.0.dll",
         "bundled": true,
         "bundle_dir": "community_mods/enhancement-plan",
         "files": [
           {
-            "path": "LC2EnhancementPlan_v4.8.dll",
-            "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
-            "size_bytes": 328192
+            "path": "LC2EnhancementPlan_v5.0.0.dll",
+            "sha256": "0B4CEC387EA2634AA8F96E78CDD5E214B5A00629F81CB4181F5B2C67AEEA5899",
+            "size_bytes": 331264
           }
         ],
         "provides": [
-          "lc2enhancementplan_v4.8.dll"
+          "lc2enhancementplan_v5.0.0.dll"
         ],
         "hotkeys": [
-          "INS"
+          "F3",
+          "Shift+Q"
         ],
-        "panel_hotkey": "INS"
+        "panel_hotkey": "F3"
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 4.8",
-        "author_source": "DLL 内嵌作者团队署名；QQ 上传者時間與你",
+        "version_note": "curated community bundle 5.0.0",
+        "author_source": "5.0.0 DLL 内嵌作者团队署名“茶橘柚、空容、刺心、木亦”与 F3/Shift+Q 面板提示",
         "author_channel": "local community package",
-        "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
-        "size_bytes": 328192,
+        "sha256": "0B4CEC387EA2634AA8F96E78CDD5E214B5A00629F81CB4181F5B2C67AEEA5899",
+        "size_bytes": 331264,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -293,6 +294,46 @@
       }
     },
     {
+      "id": "lightning-enhance-plate",
+      "display": {
+        "name": "雷击与轰雷强化",
+        "version": "1.0.1",
+        "author": "脆毛肚",
+        "summary": "强化雷击与轰雷前后期联动，并为三件雷击宝藏追加可叠加成长效果",
+        "usage_hint": "安装后重启游戏自动生效；适用于单人、联机房主或房主与客机共同安装的房间，仅客机安装时不生效。属于玩法数值修改，联机建议使用一致版本。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2LightningEnhancePlatev1.0.1.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/lightning-enhance-plate",
+        "files": [
+          {
+            "path": "LC2LightningEnhancePlatev1.0.1.dll",
+            "sha256": "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
+            "size_bytes": 35328
+          }
+        ],
+        "provides": [
+          "lc2lightningenhanceplatev1.0.1.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.1",
+        "author_source": "BepInPlugin 1.0.1元数据；随包说明以群内ID“脆毛肚”作为制作反馈联系人，群文件上传者同名",
+        "author_channel": "local community package",
+        "sha256": "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
+        "size_bytes": 35328,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
+      }
+    },
+    {
       "id": "dynamic-hp",
       "display": {
         "name": "关卡动态血量",
@@ -339,24 +380,25 @@
       "id": "monster-treasure",
       "display": {
         "name": "怪物宝藏",
-        "version": "11.6",
+        "version": "11.7",
         "author": "懒虫桑",
         "summary": "按区域为敌对生物添加宝藏、冰属性与光环效果，并提供 Boss 范围和保存设置",
-        "usage_hint": "安装后重启游戏，按 Alt+F 或在工具箱点击“打开 MOD 面板”；玩法逻辑仅由房主/单机启用，客机只查看面板。11.6 修复火环零血力竭、关闭残留和补发 Buff 等问题，但本工具箱尚未实战验证；与动态血量、增强计划等建议分开使用。"
+        "usage_hint": "安装后重启游戏，按 Alt+F 或在工具箱点击“打开 MOD 面板”；玩法逻辑仅由房主/单机启用，客机只查看面板。11.7 限制伤害类宝藏最多把玩家打到1血，并再次修复反复倒地问题；本工具箱尚未实战验证，与动态血量、增强计划等建议分开使用。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "怪物宝藏v11.6.dll",
+        "expected_filename": "怪物v11.7.dll",
         "bundled": true,
         "bundle_dir": "community_mods/monster-treasure",
         "files": [
           {
-            "path": "怪物宝藏v11.6.dll",
-            "sha256": "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
-            "size_bytes": 107008
+            "path": "怪物v11.7.dll",
+            "sha256": "EBCA68273D10C3385C5B4EFE351CB94E1836F6B5465195FA176FC83D6D31F1D9",
+            "size_bytes": 107520
           }
         ],
         "provides": [
+          "怪物v11.7.dll",
           "怪物宝藏v11.6.dll",
           "怪物宝藏v11.dll",
           "怪物宝藏v10.7.dll",
@@ -369,11 +411,11 @@
         "panel_hotkey": "Alt+F"
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 11.6",
-        "author_source": "11.6 DLL 内嵌“作者 懒虫桑”；随包 9.2 更新说明与用户提供来源记录",
+        "version_note": "curated community bundle 11.7",
+        "author_source": "11.7 DLL 内嵌“作者 懒虫桑”；随包 v11.7/9.2 更新说明与用户提供来源记录",
         "author_channel": "local community package",
-        "sha256": "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
-        "size_bytes": 107008,
+        "sha256": "EBCA68273D10C3385C5B4EFE351CB94E1836F6B5465195FA176FC83D6D31F1D9",
+        "size_bytes": 107520,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -727,20 +769,20 @@
       "id": "thunder-hammer-summon",
       "display": {
         "name": "雷神之锤召唤愤怒雷精灵",
-        "version": "1.5.0",
+        "version": "1.5.1",
         "author": "兔子王お",
         "summary": "雷神之锤技能召唤愤怒雷精灵，并提供伤害、行动与水晶清理设置",
-        "usage_hint": "安装后重启游戏自动生效；2.5 修复雷精灵入场阶段行动。仅主机/单机执行召唤，联机建议使用一致版本。"
+        "usage_hint": "安装后重启游戏自动生效；2.6来源更新为1.5.1，继续维护雷精灵入场阶段的玩家输入与友方行动。仅主机/单机执行召唤，联机建议使用一致版本。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "LC2.ThunderHammer真雷神之锤.dll",
+        "expected_filename": "LC2.ThunderHammer真·雷神之锤.dll",
         "bundled": true,
         "bundle_dir": "community_mods/thunder-hammer-summon",
         "files": [
           {
-            "path": "LC2.ThunderHammer真雷神之锤.dll",
-            "sha256": "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
+            "path": "LC2.ThunderHammer真·雷神之锤.dll",
+            "sha256": "9A4DA44DA2B97E96FD6662F8230934BE62C4AA3ED70181ED47613F57D335181A",
             "size_bytes": 31744
           }
         ],
@@ -751,10 +793,10 @@
         "hotkeys": []
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 1.5.0",
-        "author_source": "BepInPlugin 1.5.0 元数据；召唤大师珀亚 2.5 来源包与说明",
+        "version_note": "curated community bundle 1.5.1",
+        "author_source": "BepInPlugin 1.5.1 元数据；召唤大师珀亚 2.6 来源包与说明",
         "author_channel": "local community package",
-        "sha256": "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
+        "sha256": "9A4DA44DA2B97E96FD6662F8230934BE62C4AA3ED70181ED47613F57D335181A",
         "size_bytes": 31744,
         "signature_status": "not_assessed",
         "risk_level": "high",
@@ -832,7 +874,7 @@
       },
       "integrity_policy": {
         "version_note": "curated community bundle 1.0.0",
-        "author_source": "BepInPlugin 元数据；召唤大师珀亚 2.5 来源包与既有上传来源",
+        "author_source": "BepInPlugin 元数据；召唤大师珀亚 2.6 来源包与既有上传来源；相对2.5载荷逐字节相同",
         "author_channel": "local community package",
         "sha256": "E39B6ADA289999DE721B6AAE84BF4EF8BFC123758A959848810FAE2F89C70AC2",
         "size_bytes": 12800,
@@ -848,7 +890,7 @@
       "id": "bobo-staff",
       "display": {
         "name": "啵啵法杖",
-        "version": "1.9.2",
+        "version": "1.9.6",
         "author": "啊 这",
         "summary": "把终始之视改为可召唤啵啵的法杖，并提供冷却、耗蓝、上限与攻击加成配置",
         "usage_hint": "安装后重启游戏自动生效；默认匹配终始之视（Staff_015），会替换技能和显示名。属于玩法修改，联机建议使用一致版本。"
@@ -861,8 +903,8 @@
         "files": [
           {
             "path": "ComboContract.dll",
-            "sha256": "D916BA3AC999B1BEE4249184159729B7D860413B031CFBEF49D6A1085E7036C7",
-            "size_bytes": 27648
+            "sha256": "ACC96A4EF24C6B8E4FB56F51163CC07FD8DB736C957EF2DE6ED3502C6DDE9C85",
+            "size_bytes": 31744
           }
         ],
         "provides": [
@@ -871,11 +913,11 @@
         "hotkeys": []
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 1.9.2",
-        "author_source": "BepInPlugin 1.9.2 元数据；用户确认作者 QQ 昵称为“啊 这”（2026-09-02）",
+        "version_note": "curated community bundle 1.9.6",
+        "author_source": "BepInPlugin 1.9.6 元数据；用户确认作者 QQ 昵称为“啊 这”（2026-09-02）",
         "author_channel": "local community package",
-        "sha256": "D916BA3AC999B1BEE4249184159729B7D860413B031CFBEF49D6A1085E7036C7",
-        "size_bytes": 27648,
+        "sha256": "ACC96A4EF24C6B8E4FB56F51163CC07FD8DB736C957EF2DE6ED3502C6DDE9C85",
+        "size_bytes": 31744,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1451,10 +1493,10 @@
       "id": "reaper-summon",
       "display": {
         "name": "召唤行刑者",
-        "version": "2.5",
+        "version": "2.6",
         "author": "兔子王お",
         "summary": "让游荡异灵契约连协召唤行刑者，过图后重召并可隐藏蓄力攻击红圈",
-        "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效；2.5 增加友方保护、随从拦截与蓄力红圈隐藏等配置。仅主机/单机执行召唤，联机建议使用一致版本。"
+        "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效；2.6 延续友方保护、随从拦截与蓄力红圈配置，并修复行刑者导致游戏卡顿。仅主机/单机执行召唤，联机建议使用一致版本。"
       },
       "operation": {
         "kind": "bepinex_plugin",
@@ -1464,8 +1506,8 @@
         "files": [
           {
             "path": "LC2.ReaperSummon召唤行刑者.dll",
-            "sha256": "E750A179AFFB0E111BD3B3C7EF691D9EC33BC2E06C6F515BAF0DF8DF09566A1C",
-            "size_bytes": 29184
+            "sha256": "E4E1A0A95EDB423B16D4E7B855658BF48CA11CC325C1D91287A91129B971DAB9",
+            "size_bytes": 32768
           }
         ],
         "provides": [
@@ -1474,11 +1516,11 @@
         "hotkeys": []
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 2.5",
-        "author_source": "作者提供的 QQ 上传列表截图；召唤大师珀亚 2.5 来源包与说明（2026-09-02）",
+        "version_note": "curated community bundle 2.6",
+        "author_source": "作者提供的 QQ 上传列表截图；召唤大师珀亚 2.6 来源包与说明（2026-09-02）",
         "author_channel": "local community package",
-        "sha256": "E750A179AFFB0E111BD3B3C7EF691D9EC33BC2E06C6F515BAF0DF8DF09566A1C",
-        "size_bytes": 29184,
+        "sha256": "E4E1A0A95EDB423B16D4E7B855658BF48CA11CC325C1D91287A91129B971DAB9",
+        "size_bytes": 32768,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [

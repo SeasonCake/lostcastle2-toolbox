@@ -6,7 +6,7 @@
 - 不修改游戏参数、返回值、存档、网络状态或战斗逻辑。
 - 事件仅通过本机命名管道 `LostCastle2Toolbox.Combat.v2` 发送，不写战斗事件文件。
 - 不采集昵称、Steam ID、平台账号、网络地址或聊天内容；实体编号仅作为本轮进程内的临时命中关联值。
-- 队列、单行和事件字段均有上限。单个快照、转换或checkpoint失败会把本轮标为“实时 · 有事件跳过”并继续；只有队列溢出仍fail closed。伤害嵌套栈错序只影响parent/depth诊断，不丢伤害事件，改为计数日志且不再把HUD标黄。
+- 队列、单行和事件字段均有上限。单个快照、转换或checkpoint失败会把本轮标为可恢复的“有事件跳过”并继续；详细页只在当前区与下一区显示，Mini HUD 不显示。只有队列溢出仍fail closed。伤害嵌套栈错序只影响parent/depth诊断，不丢伤害事件，改为计数日志且不再把HUD标黄。
 - 已安装/已发布的 `0.4.5` 保留由实战闭合的伤害、承伤、HP 恢复、房间位置与 14 个既有 Hook。玩家承伤与 HP/MP 资源观察只接收本地玩家根实体，队友只参与匿名伤害归属；20%/40%/65% 官方生命锁定产生的非受击负 HP 变化使用既有 `resource_operation=loss`，不进入“受击承伤”或“回复”。65% 锁血已完成 `49/140` 实机正控。法力按原始浮点变化累计并只在 UI 边界取整；恢复同时采用根操作对账和连续观测基线，并扣除同操作官方已覆盖量，覆盖官方恢复、闪避回蓝、同操作先扣后回以及两次技能之间的自然回蓝。普通太刀实测已得到法力消耗/恢复 `762/763`，HUD 保持实时。
 - 已实测的 `0.4.6` 不增加 Hook 或道具特判。它修正零请求/零净变化的 MP 观察把已经识别的 fallback 恢复提前丢弃的问题；普通回蓝、怀表回满、魔晶石容量增加与分解负控已闭合。HP 仍按实际正向变化累计。
 - `0.4.7` 实战确认 RoundStart prefix 仍晚于回营补满；官方承伤 `121` 与实际 HP 变化/恢复 `119` 已闭合为逐击入整与真实浮点变化的双口径，不改聚合公式。
@@ -35,7 +35,8 @@
 - 0.4.25在真实运行前被阶段复审撤回：去重发生在完整重读取之后，普通样本cap会同时吞掉force边界，checker还提前假定dict必须等于cache-list及`active+dict`必须转场守恒。installed已回滚0.4.24。0.4.26把200ms单调时钟限频放在任何PlayerList/dict/network/cache读取之前，首个攻击与所有force边界旁路；普通额度不再影响边界，并记录suppressed/throttled计数。dict/cache与rollover只做关系分类，真实样本冻结前不因差异判FAIL；unmatched/collision使用每进程加盐HMAC opaque token辅助本地复核，不输出raw key、身份或pointer。
 - r19 四真人短局得到479个完整样本：`mCacheRoundDataDict`始终0 records；Statistics active在同房恒定，cache-list进房归零并按玩家实时单调增长。队友-only房本机slot3始终0，本机攻击房分别增加1,139/2,199；最后`active+cache=[45,888,35,652,41,555,3,338]`，精确等于OWNER远端123,095加本机3,338。Boss全0、NPC未覆盖；严格checker因此只签普通伤害raw realtime，rollover因旧版本没有真正room_exit force样本保持NOT_RUN。
 - 同局先离队再退出时，官方卡仍为本机3,338，但HUD跳45,888。冻结事件证明45,888精确来自旧P1，不是三队友求和：同session内LocalPlayer native token和Index从P4变P1，Bridge先按旧slot0取live，再创建`player-5`并覆盖身份，导致collision。0.4.27采用`active + cache-list`发布过程值；同session按平台HMAC或仍有效的旧token复用`player_id`，live按历史身份取值而可见`player_slot`采用当前Index，所以期望离队事件为`player-4/slot0/live=3338`。身份缺失/碰撞整组拒绝；现有OnChangeRoomEnd target同时增加Prefix房末强制样本，不新增Hook。
-- Bridge 1.7.0 沿用已经过真实多人局核对的Statistics过程值和SyncEnd官方final逻辑；工具箱 1.7.1 只做 Release 构建隐私重编译，禁用会嵌入本机 PDB 绝对路径的调试目录，插件版本、公开 API、资源和 IL 方法体不变。`ReleaseDiagnosticsEnabled=false`，不会安装额外settlement network验收probe，也不会写高频逐事件、cache或终局采样Info日志；保留插件版本、启动/连接、transport reset、queue overflow与session/schema failure等低频支持信号。诊断开关不改变pipe数值路径，也不修改游戏对象。
+- Bridge 1.7.0 是 v1.7.1 已发布并冻结的隐私重编译版本。工具箱1.7.2 r2/r3依次提升到1.7.1/1.7.2并引入互斥诊断档与Statistics本地终局候选。r4真实单人结算证明`StatisticsMgr.OnGameSettlementSyncEnd`仍不执行，同时确认进程重启续玩时首个完整live向量非零会被旧基线门永久拒绝。r5 Bridge 1.7.3只允许“本游戏进程的首个session”接收完整非零live种子，后续同进程新局仍要求零基线；桌面把首样本仅作DPS基线。单人终局改由`GameSettlementUI.SetSettlementData`/`UpdateSettlementInfo`及offline-end兜底触发。真实主动结束样本证明UI入口会执行，但当时最终save-list尚未物化，r5没有读取UI正在显示的record，因而没有official或`session_ended`。
+- Bridge 1.7.4只在最终record读取`AdventureRecordPlayerData.mTakeDamageValue`并发布`official_taken_damage`；历史证据没有证明active+cache承伤可安全逐房相加，所以局中承伤继续使用已验证的玩家根逐击口径。`UpdateSettlementInfo`显式record以及同一调用链的`GameSettlementUI._selfPlayerData`必须通过单人本机身份、slot、非负值和Boss≤Damage门，才被冻结为Damage/Boss/Taken三项最终值；较早的`GameOverEnd_Offline`只记录入口，不读取可能为空或陈旧的record。可信单人结算UI即使record仍不可用，也保留最后live值并发送`session_ended`，不得遗留phantom session或冒充官方。`CombatDiagnostics=true`打开既有逐击、cache与终局采样日志，`false`只保留低频支持信号；两档数值路径相同，均不修改游戏对象，档位标记不一致时拒绝启动。
 - 多人只向桌面发送会话内匿名`player-N`、槽位、本机标记和通过完整门的官方数值，不发送昵称、Steam ID、平台账号或原始身份。本机严格比较`LocalPlayer`对象，不假设1P/房主或slot0。真实0.4.17变身fallback与最终SyncEnd仍未运行。
 
 构建需要 .NET 6 SDK、BepInEx 6 和当前游戏生成的 interop 程序集：

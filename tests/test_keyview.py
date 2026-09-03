@@ -18,15 +18,80 @@ import keyview
 
 
 class KeyViewTests(unittest.TestCase):
-    def test_release_runtime_keeps_combat_data_in_memory_only(self) -> None:
+    def test_build_profiles_are_explicit_and_fail_closed(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        diagnostic = keyview.load_build_profile(project_root, packaged=False)
+        self.assertEqual(diagnostic.profile_id, "diagnostic")
+        self.assertTrue(diagnostic.combat_diagnostics_available)
+        self.assertTrue(diagnostic.bridge_diagnostics_enabled)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            resource_root = Path(temp_dir)
+            assets = resource_root / "assets"
+            assets.mkdir()
+            distribution_source = (
+                project_root
+                / "assets"
+                / "build_profiles"
+                / "distribution"
+                / "build_profile.json"
+            )
+            (assets / "build_profile.json").write_text(
+                distribution_source.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            distribution = keyview.load_build_profile(resource_root, packaged=True)
+            self.assertEqual(distribution.profile_id, "distribution")
+            self.assertFalse(distribution.combat_diagnostics_available)
+
+            manifest_path = assets / "lc2_runtime_manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "build_profile": "distribution",
+                        "bridge": {"diagnostics_enabled": False},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            keyview.validate_packaged_build_profile(
+                distribution,
+                manifest_path,
+                packaged=True,
+            )
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "build_profile": "distribution",
+                        "bridge": {"diagnostics_enabled": True},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(keyview.BuildProfileError):
+                keyview.validate_packaged_build_profile(
+                    distribution,
+                    manifest_path,
+                    packaged=True,
+                )
+            (assets / "build_profile.json").unlink()
+            with self.assertRaises(keyview.BuildProfileError):
+                keyview.load_build_profile(resource_root, packaged=True)
+
         main_source = inspect.getsource(keyview.main)
-        self.assertNotIn("CombatMatchArchiver", main_source)
-        self.assertNotIn("event_batch_sink=", main_source)
+        self.assertIn("CombatMatchArchiver", main_source)
+        self.assertIn("event_batch_sink=", main_source)
         build_source = (Path(__file__).resolve().parents[1] / "build.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertNotIn("packageExports", build_source)
-        self.assertNotIn("exports.README", build_source)
+        self.assertIn("[string]$BuildProfile = 'Diagnostic'", build_source)
+        self.assertIn("-p:CombatDiagnostics=$bridgeDiagnostics", build_source)
+        self.assertIn(
+            "verify_packaged_runtime.py --package $packageRoot",
+            build_source,
+        )
+        self.assertIn("失落城堡2工具箱1.7.4-诊断候选-结算与承伤-r6", build_source)
+        self.assertIn("失落城堡2工具箱1.7.4-实时数值监测+一键MOD安装", build_source)
 
     def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:
         root = mock.Mock()
@@ -70,6 +135,32 @@ class KeyViewTests(unittest.TestCase):
             build_source,
         )
         self.assertIn("Packaged license or third-party notices are missing.", build_source)
+
+    def test_group_package_guides_are_user_facing_not_diagnostic_handoffs(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        usage = (project_root / "package_assets" / "使用说明.txt").read_text(
+            encoding="utf-8"
+        )
+        runtime = (
+            project_root / "package_assets" / "运行环境" / "README.txt"
+        ).read_text(encoding="utf-8")
+        notices = (project_root / "THIRD_PARTY_NOTICES.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Mini HUD 局中", usage)
+        self.assertIn("正式分享版不保存逐事件对局明细", usage)
+        self.assertIn("正式分享版不保存逐事件对局明细", runtime)
+        self.assertIn("documented in the repository", notices)
+        for text in (usage, runtime, notices):
+            for internal_term in (
+                "诊断候选",
+                "导出诊断",
+                "128 MiB",
+                "network SyncEnd",
+                "r5 Bridge",
+            ):
+                self.assertNotIn(internal_term, text)
 
     def test_windows_fixed_and_string_versions_match_the_app_version(self) -> None:
         version_source = (
@@ -189,6 +280,8 @@ class KeyViewTests(unittest.TestCase):
         payload = json.loads(output.getvalue())
         self.assertTrue(payload["game_exe_found"])
         self.assertEqual(payload["runtime_bundle"], "verified")
+        self.assertEqual(payload["build_profile"], "diagnostic")
+        self.assertTrue(payload["combat_diagnostics"])
         self.assertNotIn("game_exe", payload)
         self.assertNotIn(str(private_path), output.getvalue())
 
@@ -197,6 +290,24 @@ class KeyViewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             resource_root = Path(temp_dir)
             (resource_root / "assets").mkdir()
+            profile_target = (
+                resource_root
+                / "assets"
+                / "build_profiles"
+                / "diagnostic"
+                / "build_profile.json"
+            )
+            profile_target.parent.mkdir(parents=True)
+            profile_target.write_text(
+                (
+                    project_root
+                    / "assets"
+                    / "build_profiles"
+                    / "diagnostic"
+                    / "build_profile.json"
+                ).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             (resource_root / "assets" / "lc2_runtime_manifest.json").write_text(
                 (project_root / "assets" / "lc2_runtime_manifest.json").read_text(
                     encoding="utf-8"
@@ -211,6 +322,7 @@ class KeyViewTests(unittest.TestCase):
         payload = json.loads(output.getvalue())
         self.assertFalse(payload["game_exe_found"])
         self.assertEqual(payload["runtime_bundle"], "not_present_source_checkout")
+        self.assertEqual(payload["build_profile"], "diagnostic")
 
     def test_window_size_parser_accepts_bounded_qa_geometry(self) -> None:
         self.assertEqual(keyview.parse_window_size("780x560"), (780, 560))

@@ -30,6 +30,7 @@ internal sealed class PartyMemberSnapshot
     public long? LiveBossDamage { get; init; }
     public long? OfficialDamage { get; init; }
     public long? OfficialBossDamage { get; init; }
+    public long? OfficialTakenDamage { get; init; }
 
     public Dictionary<string, object> ToPayload()
     {
@@ -55,6 +56,10 @@ internal sealed class PartyMemberSnapshot
         {
             payload["official_boss_damage"] = OfficialBossDamage.Value;
         }
+        if (OfficialTakenDamage is not null)
+        {
+            payload["official_taken_damage"] = OfficialTakenDamage.Value;
+        }
         return payload;
     }
 
@@ -63,7 +68,8 @@ internal sealed class PartyMemberSnapshot
         $"{(LiveDamage is null ? "null" : LiveDamage.Value)}:" +
         $"{(LiveBossDamage is null ? "null" : LiveBossDamage.Value)}:" +
         $"{(OfficialDamage is null ? "null" : OfficialDamage.Value)}:" +
-        $"{(OfficialBossDamage is null ? "null" : OfficialBossDamage.Value)}";
+        $"{(OfficialBossDamage is null ? "null" : OfficialBossDamage.Value)}:" +
+        $"{(OfficialTakenDamage is null ? "null" : OfficialTakenDamage.Value)}";
 }
 
 internal sealed class CombatPipeServer : IDisposable
@@ -111,6 +117,17 @@ internal sealed class CombatPipeServer : IDisposable
     }
 
     public void Start() => _writerThread.Start();
+
+    public bool IsRoundActive
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _roundActive;
+            }
+        }
+    }
 
     public void BeginGameSession()
     {
@@ -226,6 +243,9 @@ internal sealed class CombatPipeServer : IDisposable
                     : null,
                 OfficialBossDamage = member.OfficialBossDamage is >= 0
                     ? member.OfficialBossDamage
+                    : null,
+                OfficialTakenDamage = member.OfficialTakenDamage is >= 0
+                    ? member.OfficialTakenDamage
                     : null,
             });
         }
