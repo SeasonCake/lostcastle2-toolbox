@@ -60,6 +60,23 @@ from toolbox.macro_model import parse_macro_profile
 
 
 class AppShellModelTests(unittest.TestCase):
+    def test_home_cards_reserve_actions_before_flexible_status_copy(self) -> None:
+        source = inspect.getsource(ToolboxShell._module_card)
+        self.assertLess(
+            source.index('actions.pack(side="right")'),
+            source.index('self.labels[summary_key].pack(side="right"'),
+        )
+        self.assertLess(
+            source.index('self.labels[summary_key].pack(side="right"'),
+            source.index('copy.pack(side="left", fill="x", expand=True)'),
+        )
+        refresh = inspect.getsource(ToolboxShell._refresh_module_statuses)
+        self.assertIn("text=combat_status.label", refresh)
+
+    def test_keyboard_status_uses_actual_mapped_window_state(self) -> None:
+        source = inspect.getsource(ToolboxShell._refresh_module_statuses)
+        self.assertIn("self.keyboard.is_visible_on_desktop()", source)
+
     def test_candidate_diagnostics_controls_are_optional_and_stay_on_detail_page(self) -> None:
         constructor = inspect.getsource(ToolboxShell.__init__)
         header_builder = inspect.getsource(ToolboxShell._build)

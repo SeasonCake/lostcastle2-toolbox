@@ -170,8 +170,10 @@ def parse_macro_profile(data: Mapping[str, Any]) -> MacroProfile:
     steps_data = data.get("steps")
     if not isinstance(steps_data, Sequence) or isinstance(steps_data, (str, bytes)):
         raise MacroProfileError("steps 必须是数组")
-    if not 1 <= len(steps_data) <= MAX_STEPS:
-        raise MacroProfileError(f"steps 数量必须为 1–{MAX_STEPS}")
+    if len(steps_data) > MAX_STEPS:
+        raise MacroProfileError(f"steps 数量不能超过 {MAX_STEPS}")
+    if enabled and not steps_data:
+        raise MacroProfileError("启用的宏至少需要 1 个动作步骤")
     steps: list[MacroStep] = []
     for index, raw_step in enumerate(steps_data):
         step_data = _require_mapping(raw_step, f"steps[{index}]")

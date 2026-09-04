@@ -295,6 +295,15 @@ class ContractTests(unittest.TestCase):
             "steps": [{"type": "key", "key": "J", "action": "tap", "hold_ms": 60}],
         }
         validator.validate(valid_profile)
+        valid_profile["enabled"] = False
+        valid_profile["steps"] = []
+        validator.validate(valid_profile)
+        valid_profile["enabled"] = True
+        with self.assertRaises(ValidationError):
+            validator.validate(valid_profile)
+        valid_profile["steps"] = [
+            {"type": "key", "key": "J", "action": "tap", "hold_ms": 60}
+        ]
         valid_profile["limits"]["foreground_only"] = False
         with self.assertRaises(ValidationError):
             validator.validate(valid_profile)

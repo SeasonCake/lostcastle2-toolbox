@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+import tempfile
+from unittest import mock
 
 from toolbox.macro_engine import MacroState
 from toolbox.macro_ui import (
@@ -11,6 +14,7 @@ from toolbox.macro_ui import (
     milliseconds_from_seconds_text,
     runtime_presentation,
     seconds_text_from_milliseconds,
+    MacroFeature,
 )
 
 
@@ -77,6 +81,75 @@ class MacroRuntimeLimitUiTests(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     milliseconds_from_seconds_text(value)
+
+
+class MacroCreationTests(unittest.TestCase):
+    def test_new_profiles_start_disabled_with_no_example_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            feature = object.__new__(MacroFeature)
+            feature.errors = []
+            feature._dirty = False
+            feature._step_draft_dirty = False
+            feature.window = None
+            feature.profiles = ()
+            feature.config_path = Path(temp_dir) / "macros.json"
+            feature.controller = mock.Mock()
+            feature._refresh_profile_list = mock.Mock()
+            feature._set_status = mock.Mock()
+
+            for mode in ("once", "hold_repeat", "toggle_repeat"):
+                feature._new_profile(mode)
+
+            self.assertEqual(len(feature.profiles), 3)
+            self.assertEqual(len({profile.id for profile in feature.profiles}), 3)
+            for profile in feature.profiles:
+                self.assertFalse(profile.enabled)
+                self.assertEqual(profile.steps, ())
+            stored = feature.config_path.read_text(encoding="utf-8")
+            self.assertNotIn('"key": "J",\n        "action": "tap"', stored)
+            feature.controller.stop_all.assert_called_with("config_changed")
+
+    def test_unapplied_step_draft_is_not_silently_replaced(self) -> None:
+        class FakeTree:
+            def __init__(self) -> None:
+                self.current = ("1",)
+
+            def selection(self) -> tuple[str, ...]:
+                return self.current
+
+            def selection_remove(self, *_items: str) -> None:
+                self.current = ()
+
+            def selection_set(self, item: str) -> None:
+                self.current = (item,)
+
+            def focus(self, _item: str) -> None:
+                return None
+
+        feature = object.__new__(MacroFeature)
+        feature._loading_form = False
+        feature._step_draft_dirty = True
+        feature._loaded_step_index = 0
+        feature._editing_steps = [
+            {"type": "key", "key": "J", "action": "tap", "hold_ms": 50},
+            {"type": "key", "key": "K", "action": "tap", "hold_ms": 50},
+        ]
+        feature.step_tree = FakeTree()
+        feature.window = None
+        feature.vars = {
+            "step_action": mock.Mock(),
+            "step_key": mock.Mock(),
+            "step_ms": mock.Mock(),
+        }
+        feature._sync_step_editor_state = mock.Mock()
+
+        with mock.patch("toolbox.macro_ui.messagebox.askyesno", return_value=False):
+            feature._load_selected_step(None)
+
+        self.assertEqual(feature.step_tree.selection(), ("0",))
+        self.assertTrue(feature._step_draft_dirty)
+        for variable in feature.vars.values():
+            variable.set.assert_not_called()
 
 
 if __name__ == "__main__":

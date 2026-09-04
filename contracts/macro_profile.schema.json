@@ -36,7 +36,7 @@
     },
     "steps": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "maxItems": 256,
       "items": {
         "oneOf": [
@@ -73,5 +73,16 @@
         ]
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "enabled": { "const": true } },
+        "required": ["enabled"]
+      },
+      "then": {
+        "properties": { "steps": { "minItems": 1 } }
+      }
+    }
+  ]
 }

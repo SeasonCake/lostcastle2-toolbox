@@ -91,6 +91,13 @@ class PublicCatalogTests(unittest.TestCase):
                                 "size_bytes": len(content),
                             }
                         ],
+                        "superseded_files": [
+                            {
+                                "path": "fixture-v0.dll",
+                                "sha256": digest,
+                                "size_bytes": len(content),
+                            }
+                        ],
                         "hotkeys": ["F6"],
                     },
                     "integrity_policy": {
@@ -112,6 +119,10 @@ class PublicCatalogTests(unittest.TestCase):
         self.assertNotIn("bundle_dir", public["entries"][0]["operation"])
         self.assertFalse(public["entries"][0]["operation"]["bundled"])
         self.assertEqual(public["entries"][0]["operation"]["files"][0]["sha256"], digest)
+        self.assertEqual(
+            public["entries"][0]["operation"]["superseded_files"][0]["path"],
+            "fixture-v0.dll",
+        )
         self.assertEqual(render_catalog(public), render_catalog(public_catalog_from_payload(payload)))
 
     def test_public_validator_rejects_bundles_and_local_payload_paths(self) -> None:
@@ -133,6 +144,31 @@ class PublicCatalogTests(unittest.TestCase):
         bundle_dir["entries"][0]["operation"]["bundle_dir"] = "community_mods/tool"
         with self.assertRaises(PublicCatalogError):
             validate_public_catalog(bundle_dir)
+
+    def test_public_validator_rejects_unsafe_superseded_identities(self) -> None:
+        source = json.loads(
+            (PROJECT_ROOT / "assets" / "community_mod_catalog.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        public = public_catalog_from_payload(source)
+        entry = next(
+            item for item in public["entries"] if item["id"] == "damage-meter"
+        )
+        for field, value in (
+            ("path", "../legacy.dll"),
+            ("path", "legacy//plugin.dll"),
+            ("size_bytes", 0),
+            ("sha256", "not-a-hash"),
+        ):
+            with self.subTest(field=field, value=value):
+                invalid = copy.deepcopy(public)
+                target = next(
+                    item for item in invalid["entries"] if item["id"] == entry["id"]
+                )
+                target["operation"]["superseded_files"][0][field] = value
+                with self.assertRaises(PublicCatalogError):
+                    validate_public_catalog(invalid)
 
     def test_user_supplied_multifile_directory_installs_and_tamper_fails_closed(self) -> None:
         first = b"fixture primary"

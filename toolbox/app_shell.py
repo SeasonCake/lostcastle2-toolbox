@@ -24,6 +24,7 @@ from .mod_manager import (
 )
 from .mod_inspector import ModDraft, ModInspectionError, ModPackageInspector
 from .user_mod_registry import UserModRegistry, UserModRegistryError, draft_fingerprint
+from .windows_windowing import clamp_to_nearest_work_area, place_tk_window
 
 
 BG = "#F3EEE3"
@@ -283,6 +284,8 @@ class KeyboardModule(Protocol):
     hud_ui_scale: float
 
     def toggle_visible(self) -> None: ...
+
+    def is_visible_on_desktop(self) -> bool: ...
 
     def open_settings(self) -> None: ...
 
@@ -973,15 +976,15 @@ class CombatHudWindow:
                     self.ui_scale,
                     player_count=self._last_player_count,
                 )
-                x = min(
-                    max(0, position[0]),
-                    max(0, self.window.winfo_screenwidth() - width),
+                x, y = clamp_to_nearest_work_area(
+                    position[0],
+                    position[1],
+                    width,
+                    height,
+                    fallback_width=self.window.winfo_screenwidth(),
+                    fallback_height=self.window.winfo_screenheight(),
                 )
-                y = min(
-                    max(0, position[1]),
-                    max(0, self.window.winfo_screenheight() - height),
-                )
-                self.window.geometry(f"+{x}+{y}")
+                place_tk_window(self.window, width, height, x, y)
 
     def show(self) -> None:
         if self.window is not None:
@@ -1667,15 +1670,15 @@ class CombatHudWindow:
             self.ui_scale,
             player_count=self._last_player_count,
         )
-        x = min(
-            max(0, self.window.winfo_x()),
-            max(0, self.window.winfo_screenwidth() - width),
+        x, y = clamp_to_nearest_work_area(
+            self.window.winfo_x(),
+            self.window.winfo_y(),
+            width,
+            height,
+            fallback_width=self.window.winfo_screenwidth(),
+            fallback_height=self.window.winfo_screenheight(),
         )
-        y = min(
-            max(0, self.window.winfo_y()),
-            max(0, self.window.winfo_screenheight() - height),
-        )
-        self.window.geometry(f"{width}x{height}+{x}+{y}")
+        place_tk_window(self.window, width, height, x, y)
 
     def close(self) -> None:
         if self.window is not None:
@@ -1762,6 +1765,7 @@ class ToolboxShell:
         self.pages: dict[str, tk.Frame] = {}
         self.nav_buttons: dict[str, tk.Button] = {}
         self.labels: dict[str, tk.Label] = {}
+        self.module_action_buttons: dict[str, tk.Button] = {}
         self._macro_row_descriptions: list[str] = []
         self.mod_buttons: dict[str, dict[str, tk.Button]] = {}
         self.mod_tree: ttk.Treeview | None = None
@@ -2171,6 +2175,35 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 10, "bold"),
         )
         marker.pack(side="left", padx=(0, 10))
+        # Reserve fixed controls before the flexible copy. Long combat states must
+        # truncate inside their own column instead of pushing the HUD action away.
+        actions = tk.Frame(card, bg=SURFACE)
+        actions.pack(side="right")
+        secondary_button = self._button(
+            actions, secondary_action[0], secondary_action[1], width=10
+        )
+        secondary_button.pack(side="left", padx=(0, 5))
+        primary_button = self._button(
+            actions,
+            primary_action[0],
+            primary_action[1],
+            accent=True,
+            width=10,
+        )
+        primary_button.pack(side="left")
+        self.module_action_buttons[f"{status_key}_secondary"] = secondary_button
+        self.module_action_buttons[f"{status_key}_primary"] = primary_button
+        self.labels[summary_key] = tk.Label(
+            card,
+            text="—",
+            bg=SURFACE,
+            fg=TEXT,
+            width=36,
+            anchor="e",
+            justify="right",
+            font=("Microsoft YaHei UI", 8),
+        )
+        self.labels[summary_key].pack(side="right", padx=12)
         copy = tk.Frame(card, bg=SURFACE)
         copy.pack(side="left", fill="x", expand=True)
         tk.Label(
@@ -2190,29 +2223,6 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 8),
         )
         self.labels[status_key].pack(fill="x", pady=(3, 0))
-        self.labels[summary_key] = tk.Label(
-            card,
-            text="—",
-            bg=SURFACE,
-            fg=TEXT,
-            width=36,
-            anchor="e",
-            justify="right",
-            font=("Microsoft YaHei UI", 8),
-        )
-        self.labels[summary_key].pack(side="left", padx=12)
-        actions = tk.Frame(card, bg=SURFACE)
-        actions.pack(side="right")
-        self._button(actions, secondary_action[0], secondary_action[1], width=10).pack(
-            side="left", padx=(0, 5)
-        )
-        self._button(
-            actions,
-            primary_action[0],
-            primary_action[1],
-            accent=True,
-            width=10,
-        ).pack(side="left")
 
     def _build_combat_page(self) -> None:
         page = self._new_page("combat")
@@ -3764,9 +3774,15 @@ class ToolboxShell:
             tk_scaling=float(self.root.tk.call("tk", "scaling")),
         )
         self.root.state("normal")
-        x = min(max(0, self.root.winfo_x()), max(0, self.root.winfo_screenwidth() - width))
-        y = min(max(0, self.root.winfo_y()), max(0, self.root.winfo_screenheight() - height))
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        x, y = clamp_to_nearest_work_area(
+            self.root.winfo_x(),
+            self.root.winfo_y(),
+            width,
+            height,
+            fallback_width=self.root.winfo_screenwidth(),
+            fallback_height=self.root.winfo_screenheight(),
+        )
+        place_tk_window(self.root, width, height, x, y)
         self.main_ui_scale = TOOLBOX_UI_SCALES[preset]
         self._apply_main_ui_scale()
         self.root.update_idletasks()
@@ -3897,7 +3913,10 @@ class ToolboxShell:
         snapshot = self.combat_aggregator.snapshot()
         combat_status = combat_status_presentation(snapshot)
         self.labels["combat_status"].configure(
-            text=combat_status.text,
+            # The overview is a compact status surface. The full estimate/final
+            # explanation remains on the combat detail page instead of competing
+            # with summary values and actions in this single-row card.
+            text=combat_status.label,
             fg=combat_status.color,
         )
         self.labels["combat_summary"].configure(
@@ -3909,9 +3928,10 @@ class ToolboxShell:
                 f"{format_whole_metric(snapshot.effective_healing)}"
             )
         )
+        keyboard_visible = self.keyboard.is_visible_on_desktop()
         self.labels["keyboard_status"].configure(
-            text="● 悬浮窗已显示" if self.keyboard.visible else "● 悬浮窗已隐藏",
-            fg=GREEN if self.keyboard.visible else MUTED,
+            text="● 悬浮窗已显示" if keyboard_visible else "● 悬浮窗已隐藏",
+            fg=GREEN if keyboard_visible else MUTED,
         )
         preview_items = tuple(self.keyboard_preview_provider())
         if self.keyboard.display_mode == "gamepad":
@@ -3942,8 +3962,8 @@ class ToolboxShell:
         )
         self.labels["macro_summary"].configure(text=f"{len(profiles)} 个方案\n{enabled} 个已启用")
         self.labels["keyboard_page_status"].configure(
-            text="● 悬浮窗已显示" if self.keyboard.visible else "● 悬浮窗已隐藏",
-            fg="#77D99B" if self.keyboard.visible else "#9FB1BD",
+            text="● 悬浮窗已显示" if keyboard_visible else "● 悬浮窗已隐藏",
+            fg="#77D99B" if keyboard_visible else "#9FB1BD",
         )
         mode_copy = (
             "手柄"

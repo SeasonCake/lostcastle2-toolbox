@@ -36,9 +36,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ready-file", required=True, type=Path)
     parser.add_argument("--orphan-end-count", type=int, default=0)
+    parser.add_argument("--hold-seconds", type=float, default=0.5)
     args = parser.parse_args()
     if args.orphan_end_count < 0 or args.orphan_end_count > 1000:
         parser.error("--orphan-end-count must be between 0 and 1000")
+    if args.hold_seconds < 0 or args.hold_seconds > 60:
+        parser.error("--hold-seconds must be between 0 and 60")
     handle = win32pipe.CreateNamedPipe(
         PIPE_NAME,
         win32pipe.PIPE_ACCESS_OUTBOUND,
@@ -77,7 +80,7 @@ def main() -> int:
             ).encode("utf-8") + b"\n"
             win32file.WriteFile(handle, payload)
             time.sleep(0.01)
-        time.sleep(0.5)
+        time.sleep(args.hold_seconds)
     finally:
         try:
             win32pipe.DisconnectNamedPipe(handle)

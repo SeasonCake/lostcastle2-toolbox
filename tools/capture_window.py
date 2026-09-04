@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 from ctypes import wintypes
+import os
 from pathlib import Path
 
 from PIL import Image, ImageGrab
@@ -41,6 +42,17 @@ def capture_with_print_window(hwnd: int, width: int, height: int) -> Image.Image
         # Releasing it with DeleteDC is invalid and can fail after a successful
         # capture; ReleaseDC below is the matching lifetime operation.
         win32gui.ReleaseDC(hwnd, window_dc)
+
+
+def save_png_atomic(image: Image.Image, output: Path) -> None:
+    """Expose a capture only after its complete PNG bytes are on disk."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{os.getpid()}.tmp.png")
+    try:
+        image.save(temporary, format="PNG")
+        temporary.replace(output)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def main() -> int:
@@ -112,7 +124,6 @@ def main() -> int:
     rect = wintypes.RECT()
     if not user32.GetWindowRect(matches[0], ctypes.byref(rect)):
         raise SystemExit("GetWindowRect failed")
-    args.output.parent.mkdir(parents=True, exist_ok=True)
     width = rect.right - rect.left
     height = rect.bottom - rect.top
     image = None if args.screen else capture_with_print_window(matches[0], width, height)
@@ -120,7 +131,7 @@ def main() -> int:
         image = ImageGrab.grab(
             bbox=(rect.left, rect.top, rect.right, rect.bottom), all_screens=True
         )
-    image.save(args.output)
+    save_png_atomic(image, args.output)
     print(f"{args.output} {image.width}x{image.height}")
     return 0
 

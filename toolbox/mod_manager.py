@@ -86,6 +86,7 @@ class ModOperation:
     archive_source: ModArchiveSource | None = None
     bundle_dir: str | None = None
     files: tuple[ModFileSpec, ...] = ()
+    superseded_files: tuple[ModFileSpec, ...] = ()
     provides: tuple[str, ...] = ()
     hotkeys: tuple[str, ...] = ()
     panel_hotkey: str | None = None
@@ -137,6 +138,10 @@ class ModStatus:
     @property
     def installed(self) -> bool:
         return self.state == "installed"
+
+    @property
+    def present(self) -> bool:
+        return self.state in {"installed", "integrity_error"}
 
 
 class ModCatalog:
@@ -203,7 +208,13 @@ class ModCatalog:
         bundle_dir = ModCatalog._optional_relative_path(
             operation_raw.get("bundle_dir"), "operation.bundle_dir"
         )
-        files = ModCatalog._parse_file_specs(operation_raw.get("files"))
+        files = ModCatalog._parse_file_specs(
+            operation_raw.get("files"), "operation.files"
+        )
+        superseded_files = ModCatalog._parse_file_specs(
+            operation_raw.get("superseded_files"),
+            "operation.superseded_files",
+        )
         provides = ModCatalog._parse_string_list(
             operation_raw.get("provides", []), "operation.provides"
         )
@@ -220,6 +231,7 @@ class ModCatalog:
             archive_source=archive_source,
             bundle_dir=bundle_dir,
             files=files,
+            superseded_files=superseded_files,
             provides=provides,
             hotkeys=hotkeys,
             panel_hotkey=panel_hotkey,
@@ -266,6 +278,15 @@ class ModCatalog:
                 )
             if bundled and bundle_dir is None:
                 raise ModManagerError("Bundled multi-file MODs require bundle_dir.")
+        active_paths = {spec.path.casefold() for spec in files} or {
+            expected_filename.casefold()
+        }
+        if any(
+            spec.path.casefold() in active_paths for spec in superseded_files
+        ):
+            raise ModManagerError(
+                "Superseded MOD payload paths must differ from current payload paths."
+            )
         integrity_policy = ModIntegrityPolicy(
             version_note=ModCatalog._required_string(
                 policy_raw, "version_note", "integrity_policy"
@@ -326,20 +347,20 @@ class ModCatalog:
         )
 
     @staticmethod
-    def _parse_file_specs(raw: Any) -> tuple[ModFileSpec, ...]:
+    def _parse_file_specs(raw: Any, section: str) -> tuple[ModFileSpec, ...]:
         if raw is None:
             return ()
         if not isinstance(raw, list) or not raw:
-            raise ModManagerError("MOD operation.files must be a non-empty array.")
+            raise ModManagerError(f"MOD {section} must be a non-empty array.")
         specs: list[ModFileSpec] = []
         paths: set[str] = set()
         for item in raw:
             if not isinstance(item, dict):
-                raise ModManagerError("MOD operation.files entries must be objects.")
-            path = ModCatalog._required_string(item, "path", "operation.files")
-            path = ModCatalog._validate_relative_path(path, "operation.files.path")
+                raise ModManagerError(f"MOD {section} entries must be objects.")
+            path = ModCatalog._required_string(item, "path", section)
+            path = ModCatalog._validate_relative_path(path, f"{section}.path")
             sha256 = ModCatalog._required_string(
-                item, "sha256", "operation.files"
+                item, "sha256", section
             ).upper()
             size_bytes = item.get("size_bytes")
             if not SHA256_PATTERN.fullmatch(sha256):
@@ -347,7 +368,7 @@ class ModCatalog:
             if type(size_bytes) is not int or size_bytes <= 0:
                 raise ModManagerError("Invalid MOD payload size.")
             if path.casefold() in paths:
-                raise ModManagerError("Duplicate MOD payload path.")
+                raise ModManagerError(f"Duplicate MOD payload path in {section}.")
             paths.add(path.casefold())
             specs.append(ModFileSpec(path, sha256, size_bytes))
         return tuple(specs)
@@ -392,12 +413,17 @@ class ModCatalog:
 
     @staticmethod
     def _validate_relative_path(value: str, section: str) -> str:
-        normalized = value.replace("\\", "/").strip("/")
+        normalized = value.replace("\\", "/")
         path = PurePosixPath(normalized)
         if (
             not normalized
+            or normalized.startswith("/")
+            or normalized.endswith("/")
             or path.is_absolute()
-            or any(part in {"", ".", ".."} or ":" in part for part in path.parts)
+            or any(
+                part in {"", ".", ".."} or ":" in part
+                for part in normalized.split("/")
+            )
         ):
             raise ModManagerError(f"MOD catalog {section} contains an unsafe path.")
         return path.as_posix()
@@ -511,15 +537,26 @@ class ModManager:
             return ModStatus("game_not_configured", source_bundled, False)
         specs = self._file_specs(descriptor)
         targets = [self._join_relative(directory, spec.path) for spec in specs]
+        superseded_targets = [
+            self._join_relative(directory, spec.path)
+            for spec in descriptor.operation.superseded_files
+        ]
+        superseded_present = any(
+            target.exists() or target.is_symlink() for target in superseded_targets
+        )
         existing = [target.exists() for target in targets]
         if not any(existing):
-            return ModStatus("not_installed", source_bundled, False)
+            return ModStatus(
+                "integrity_error" if superseded_present else "not_installed",
+                source_bundled,
+                False,
+            )
         integrity_ok = all(
             target.is_file()
             and target.stat().st_size == spec.size_bytes
             and self._sha256(target) == spec.sha256
             for target, spec in zip(targets, specs, strict=True)
-        )
+        ) and not superseded_present
         return ModStatus(
             "installed" if integrity_ok else "integrity_error",
             source_bundled,
@@ -555,6 +592,7 @@ class ModManager:
         target = self.installed_path(mod_id)
         if source == target:
             self._validate_file(source, descriptor)
+            self._remove_exact_superseded_files(descriptor)
             return target
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + ".installing")
@@ -576,6 +614,7 @@ class ModManager:
         finally:
             if temporary.exists():
                 temporary.unlink()
+        self._remove_exact_superseded_files(descriptor)
         return target
 
     def installed_conflicts(self, mod_id: str) -> tuple[str, ...]:
@@ -590,7 +629,7 @@ class ModManager:
             other_provided = {item.casefold() for item in other.operation.provides}
             if not provided.intersection(other_provided):
                 continue
-            if self.status(other.mod_id).installed:
+            if self.status(other.mod_id).present:
                 conflicts.append(other.display.name)
         return tuple(conflicts)
 
@@ -599,8 +638,6 @@ class ModManager:
         directory = self._installed_directory(descriptor)
         specs = self._file_specs(descriptor)
         targets = [self._join_relative(directory, spec.path) for spec in specs]
-        if not any(target.exists() for target in targets):
-            return False
         removed = False
         for target in targets:
             if not target.exists():
@@ -610,6 +647,8 @@ class ModManager:
             target.unlink()
             removed = True
             self._hash_cache.pop(target, None)
+        if self._remove_exact_superseded_files(descriptor, directory=directory):
+            removed = True
         parents = sorted(
             {target.parent for target in targets},
             key=lambda path: len(path.parts),
@@ -662,7 +701,56 @@ class ModManager:
             finally:
                 if temporary.exists():
                     temporary.unlink()
+        self._remove_exact_superseded_files(descriptor, directory=directory)
         return self.installed_path(descriptor.mod_id)
+
+    def _remove_exact_superseded_files(
+        self,
+        descriptor: ModDescriptor,
+        *,
+        directory: Path | None = None,
+    ) -> bool:
+        """Remove only hash-bound historical payloads owned by this catalog entry."""
+
+        if not descriptor.operation.superseded_files:
+            return False
+        directory = directory or self._installed_directory(descriptor)
+        removed = False
+        for spec in descriptor.operation.superseded_files:
+            target = self._join_relative(directory, spec.path)
+            current = directory
+            unsafe_link = False
+            for part in PurePosixPath(spec.path).parts:
+                current /= part
+                is_junction = getattr(current, "is_junction", lambda: False)
+                if current.is_symlink() or is_junction():
+                    unsafe_link = True
+                    break
+            if unsafe_link:
+                continue
+            resolved = target.resolve()
+            try:
+                self._ensure_contained(resolved, directory)
+            except ModManagerError:
+                continue
+            if not resolved.is_file():
+                continue
+            if (
+                resolved.stat().st_size != spec.size_bytes
+                or self._sha256(resolved, use_cache=False) != spec.sha256
+            ):
+                continue
+            resolved.unlink()
+            self._hash_cache.pop(resolved, None)
+            removed = True
+            current = resolved.parent
+            while current != directory:
+                try:
+                    current.rmdir()
+                except OSError:
+                    break
+                current = current.parent
+        return removed
 
     def _installed_directory(self, descriptor: ModDescriptor) -> Path:
         if descriptor.operation.is_game_plugin:

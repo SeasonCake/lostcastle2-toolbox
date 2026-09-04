@@ -268,9 +268,9 @@ if ($LASTEXITCODE -ne 0) {
 
 $packageParent = Join-Path $projectRoot 'package'
 $packageName = if ($BuildProfile -eq 'Diagnostic') {
-    '失落城堡2工具箱1.7.4-诊断候选-结算与承伤-r6'
+    '失落城堡2工具箱1.7.6-诊断候选-r1'
 } else {
-    '失落城堡2工具箱1.7.4-实时数值监测+一键MOD安装'
+    '失落城堡2工具箱1.7.6-实时数值监测+一键MOD安装'
 }
 $packageRoot = Join-Path $packageParent $packageName
 if (Test-Path -LiteralPath $packageRoot) {

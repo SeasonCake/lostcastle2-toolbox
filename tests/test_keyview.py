@@ -18,6 +18,183 @@ import keyview
 
 
 class KeyViewTests(unittest.TestCase):
+    def test_receipt_multiline_width_uses_the_widest_rendered_line(self) -> None:
+        text = "● 游戏未运行\n可从顶部启动"
+        known_measurements = {
+            text: 215,
+            "● 游戏未运行": 120,
+            "可从顶部启动": 126,
+        }
+        font = mock.Mock()
+        font.measure.side_effect = known_measurements.__getitem__
+
+        measured = keyview._measure_multiline_text_width(font, text)
+
+        self.assertEqual(measured, 126)
+        self.assertGreater(known_measurements[text], 140)
+        font.measure.assert_has_calls(
+            [mock.call("● 游戏未运行"), mock.call("可从顶部启动")]
+        )
+
+    def test_qa_ready_marker_binds_capture_to_pid_and_start_time(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            receipt = Path(temp_dir) / "main.receipt.json"
+
+            marker = keyview.write_qa_capture_ready_marker(receipt, 123456789)
+
+            self.assertEqual(marker, receipt.with_suffix(".ready.json"))
+            self.assertEqual(
+                json.loads(marker.read_text(encoding="utf-8")),
+                {
+                    "pid": keyview.os.getpid(),
+                    "capture_after_ns": 123456789,
+                },
+            )
+
+    def test_qa_progress_marker_records_the_latest_bounded_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            receipt = Path(temp_dir) / "main.receipt.json"
+
+            marker = keyview.write_qa_progress_marker(receipt, "labels_measured")
+            payload = json.loads(marker.read_text(encoding="utf-8"))
+
+            self.assertEqual(marker, receipt.with_suffix(".progress.json"))
+            self.assertEqual(payload["pid"], keyview.os.getpid())
+            self.assertEqual(payload["stage"], "labels_measured")
+            self.assertIsInstance(payload["recorded_ns"], int)
+
+    def test_qa_ready_is_published_by_the_running_tk_event_loop(self) -> None:
+        source = inspect.getsource(keyview.main)
+
+        self.assertIn("root.after_idle(begin_qa_capture)", source)
+        self.assertIn(
+            "write_qa_capture_ready_marker(args.qa_ui_receipt, qa_started_ns)",
+            inspect.getsource(keyview.main).split("def begin_qa_capture", 1)[1],
+        )
+        self.assertNotIn('qa_state["last_size"]', source)
+        begin_source = source.split("def begin_qa_capture", 1)[1]
+        self.assertLess(
+            begin_source.index("selected_qa_window_is_ready(window)"),
+            begin_source.index("write_qa_capture_ready_marker"),
+        )
+        self.assertIn(
+            'if args.qa_ui_window == "keyboard":\n'
+            "                return keyboard_app.is_visible_on_desktop()",
+            source,
+        )
+
+    def test_startup_uses_explicit_keyboard_visibility_actions(self) -> None:
+        source = inspect.getsource(keyview.main)
+
+        self.assertIn("keyboard_app.hide_overlay()", source)
+        self.assertIn("root.after(250, keyboard_app.show_overlay)", source)
+        self.assertNotIn("root.after(250, keyboard_app.toggle_visible)", source)
+
+    def test_initial_hotkey_state_swallows_keys_held_during_startup(self) -> None:
+        with mock.patch.object(
+            keyview,
+            "is_key_down",
+            side_effect=lambda vk_code: vk_code == keyview.HOTKEY_VIRTUAL_KEYS["F10"],
+        ) as reader:
+            state = keyview.initial_hotkey_state()
+
+        self.assertEqual(
+            state,
+            {"F8": False, "F9": False, "F10": True, "F11": False},
+        )
+        self.assertEqual(reader.call_count, len(keyview.HOTKEY_VIRTUAL_KEYS))
+
+    def test_window_clamp_supports_primary_right_and_negative_monitors(self) -> None:
+        cases = (
+            ((1800, 1000, 400, 200, (0, 0, 1920, 1040)), (1520, 840)),
+            ((3700, 1000, 400, 200, (1920, 40, 3840, 1080)), (3440, 880)),
+            ((-2100, -30, 600, 300, (-1920, 0, 0, 1040)), (-1920, 0)),
+            ((50, 80, 2200, 1400, (0, 0, 1920, 1040)), (0, 0)),
+        )
+        for arguments, expected in cases:
+            with self.subTest(arguments=arguments):
+                self.assertEqual(keyview.clamp_window_position(*arguments), expected)
+
+    def test_game_foreground_topmost_reassertion_is_fail_closed(self) -> None:
+        self.assertTrue(
+            keyview.should_reassert_overlay_topmost(
+                visible=True,
+                always_on_top=True,
+                game_process_id=42,
+                foreground_process_id=42,
+            )
+        )
+        for fields in (
+            dict(visible=False, always_on_top=True, game_process_id=42, foreground_process_id=42),
+            dict(visible=True, always_on_top=False, game_process_id=42, foreground_process_id=42),
+            dict(visible=True, always_on_top=True, game_process_id=None, foreground_process_id=42),
+            dict(visible=True, always_on_top=True, game_process_id=42, foreground_process_id=7),
+        ):
+            with self.subTest(fields=fields):
+                self.assertFalse(keyview.should_reassert_overlay_topmost(**fields))
+
+    def test_first_show_reasserts_topmost_without_requesting_focus(self) -> None:
+        app = object.__new__(keyview.KeyViewApp)
+        app.visible = False
+        app.always_on_top = True
+        app.settings_window = None
+        app.root = mock.Mock()
+        app._apply_window_roles = mock.Mock()
+        app._show_native_overlay_no_activate = mock.Mock(return_value=True)
+        app._sync_background_layer = mock.Mock()
+        app._reassert_overlay_topmost_no_activate = mock.Mock()
+
+        app.show_overlay()
+
+        app.root.deiconify.assert_called_once_with()
+        app.root.update_idletasks.assert_called_once_with()
+        app.root.attributes.assert_called_once_with("-topmost", True)
+        app.root.focus_force.assert_not_called()
+        app._apply_window_roles.assert_called_once_with()
+        app._show_native_overlay_no_activate.assert_called_once_with()
+        app._sync_background_layer.assert_called_once_with()
+        app._reassert_overlay_topmost_no_activate.assert_called_once_with()
+        self.assertTrue(app.visible)
+
+    def test_visibility_toggle_uses_real_desktop_state_not_stale_flag(self) -> None:
+        app = object.__new__(keyview.KeyViewApp)
+        app.visible = True
+        app.is_visible_on_desktop = mock.Mock(return_value=False)
+        app.show_overlay = mock.Mock()
+        app.hide_overlay = mock.Mock()
+
+        app.toggle_visible()
+
+        app.show_overlay.assert_called_once_with()
+        app.hide_overlay.assert_not_called()
+
+        app.is_visible_on_desktop.return_value = True
+        app.toggle_visible()
+        app.hide_overlay.assert_called_once_with()
+
+    def test_native_show_requests_no_activation(self) -> None:
+        app = object.__new__(keyview.KeyViewApp)
+        app.root = mock.Mock()
+        app.always_on_top = True
+        app._shell_hwnd = mock.Mock(return_value=123)
+
+        with mock.patch.object(keyview.user32, "IsWindow", return_value=True), mock.patch.object(
+            keyview.user32, "ShowWindow"
+        ) as show_window, mock.patch.object(
+            keyview.user32, "SetWindowPos", return_value=True
+        ) as set_window_pos, mock.patch.object(
+            keyview.user32, "IsWindowVisible", return_value=True
+        ), mock.patch.object(
+            keyview.user32, "IsIconic", return_value=False
+        ):
+            shown = app._show_native_overlay_no_activate()
+
+        self.assertTrue(shown)
+        show_window.assert_called_once_with(123, 4)
+        flags = set_window_pos.call_args.args[-1]
+        self.assertTrue(flags & 0x0010)
+        self.assertTrue(flags & 0x0040)
+
     def test_build_profiles_are_explicit_and_fail_closed(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
         diagnostic = keyview.load_build_profile(project_root, packaged=False)
@@ -90,8 +267,8 @@ class KeyViewTests(unittest.TestCase):
             "verify_packaged_runtime.py --package $packageRoot",
             build_source,
         )
-        self.assertIn("失落城堡2工具箱1.7.4-诊断候选-结算与承伤-r6", build_source)
-        self.assertIn("失落城堡2工具箱1.7.4-实时数值监测+一键MOD安装", build_source)
+        self.assertIn("失落城堡2工具箱1.7.6-诊断候选-r1", build_source)
+        self.assertIn("失落城堡2工具箱1.7.6-实时数值监测+一键MOD安装", build_source)
 
     def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:
         root = mock.Mock()
@@ -257,13 +434,14 @@ class KeyViewTests(unittest.TestCase):
         app.root = Root()
         app._set_click_through.side_effect = lambda value: setattr(app, "click_through", value)
         app._set_clean_mode.side_effect = lambda value, save=False: setattr(app, "key_only", value)
-        app.toggle_visible.side_effect = lambda: setattr(app, "visible", True)
+        app.is_visible_on_desktop.return_value = False
+        app.show_overlay.side_effect = lambda: setattr(app, "visible", True)
 
         keyview.KeyViewApp.restore_interaction(app)
 
         app._set_click_through.assert_called_once_with(False)
         app._set_clean_mode.assert_called_once_with(False, save=False)
-        app.toggle_visible.assert_called_once_with()
+        app.show_overlay.assert_called_once_with()
         app._sync_background_layer.assert_called_once_with()
         app._save_current_settings.assert_called_once_with()
         self.assertTrue(app.visible)

@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 
 from toolbox.macro_engine import MacroState
 from toolbox.macro_ui import ACTION_LABELS, MacroFeature, runtime_presentation
+from tools.capture_window import capture_with_print_window
 
 
 def sha256(path: Path) -> str:
@@ -104,10 +105,12 @@ def parse_args() -> argparse.Namespace:
             "down",
             "blocked",
             "advanced",
+            "new",
         ),
         default="idle",
     )
     parser.add_argument("--timeout", type=float, default=20.0)
+    parser.add_argument("--capture-self", action="store_true")
     return parser.parse_args()
 
 
@@ -150,8 +153,21 @@ def main() -> int:
         feature._set_runtime(*runtime_presentation(MacroState.BLOCKED_FOCUS))
     elif args.state == "advanced":
         feature._toggle_advanced_settings()
+    elif args.state == "new":
+        feature._new_profile("once")
     window.update_idletasks()
     print(f"PID={os.getpid()} TITLE={title}", flush=True)
+
+    if args.capture_self:
+        def capture_self() -> None:
+            hwnd, _left, _top, width, height = top_level_rect(window)
+            image = capture_with_print_window(hwnd, width, height)
+            if image is None:
+                raise RuntimeError("PrintWindow failed for macro QA window")
+            args.screenshot.parent.mkdir(parents=True, exist_ok=True)
+            image.save(args.screenshot)
+
+        root.after(400, capture_self)
 
     deadline = time.monotonic() + args.timeout
     last_size: int | None = None

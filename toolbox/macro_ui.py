@@ -186,6 +186,7 @@ class MacroFeature:
         self.modifier_vars: dict[str, tk.BooleanVar] = {}
         self._editing_steps: list[dict[str, Any]] = []
         self._selected_index: int | None = None
+        self._loaded_step_index: int | None = None
         self._loading_form = False
         self._dirty = False
         self._step_draft_dirty = False
@@ -1030,6 +1031,7 @@ class MacroFeature:
         for modifier, variable in self.modifier_vars.items():
             variable.set(modifier in profile.trigger.modifiers)
         self._editing_steps = macro_profile_to_dict(profile)["steps"]
+        self._loaded_step_index = None
         self._refresh_steps()
         self._loading_form = False
         self._dirty = False
@@ -1048,6 +1050,7 @@ class MacroFeature:
         self.vars["max_runtime_seconds"].set("60")
         self.vars["repeat_delay_ms"].set("80")
         self._editing_steps = []
+        self._loaded_step_index = None
         self._refresh_steps()
         self._loading_form = False
         self._dirty = False
@@ -1070,6 +1073,8 @@ class MacroFeature:
             counter += 1
         data["id"] = f"{base_id}-{counter}"
         data["name"] = {"once": "新建单次宏", "hold_repeat": "新建按住宏", "toggle_repeat": "新建开关宏"}[mode]
+        data["enabled"] = False
+        data["steps"] = []
         profile = parse_macro_profile(data)
         self.profiles = (*self.profiles, profile)
         try:
@@ -1181,6 +1186,7 @@ class MacroFeature:
             return
         self._editing_steps.append(step)
         self._refresh_steps(select=len(self._editing_steps) - 1)
+        self._loaded_step_index = len(self._editing_steps) - 1
         self._step_draft_dirty = False
         self._mark_dirty()
 
@@ -1195,6 +1201,7 @@ class MacroFeature:
             self._set_status("时长必须是整数毫秒。", error=True)
             return
         self._refresh_steps(select=index)
+        self._loaded_step_index = index
         self._step_draft_dirty = False
         self._mark_dirty()
 
@@ -1203,6 +1210,7 @@ class MacroFeature:
         if index is None:
             return
         del self._editing_steps[index]
+        self._loaded_step_index = None
         self._refresh_steps(select=min(index, len(self._editing_steps) - 1))
         self._mark_dirty()
 
@@ -1218,6 +1226,7 @@ class MacroFeature:
             self._editing_steps[index],
         )
         self._refresh_steps(select=target)
+        self._loaded_step_index = target
         self._mark_dirty()
 
     def _selected_step_index(self) -> int | None:
@@ -1244,8 +1253,30 @@ class MacroFeature:
             self.step_tree.focus(str(select))
 
     def _load_selected_step(self, _event: tk.Event[Any]) -> None:
+        if self._loading_form:
+            return
         index = self._selected_step_index()
         if index is None:
+            return
+        if self._step_draft_dirty and index == self._loaded_step_index:
+            return
+        if self._step_draft_dirty and not messagebox.askyesno(
+            "步骤尚未应用",
+            "当前步骤设置尚未添加或替换，是否放弃并查看其他步骤？",
+            parent=self.window,
+        ):
+            if self.step_tree is not None:
+                self._loading_form = True
+                selection = self.step_tree.selection()
+                if selection:
+                    self.step_tree.selection_remove(*selection)
+                if (
+                    self._loaded_step_index is not None
+                    and 0 <= self._loaded_step_index < len(self._editing_steps)
+                ):
+                    self.step_tree.selection_set(str(self._loaded_step_index))
+                    self.step_tree.focus(str(self._loaded_step_index))
+                self._loading_form = False
             return
         step = self._editing_steps[index]
         self._loading_form = True
@@ -1258,6 +1289,7 @@ class MacroFeature:
             if step["action"] == "tap":
                 self.vars["step_ms"].set(str(step["hold_ms"]))
         self._loading_form = False
+        self._loaded_step_index = index
         self._step_draft_dirty = False
         self._sync_step_editor_state()
 
@@ -1293,5 +1325,6 @@ class MacroFeature:
         self.modifier_vars.clear()
         self._editing_steps.clear()
         self._selected_index = None
+        self._loaded_step_index = None
         self._dirty = False
         self._step_draft_dirty = False

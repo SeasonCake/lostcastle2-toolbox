@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $projectRoot
 
-$packageName = '失落城堡2工具箱1.7.4-public-core'
+$packageName = '失落城堡2工具箱1.7.6-public-core'
 $appName = '失落城堡2工具箱'
 $publicBuildParent = Join-Path $projectRoot 'build'
 $publicBuildRoot = Join-Path $publicBuildParent 'public-core'
@@ -29,7 +29,7 @@ $supportAssetsSource = Join-Path $projectRoot 'package_assets\赞助与投喂'
 $publicRuntimeNoticesSource = Join-Path $projectRoot 'package_assets\运行环境\public-core'
 
 $expectedPublicModCatalogSha256 = '879388326B33DCCE722DCC4E4FD76802DC5628787713ED51D6EAA0999E12BE0C'
-$expectedPublicCommunityCatalogSha256 = '747438843AA01B1E1B5D8A1260D9FB31C5B5FBE07A7B57386B40BFE2DE0B9C6A'
+$expectedPublicCommunityCatalogSha256 = '5840BFBC0891F779F47E2FE06BA93FE6A4D6E59C5D89F22F0DF849C530A260CA'
 $expectedPublicRuntimeManifestSha256 = '5265F0D56DA5CF6979BA937AE3FD683A2277B69648D0821C91240AA3CF1549BB'
 $expectedOfficialRuntimeSha256 = '2A7CBF74D26ABE4765C3E662DB1721B923BAC39849EBFEF2CA5DC7DE7E2D9B7F'
 $expectedOfficialRuntimeSize = 34335572L
@@ -107,11 +107,15 @@ function Assert-NoUnsafeRelativePath {
         [Parameter(Mandatory = $true)][string]$Label
     )
     $normalized = $Value.Replace('\', '/')
-    $segments = @($normalized.Split('/') | Where-Object { $_ -ne '' })
+    $segments = @($normalized.Split('/'))
     Assert-Condition (-not [string]::IsNullOrWhiteSpace($normalized)) "$Label is empty."
     Assert-Condition (-not $normalized.StartsWith('/')) "$Label is absolute."
+    Assert-Condition (-not $normalized.EndsWith('/')) "$Label has an empty final segment."
     Assert-Condition (-not ($normalized -match '^[A-Za-z]:')) "$Label has a drive prefix."
+    Assert-Condition (-not ($segments -contains '')) "$Label has an empty path segment."
+    Assert-Condition (-not ($segments -contains '.')) "$Label contains a current-directory segment."
     Assert-Condition (-not ($segments -contains '..')) "$Label traverses outside its root."
+    Assert-Condition (@($segments | Where-Object { $_ -match ':' }).Count -eq 0) "$Label contains a drive-qualified segment."
 }
 
 function Get-CatalogIds {
@@ -148,11 +152,13 @@ function Assert-PublicCatalog {
         Assert-Condition (-not ($entryJson -match '(?i)third_party[/\\]')) "$Label entry '$($entry.id)' references third_party."
         Assert-Condition ([string]$entry.integrity_policy.redistribution_status -eq 'public_core_user_supplied_required') "$Label entry '$($entry.id)' lacks the public-core redistribution boundary."
         Assert-Condition ($entry.integrity_policy.PSObject.Properties.Name -contains 'source_redistribution_status') "$Label entry '$($entry.id)' lost its source redistribution record."
-        if ($operationProperties -contains 'files') {
-            foreach ($file in @($entry.operation.files)) {
-                Assert-NoUnsafeRelativePath ([string]$file.path) "$Label entry '$($entry.id)' file path"
-                Assert-Condition ([long]$file.size_bytes -gt 0) "$Label entry '$($entry.id)' has an invalid file size."
-                Assert-Condition ([string]$file.sha256 -match '^[0-9A-Fa-f]{64}$') "$Label entry '$($entry.id)' has an invalid file SHA-256."
+        foreach ($fileField in @('files', 'superseded_files')) {
+            if ($operationProperties -contains $fileField) {
+                foreach ($file in @($entry.operation.$fileField)) {
+                    Assert-NoUnsafeRelativePath ([string]$file.path) "$Label entry '$($entry.id)' $fileField path"
+                    Assert-Condition ([long]$file.size_bytes -gt 0) "$Label entry '$($entry.id)' has an invalid $fileField size."
+                    Assert-Condition ([string]$file.sha256 -match '^[0-9A-Fa-f]{64}$') "$Label entry '$($entry.id)' has an invalid $fileField SHA-256."
+                }
             }
         }
     }
@@ -370,7 +376,7 @@ function Assert-PublicPackage {
     $packageExe = Join-Path $PackageRoot "$appName.exe"
     Assert-LeafFile $packageExe 'public-core executable'
     $version = (Get-Item -LiteralPath $packageExe).VersionInfo.FileVersion.Trim()
-    Assert-Condition ($version -in @('1.7.4', '1.7.4.0')) "Packaged FileVersion is not 1.7.4: $version"
+    Assert-Condition ($version -in @('1.7.6', '1.7.6.0')) "Packaged FileVersion is not 1.7.6: $version"
 
     $internalRoot = Join-Path $PackageRoot '_internal'
     Assert-Condition (Test-Path -LiteralPath $internalRoot -PathType Container) 'Packaged PyInstaller _internal directory is missing.'

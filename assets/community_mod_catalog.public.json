@@ -21,6 +21,13 @@
             "size_bytes": 26624
           }
         ],
+        "superseded_files": [
+          {
+            "path": "实时数据1.3.dll",
+            "sha256": "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
+            "size_bytes": 27136
+          }
+        ],
         "provides": [
           "实时数值v2.0.dll"
         ],
@@ -62,6 +69,13 @@
             "path": "LC2EnhancementPlan_v5.0.0.dll",
             "sha256": "0B4CEC387EA2634AA8F96E78CDD5E214B5A00629F81CB4181F5B2C67AEEA5899",
             "size_bytes": 331264
+          }
+        ],
+        "superseded_files": [
+          {
+            "path": "LC2EnhancementPlan_v4.8.dll",
+            "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+            "size_bytes": 328192
           }
         ],
         "provides": [
@@ -394,6 +408,18 @@
             "path": "怪物v11.7.dll",
             "sha256": "EBCA68273D10C3385C5B4EFE351CB94E1836F6B5465195FA176FC83D6D31F1D9",
             "size_bytes": 107520
+          }
+        ],
+        "superseded_files": [
+          {
+            "path": "怪物宝藏v11.dll",
+            "sha256": "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+            "size_bytes": 86016
+          },
+          {
+            "path": "怪物宝藏v11.6.dll",
+            "sha256": "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
+            "size_bytes": 107008
           }
         ],
         "provides": [
@@ -782,6 +808,13 @@
           {
             "path": "LC2.ThunderHammer真·雷神之锤.dll",
             "sha256": "9A4DA44DA2B97E96FD6662F8230934BE62C4AA3ED70181ED47613F57D335181A",
+            "size_bytes": 31744
+          }
+        ],
+        "superseded_files": [
+          {
+            "path": "LC2.ThunderHammer真雷神之锤.dll",
+            "sha256": "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
             "size_bytes": 31744
           }
         ],
@@ -2077,6 +2110,13 @@
           {
             "path": "失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll",
             "sha256": "915764422A72CE28D268BC19CDF794E781132F3A732EFE4004780EB5A3875A11",
+            "size_bytes": 59392
+          }
+        ],
+        "superseded_files": [
+          {
+            "path": "失落城堡2伤害统计v1.5.1.dll",
+            "sha256": "64677F4DBEA9316911862D68A09B67615C1CA1B8BC7742A0108D0CC7D579A8D6",
             "size_bytes": 59392
           }
         ],

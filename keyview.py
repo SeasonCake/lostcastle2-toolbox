@@ -45,10 +45,18 @@ from toolbox.runtime_setup import (
 )
 from toolbox.user_mod_registry import UserModRegistry
 from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, send_hotkey
+from toolbox.windows_windowing import (
+    clamp_to_nearest_work_area,
+    clamp_window_position,
+    move_tk_window_no_activate,
+    nearest_monitor_work_area,
+    place_tk_window,
+    tk_geometry,
+)
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.7.4"
+APP_VERSION = "1.7.6"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -642,6 +650,13 @@ XINPUT_BUTTONS = {
     "PAD_Y": 0x8000,
 }
 
+HOTKEY_VIRTUAL_KEYS = {
+    "F8": 0x77,
+    "F9": 0x78,
+    "F10": 0x79,
+    "F11": 0x7A,
+}
+
 
 def _load_xinput() -> Any | None:
     for library_name in ("xinput1_4.dll", "xinput1_3.dll", "xinput9_1_0.dll"):
@@ -748,6 +763,17 @@ user32.GetWindow.argtypes = (wintypes.HWND, wintypes.UINT)
 user32.GetWindow.restype = wintypes.HWND
 user32.IsWindow.argtypes = (wintypes.HWND,)
 user32.IsWindow.restype = wintypes.BOOL
+user32.IsWindowVisible.argtypes = (wintypes.HWND,)
+user32.IsWindowVisible.restype = wintypes.BOOL
+user32.IsIconic.argtypes = (wintypes.HWND,)
+user32.IsIconic.restype = wintypes.BOOL
+user32.GetForegroundWindow.argtypes = ()
+user32.GetForegroundWindow.restype = wintypes.HWND
+user32.GetWindowThreadProcessId.argtypes = (
+    wintypes.HWND,
+    ctypes.POINTER(wintypes.DWORD),
+)
+user32.GetWindowThreadProcessId.restype = wintypes.DWORD
 user32.ShowWindow.argtypes = (wintypes.HWND, ctypes.c_int)
 user32.ShowWindow.restype = wintypes.BOOL
 user32.SetForegroundWindow.argtypes = (wintypes.HWND,)
@@ -784,6 +810,30 @@ def hwnd_is_above(
             return True
         visited.add(current)
     return False
+
+
+def foreground_process_id() -> int | None:
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd:
+        return None
+    process_id = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
+    return int(process_id.value) or None
+
+
+def should_reassert_overlay_topmost(
+    *,
+    visible: bool,
+    always_on_top: bool,
+    game_process_id: int | None,
+    foreground_process_id: int | None,
+) -> bool:
+    return bool(
+        visible
+        and always_on_top
+        and game_process_id is not None
+        and foreground_process_id == game_process_id
+    )
 
 
 def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
@@ -953,8 +1003,50 @@ def _top_level_window_rect(window: tk.Misc) -> tuple[int, int, int, int, int]:
     )
 
 
+def _measure_multiline_text_width(font: tkfont.Font, text: object) -> int:
+    """Measure the widest rendered line instead of treating newlines as glyphs."""
+    return max(font.measure(line) for line in str(text).split("\n"))
+
+
+def write_qa_capture_ready_marker(receipt_path: Path, started_ns: int) -> Path:
+    """Publish the point after which an external QA screenshot belongs to this run."""
+    destination = receipt_path.resolve().with_suffix(".ready.json")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "capture_after_ns": started_ns,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return destination
+
+
+def write_qa_progress_marker(receipt_path: Path, stage: str) -> Path:
+    destination = receipt_path.resolve().with_suffix(".progress.json")
+    destination.write_text(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "stage": stage,
+                "recorded_ns": time.time_ns(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return destination
+
+
 def _widget_receipt(
-    widget: tk.Label,
+    widget: tk.Misc,
     *,
     window_left: int,
     window_top: int,
@@ -966,7 +1058,10 @@ def _widget_receipt(
     height = widget.winfo_height()
     requested_width = widget.winfo_reqwidth()
     requested_height = widget.winfo_reqheight()
-    measured_text_width = font.measure(str(widget.cget("text")))
+    measured_text_width = _measure_multiline_text_width(
+        font,
+        widget.cget("text"),
+    )
     font_linespace = font.metrics("linespace")
     return {
         "actual": {
@@ -996,18 +1091,22 @@ def _widget_receipt(
 def write_qa_ui_receipt(
     *,
     window: tk.Misc,
-    labels: dict[str, tk.Label],
+    labels: dict[str, tk.Misc],
     receipt_path: Path,
     screenshot_path: Path,
 ) -> None:
+    write_qa_progress_marker(receipt_path, "receipt_started")
     window.update_idletasks()
     hwnd, window_left, window_top, window_width, window_height = (
         _top_level_window_rect(window)
     )
+    write_qa_progress_marker(receipt_path, "window_measured")
     screenshot = screenshot_path.resolve()
     width, height = _png_dimensions(screenshot)
     candidate_files = (
         Path(sys.executable).resolve(),
+        Path(__file__).resolve(),
+        (RESOURCE_DIR / "toolbox" / "app_shell.py").resolve(),
         (RESOURCE_DIR / "assets" / "keyview.ico").resolve(),
         (RESOURCE_DIR / "assets" / "community_mod_catalog.json").resolve(),
         (RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json").resolve(),
@@ -1021,11 +1120,30 @@ def write_qa_ui_receipt(
         except ValueError:
             key = path.name
         source_files[key] = _file_sha256(path)
+    write_qa_progress_marker(receipt_path, "source_hashed")
     try:
         ctypes.windll.kernel32.GetCommandLineW.restype = ctypes.c_wchar_p
         command_line = str(ctypes.windll.kernel32.GetCommandLineW())
     except (AttributeError, OSError):
         command_line = subprocess.list2cmdline([sys.executable, *sys.argv])
+    icon_handles = {
+        "small": _send_window_message_bounded(hwnd, 0x007F, 0),
+        "big": _send_window_message_bounded(hwnd, 0x007F, 1),
+        "small2": _send_window_message_bounded(hwnd, 0x007F, 2),
+        "class_big": int(_get_class_long_ptr(hwnd, -14) or 0),
+        "class_small": int(_get_class_long_ptr(hwnd, -34) or 0),
+    }
+    write_qa_progress_marker(receipt_path, "icons_measured")
+    label_receipts = {
+        key: _widget_receipt(
+            widget,
+            window_left=window_left,
+            window_top=window_top,
+        )
+        for key, widget in labels.items()
+        if widget.winfo_ismapped()
+    }
+    write_qa_progress_marker(receipt_path, "labels_measured")
     payload = {
         "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "process": {
@@ -1042,13 +1160,7 @@ def write_qa_ui_receipt(
             "title": str(window.wm_title()),
             "width": window_width,
             "height": window_height,
-            "icon_handles": {
-                "small": _send_window_message_bounded(hwnd, 0x007F, 0),
-                "big": _send_window_message_bounded(hwnd, 0x007F, 1),
-                "small2": _send_window_message_bounded(hwnd, 0x007F, 2),
-                "class_big": int(_get_class_long_ptr(hwnd, -14) or 0),
-                "class_small": int(_get_class_long_ptr(hwnd, -34) or 0),
-            },
+            "icon_handles": icon_handles,
         },
         "screenshot": {
             "path": str(screenshot),
@@ -1057,15 +1169,7 @@ def write_qa_ui_receipt(
             "width": width,
             "height": height,
         },
-        "labels": {
-            key: _widget_receipt(
-                widget,
-                window_left=window_left,
-                window_top=window_top,
-            )
-            for key, widget in labels.items()
-            if widget.winfo_ismapped()
-        },
+        "labels": label_receipts,
     }
     destination = receipt_path.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1073,6 +1177,7 @@ def write_qa_ui_receipt(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    write_qa_progress_marker(receipt_path, "receipt_written")
 
 
 def save_settings(settings: dict[str, Any], path: Path = CONFIG_FILE) -> None:
@@ -1245,6 +1350,14 @@ def is_key_down(vk_code: int) -> bool:
     return bool(user32.GetAsyncKeyState(vk_code) & 0x8000)
 
 
+def initial_hotkey_state() -> dict[str, bool]:
+    """Snapshot held keys so startup polling only reacts to later press edges."""
+    return {
+        name: is_key_down(vk_code)
+        for name, vk_code in HOTKEY_VIRTUAL_KEYS.items()
+    }
+
+
 def rounded_rectangle(
     canvas: tk.Canvas,
     x1: float,
@@ -1334,9 +1447,14 @@ class KeyViewApp:
         self.key_state: dict[str, bool] = {
             key: False for key in (*KEY_DEFINITIONS, *GAMEPAD_LABELS)
         }
-        self.hotkey_state = {"F8": False, "F9": False, "F10": False, "F11": False}
+        # A key can still be held while the toolbox starts (for example after
+        # switching windows).  Seed the edge detector from the real state so
+        # that the first poll cannot turn that held key into a phantom press.
+        self.hotkey_state = initial_hotkey_state()
         self.last_process_check = 0.0
         self.last_layer_order_check = 0.0
+        self.last_topmost_reassert = 0.0
+        self._last_foreground_process_id: int | None = None
         self.game_process_id: int | None = None
         self.game_process_started_ns: int | None = None
         self.settings_window: tk.Toplevel | None = None
@@ -1421,9 +1539,15 @@ class KeyViewApp:
         scaled_width, scaled_height = self._scaled_dimensions()
         x = int(configured_x) if configured_x is not None else (screen_w - scaled_width) // 2
         y = int(configured_y)
-        x = min(max(0, x), max(0, screen_w - scaled_width))
-        y = min(max(0, y), max(0, screen_h - scaled_height))
-        self.root.geometry(f"{scaled_width}x{scaled_height}+{x}+{y}")
+        x, y = clamp_to_nearest_work_area(
+            x,
+            y,
+            scaled_width,
+            scaled_height,
+            fallback_width=screen_w,
+            fallback_height=screen_h,
+        )
+        place_tk_window(self.root, scaled_width, scaled_height, x, y)
         self.root.update_idletasks()
 
     def _create_background_layer(self) -> None:
@@ -1507,9 +1631,17 @@ class KeyViewApp:
     def _resize_windows_to_scale(self) -> None:
         scaled_width, scaled_height = self._scaled_dimensions()
         x, y = self.root.winfo_x(), self.root.winfo_y()
+        x, y = clamp_to_nearest_work_area(
+            x,
+            y,
+            scaled_width,
+            scaled_height,
+            fallback_width=self.root.winfo_screenwidth(),
+            fallback_height=self.root.winfo_screenheight(),
+        )
         self.canvas.configure(width=scaled_width, height=scaled_height)
         self.background_canvas.configure(width=scaled_width, height=scaled_height)
-        self.root.geometry(f"{scaled_width}x{scaled_height}+{x}+{y}")
+        place_tk_window(self.root, scaled_width, scaled_height, x, y)
         self.root.update_idletasks()
         self._sync_background_layer()
 
@@ -1536,16 +1668,16 @@ class KeyViewApp:
         if mode not in {"keyboard", "gamepad"}:
             raise ValueError(f"Unsupported display mode: {mode}")
         if mode == self.display_mode:
-            if not self.visible:
-                self.toggle_visible()
+            if not self.is_visible_on_desktop():
+                self.show_overlay()
             self.root.lift()
             return
         for input_id in self._visible_input_ids():
             self.key_state[input_id] = False
         self.display_mode = mode
         self._apply_display_mode(save=False)
-        if not self.visible:
-            self.toggle_visible()
+        if not self.is_visible_on_desktop():
+            self.show_overlay()
         self.root.lift()
         self._sync_background_layer()
         self._save_current_settings()
@@ -1618,13 +1750,53 @@ class KeyViewApp:
             self.background_window.withdraw()
             return
         scaled_width, scaled_height = self._scaled_dimensions()
-        geometry = f"{scaled_width}x{scaled_height}+{self.root.winfo_x()}+{self.root.winfo_y()}"
-        self.background_window.geometry(geometry)
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        self.background_window.geometry(tk_geometry(scaled_width, scaled_height, x, y))
         self.background_window.attributes("-alpha", self.background_opacity)
         self.background_window.attributes("-topmost", self.always_on_top)
         self.background_window.deiconify()
+        move_tk_window_no_activate(self.background_window, x, y)
         self.root.lift(self.background_window)
         self._ensure_layer_order(force=True)
+
+    def _reassert_overlay_topmost_no_activate(self) -> bool:
+        if not self.visible or not self.always_on_top:
+            return False
+        try:
+            foreground = self._shell_hwnd(self.root)
+        except tk.TclError:
+            return False
+        if not user32.IsWindow(foreground):
+            return False
+        flags = 0x0001 | 0x0002 | 0x0010 | 0x0040 | 0x0200
+        result = bool(
+            user32.SetWindowPos(
+                foreground,
+                wintypes.HWND(-1),
+                0,
+                0,
+                0,
+                0,
+                flags,
+            )
+        )
+        if result:
+            self._ensure_layer_order(force=True)
+        return result
+
+    def _show_native_overlay_no_activate(self) -> bool:
+        """Map the real Windows shell without taking focus from the game."""
+        try:
+            foreground = self._shell_hwnd(self.root)
+        except tk.TclError:
+            return False
+        if not user32.IsWindow(foreground):
+            return False
+        user32.ShowWindow(foreground, 4)  # SW_SHOWNOACTIVATE
+        flags = 0x0001 | 0x0002 | 0x0010 | 0x0040 | 0x0200
+        insert_after = wintypes.HWND(-1) if self.always_on_top else wintypes.HWND(0)
+        user32.SetWindowPos(foreground, insert_after, 0, 0, 0, 0, flags)
+        return bool(user32.IsWindowVisible(foreground) and not user32.IsIconic(foreground))
 
     def _ensure_layer_order(self, *, force: bool = False) -> bool:
         """Keep the translucent backdrop behind the foreground without focus theft."""
@@ -1832,7 +2004,7 @@ class KeyViewApp:
         self.current_layout = self._layout_for_display()
         self.current_height = overlay_height(self.current_layout, key_only=self.key_only)
         x, y = self.root.winfo_x(), self.root.winfo_y()
-        self.root.geometry(f"{WINDOW_WIDTH}x{self.current_height}+{x}+{y}")
+        place_tk_window(self.root, WINDOW_WIDTH, self.current_height, x, y)
         self.canvas.configure(width=WINDOW_WIDTH, height=self.current_height)
         self.background_canvas.configure(width=WINDOW_WIDTH, height=self.current_height)
         self.canvas.itemconfigure("chrome", state="hidden" if self.key_only else "normal")
@@ -1888,12 +2060,9 @@ class KeyViewApp:
         start_x, start_y, window_x, window_y = self.drag_origin
         x = window_x + event.x_root - start_x
         y = window_y + event.y_root - start_y
-        self.root.geometry(f"+{x}+{y}")
+        move_tk_window_no_activate(self.root, x, y)
         if self.visible and self.show_background and self.background_opacity > 0:
-            scaled_width, scaled_height = self._scaled_dimensions()
-            self.background_window.geometry(
-                f"{scaled_width}x{scaled_height}+{x}+{y}"
-            )
+            move_tk_window_no_activate(self.background_window, x, y)
 
     def _end_drag(self, _event: tk.Event[Any]) -> None:
         if self.drag_origin:
@@ -2008,10 +2177,6 @@ class KeyViewApp:
         self._poll_hotkey("F10", 0x79, self.open_settings)
         self._poll_hotkey("F11", 0x7A, self.toggle_clean_mode)
 
-        if now - self.last_layer_order_check >= 0.12:
-            self.last_layer_order_check = now
-            self._ensure_layer_order()
-
         if now - self.last_process_check >= 1.5:
             self.last_process_check = now
             observed_pid = find_game_process_id()
@@ -2023,6 +2188,22 @@ class KeyViewApp:
                     else None
                 )
             self._refresh_game_status()
+
+        if now - self.last_layer_order_check >= 0.12:
+            self.last_layer_order_check = now
+            foreground_pid = foreground_process_id()
+            foreground_changed = foreground_pid != self._last_foreground_process_id
+            self._last_foreground_process_id = foreground_pid
+            if should_reassert_overlay_topmost(
+                visible=self.visible,
+                always_on_top=self.always_on_top,
+                game_process_id=self.game_process_id,
+                foreground_process_id=foreground_pid,
+            ) and (foreground_changed or now - self.last_topmost_reassert >= 0.75):
+                self.last_topmost_reassert = now
+                self._reassert_overlay_topmost_no_activate()
+            else:
+                self._ensure_layer_order()
         self.root.after(16, self._tick)
 
     def _poll_hotkey(self, name: str, vk_code: int, command: Any) -> None:
@@ -2145,8 +2326,8 @@ class KeyViewApp:
         )
 
     def open_settings(self) -> None:
-        if not self.visible:
-            self.toggle_visible()
+        if not self.is_visible_on_desktop():
+            self.show_overlay()
         if self.settings_window is not None:
             try:
                 self.settings_window.deiconify()
@@ -2667,19 +2848,44 @@ class KeyViewApp:
                 text=f"已选择 {len(self.selected_keys)} / {MAX_DISPLAY_KEYS}"
             )
 
+    def hide_overlay(self) -> None:
+        if self.settings_window is not None:
+            self._close_settings()
+        self.background_window.withdraw()
+        self.root.withdraw()
+        self.visible = False
+
+    def show_overlay(self) -> None:
+        # This is deliberately an idempotent show operation.  Startup and
+        # settings actions must never depend on a possibly stale toggle state.
+        self.visible = True
+        self.root.deiconify()
+        self.root.update_idletasks()
+        self.root.attributes("-topmost", self.always_on_top)
+        self._apply_window_roles()
+        self._show_native_overlay_no_activate()
+        self._sync_background_layer()
+        if self.always_on_top:
+            self._reassert_overlay_topmost_no_activate()
+
     def toggle_visible(self) -> None:
-        if self.visible:
-            if self.settings_window is not None:
-                self._close_settings()
-            self.background_window.withdraw()
-            self.root.withdraw()
-            self.visible = False
+        if self.is_visible_on_desktop():
+            self.hide_overlay()
         else:
-            self.root.deiconify()
-            self.root.lift()
-            self.root.attributes("-topmost", self.always_on_top)
-            self.visible = True
-            self._apply_window_roles()
+            self.show_overlay()
+
+    def is_visible_on_desktop(self) -> bool:
+        try:
+            self.root.update_idletasks()
+            hwnd = self._shell_hwnd(self.root)
+            return bool(
+                self.root.winfo_viewable()
+                and user32.IsWindow(hwnd)
+                and user32.IsWindowVisible(hwnd)
+                and not user32.IsIconic(hwnd)
+            )
+        except tk.TclError:
+            return False
 
     def _window_handle(self) -> int:
         return self._shell_hwnd(self.root)
@@ -2715,8 +2921,8 @@ class KeyViewApp:
             self._set_click_through(False)
         if self.key_only:
             self._set_clean_mode(False, save=False)
-        if not self.visible:
-            self.toggle_visible()
+        if not self.is_visible_on_desktop():
+            self.show_overlay()
         self.root.lift()
         self._sync_background_layer()
         self._save_current_settings()
@@ -2769,9 +2975,26 @@ class KeyViewApp:
 
     def reset_position(self) -> None:
         screen_w = self.root.winfo_screenwidth()
-        scaled_width, _scaled_height = self._scaled_dimensions()
-        x = (screen_w - scaled_width) // 2
-        self.root.geometry(f"+{x}+90")
+        screen_h = self.root.winfo_screenheight()
+        scaled_width, scaled_height = self._scaled_dimensions()
+        work_area = nearest_monitor_work_area(
+            self.root.winfo_x(),
+            self.root.winfo_y(),
+            scaled_width,
+            scaled_height,
+            fallback_width=screen_w,
+            fallback_height=screen_h,
+        )
+        left, top, right, _bottom = work_area
+        x = left + max(0, (right - left - scaled_width) // 2)
+        x, y = clamp_window_position(
+            x,
+            top + 90,
+            scaled_width,
+            scaled_height,
+            work_area,
+        )
+        place_tk_window(self.root, scaled_width, scaled_height, x, y)
         self._sync_background_layer()
         self._save_current_settings()
 
@@ -2922,7 +3145,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--qa-ui-screenshot", type=Path, help=argparse.SUPPRESS)
     parser.add_argument(
         "--qa-ui-window",
-        choices=("main", "hud"),
+        choices=("main", "hud", "keyboard"),
         default="main",
         help=argparse.SUPPRESS,
     )
@@ -3023,11 +3246,9 @@ def main(argv: list[str] | None = None) -> int:
         keyboard_root,
         demo=args.demo,
         macro_feature=macro_feature,
-        on_request_close=lambda: (
-            keyboard_app.toggle_visible() if keyboard_app.visible else None
-        ),
+        on_request_close=lambda: keyboard_app.hide_overlay(),
     )
-    keyboard_app.toggle_visible()
+    keyboard_app.hide_overlay()
     builtin_mod_catalog = ModCatalog.from_file(
         RESOURCE_DIR / "assets" / "mod_catalog.json"
     )
@@ -3261,19 +3482,34 @@ def main(argv: list[str] | None = None) -> int:
     if args.show_macros:
         root.after(250, lambda: (shell.show_page("macro"), macro_feature.open_window()))
     if args.show_keyboard and not args.start_hidden:
-        root.after(250, keyboard_app.toggle_visible)
+        root.after(250, keyboard_app.show_overlay)
     if args.show_combat_hud:
         root.after(250, shell.hud.show)
     if args.qa_ui_receipt is not None and args.qa_ui_screenshot is not None:
-        qa_started_ns = time.time_ns()
-        qa_state: dict[str, int | None] = {"attempts": 0, "last_size": None}
+        qa_started_ns: int | None = None
+        qa_state = {"attempts": 0}
+
+        def selected_qa_window() -> tk.Misc | None:
+            if args.qa_ui_window == "hud":
+                return shell.hud.window
+            if args.qa_ui_window == "keyboard":
+                return keyboard_root
+            return root
+
+        def selected_qa_window_is_ready(window: tk.Misc | None) -> bool:
+            if window is None:
+                return False
+            if args.qa_ui_window == "keyboard":
+                return keyboard_app.is_visible_on_desktop()
+            return bool(window.winfo_viewable())
 
         def emit_qa_ui_receipt_when_captured() -> None:
+            if qa_started_ns is None:
+                return
             qa_state["attempts"] = int(qa_state["attempts"] or 0) + 1
-            window: tk.Misc | None
-            labels: dict[str, tk.Label]
+            window = selected_qa_window()
+            labels: dict[str, tk.Misc]
             if args.qa_ui_window == "hud":
-                window = shell.hud.window
                 labels = dict(shell.hud.labels)
                 for index, row in enumerate(shell.hud.teammate_labels, start=1):
                     name, damage, share, boss = row
@@ -3285,8 +3521,9 @@ def main(argv: list[str] | None = None) -> int:
                             f"teammate_{index}_boss": boss,
                         }
                     )
+            elif args.qa_ui_window == "keyboard":
+                labels = {}
             else:
-                window = root
                 labels = dict(shell.labels)
                 labels.update(
                     {
@@ -3300,17 +3537,21 @@ def main(argv: list[str] | None = None) -> int:
                         for name, widget in shell.mod_action_buttons.items()
                     }
                 )
+                labels.update(
+                    {
+                        f"module_button_{name}": widget
+                        for name, widget in shell.module_action_buttons.items()
+                    }
+                )
 
             screenshot = args.qa_ui_screenshot.resolve()
             try:
-                window_ready = window is not None and bool(window.winfo_viewable())
+                window_ready = selected_qa_window_is_ready(window)
                 stat = screenshot.stat()
                 screenshot_ready = (
                     stat.st_mtime_ns >= qa_started_ns
                     and stat.st_size > 0
-                    and qa_state["last_size"] == stat.st_size
                 )
-                qa_state["last_size"] = stat.st_size
             except (OSError, tk.TclError):
                 window_ready = False
                 screenshot_ready = False
@@ -3324,7 +3565,7 @@ def main(argv: list[str] | None = None) -> int:
                         screenshot_path=screenshot,
                     )
                     return
-                except (OSError, ValueError, tk.TclError) as error:
+                except Exception as error:
                     error_path = args.qa_ui_receipt.with_suffix(".error.json")
                     try:
                         error_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3343,10 +3584,24 @@ def main(argv: list[str] | None = None) -> int:
                     except OSError:
                         pass
                     return
-            if int(qa_state["attempts"] or 0) < 80:
+            if qa_state["attempts"] < 80:
                 root.after(250, emit_qa_ui_receipt_when_captured)
 
-        root.after(500, emit_qa_ui_receipt_when_captured)
+        def begin_qa_capture() -> None:
+            nonlocal qa_started_ns
+            window = selected_qa_window()
+            try:
+                window_ready = selected_qa_window_is_ready(window)
+            except tk.TclError:
+                window_ready = False
+            if not window_ready:
+                root.after(50, begin_qa_capture)
+                return
+            qa_started_ns = time.time_ns()
+            write_qa_capture_ready_marker(args.qa_ui_receipt, qa_started_ns)
+            root.after(500, emit_qa_ui_receipt_when_captured)
+
+        root.after_idle(begin_qa_capture)
     if args.exit_after > 0:
         root.after(round(args.exit_after * 1000), close_all)
     try:

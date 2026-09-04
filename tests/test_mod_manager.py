@@ -255,6 +255,54 @@ class ModManagerTests(unittest.TestCase):
             with self.assertRaises(ModManagerError):
                 ModCatalog.from_file(path)
 
+    def test_catalog_accepts_only_safe_distinct_superseded_file_identities(self) -> None:
+        current = b"current plugin"
+        legacy = b"legacy plugin"
+        payload = plugin_catalog_payload(current)
+        operation = payload["entries"][0]["operation"]  # type: ignore[index]
+        operation["superseded_files"] = [
+            {
+                "path": "legacy/fixture-v1.dll",
+                "sha256": hashlib.sha256(legacy).hexdigest().upper(),
+                "size_bytes": len(legacy),
+            }
+        ]
+        descriptor = ModCatalog.from_payload(payload).entries[0]
+        self.assertEqual(
+            descriptor.operation.superseded_files[0].path,
+            "legacy/fixture-v1.dll",
+        )
+
+        for unsafe in (
+            "../fixture-v1.dll",
+            "/fixture-v1.dll",
+            "C:/fixture-v1.dll",
+            r"\\server\fixture-v1.dll",
+            "legacy//fixture-v1.dll",
+        ):
+            with self.subTest(unsafe=unsafe):
+                invalid = json.loads(json.dumps(payload))
+                invalid["entries"][0]["operation"]["superseded_files"][0][
+                    "path"
+                ] = unsafe
+                with self.assertRaises(ModManagerError):
+                    ModCatalog.from_payload(invalid)
+
+        overlapping = json.loads(json.dumps(payload))
+        overlapping["entries"][0]["operation"]["superseded_files"][0]["path"] = (
+            "fixture.dll"
+        )
+        with self.assertRaises(ModManagerError):
+            ModCatalog.from_payload(overlapping)
+
+        duplicate = json.loads(json.dumps(payload))
+        duplicate_spec = duplicate["entries"][0]["operation"]["superseded_files"][0]
+        duplicate["entries"][0]["operation"]["superseded_files"].append(
+            dict(duplicate_spec)
+        )
+        with self.assertRaises(ModManagerError):
+            ModCatalog.from_payload(duplicate)
+
     def test_bepinex_plugin_installs_and_uninstalls_only_owned_leaf(self) -> None:
         content = b"fixture plugin bytes"
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -290,6 +338,113 @@ class ModManagerTests(unittest.TestCase):
                 manager.launch("fixture-plugin")
             self.assertTrue(manager.uninstall("fixture-plugin"))
             self.assertTrue(sibling.is_file())
+
+    def test_install_and_uninstall_remove_only_exact_superseded_files(self) -> None:
+        current = b"current plugin bytes"
+        legacy = b"legacy plugin bytes"
+        payload = plugin_catalog_payload(current)
+        operation = payload["entries"][0]["operation"]  # type: ignore[index]
+        operation["superseded_files"] = [
+            {
+                "path": "legacy/fixture-v1.dll",
+                "sha256": hashlib.sha256(legacy).hexdigest().upper(),
+                "size_bytes": len(legacy),
+            }
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            game = root / "game"
+            plugins = game / "BepInEx" / "plugins"
+            plugins.mkdir(parents=True)
+            game_exe = game / "LostCastle2.exe"
+            game_exe.write_bytes(b"game")
+            source = root / "fixture.dll"
+            source.write_bytes(current)
+            target_dir = plugins / "fixture-plugin"
+            legacy_path = target_dir / "legacy" / "fixture-v1.dll"
+            legacy_path.parent.mkdir(parents=True)
+            legacy_path.write_bytes(legacy)
+            unknown = target_dir / "keep.user"
+            unknown.write_bytes(b"keep")
+            manager = ModManager(
+                ModCatalog.from_payload(payload),
+                root / "managed",
+                root / "bundled",
+                game_exe_provider=lambda: game_exe,
+            )
+
+            self.assertEqual(manager.status("fixture-plugin").state, "integrity_error")
+            current_path = manager.install("fixture-plugin", source)
+            self.assertTrue(current_path.is_file())
+            self.assertFalse(legacy_path.exists())
+            self.assertFalse(legacy_path.parent.exists())
+            self.assertTrue(unknown.is_file())
+            self.assertTrue(manager.status("fixture-plugin").installed)
+
+            legacy_path.parent.mkdir(parents=True)
+            legacy_path.write_bytes(legacy)
+            self.assertEqual(manager.status("fixture-plugin").state, "integrity_error")
+            self.assertTrue(manager.uninstall("fixture-plugin"))
+            self.assertFalse(current_path.exists())
+            self.assertFalse(legacy_path.exists())
+            self.assertTrue(unknown.is_file())
+            self.assertEqual(manager.status("fixture-plugin").state, "not_installed")
+
+            legacy_path.parent.mkdir(parents=True)
+            legacy_path.write_bytes(legacy)
+            self.assertTrue(manager.uninstall("fixture-plugin"))
+            self.assertFalse(legacy_path.exists())
+            self.assertTrue(unknown.is_file())
+            self.assertEqual(manager.status("fixture-plugin").state, "not_installed")
+
+    def test_modified_or_non_file_superseded_targets_are_preserved(self) -> None:
+        current = b"current plugin bytes"
+        legacy = b"legacy plugin bytes"
+        payload = plugin_catalog_payload(current)
+        operation = payload["entries"][0]["operation"]  # type: ignore[index]
+        operation["superseded_files"] = [
+            {
+                "path": "fixture-v1.dll",
+                "sha256": hashlib.sha256(legacy).hexdigest().upper(),
+                "size_bytes": len(legacy),
+            },
+            {
+                "path": "legacy-folder",
+                "sha256": hashlib.sha256(b"not a directory").hexdigest().upper(),
+                "size_bytes": len(b"not a directory"),
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            game = root / "game"
+            plugins = game / "BepInEx" / "plugins"
+            plugins.mkdir(parents=True)
+            game_exe = game / "LostCastle2.exe"
+            game_exe.write_bytes(b"game")
+            source = root / "fixture.dll"
+            source.write_bytes(current)
+            target_dir = plugins / "fixture-plugin"
+            target_dir.mkdir()
+            modified = target_dir / "fixture-v1.dll"
+            modified.write_bytes(b"changed plugin bytes")
+            non_file = target_dir / "legacy-folder"
+            non_file.mkdir()
+            manager = ModManager(
+                ModCatalog.from_payload(payload),
+                root / "managed",
+                root / "bundled",
+                game_exe_provider=lambda: game_exe,
+            )
+
+            current_path = manager.install("fixture-plugin", source)
+            self.assertTrue(current_path.is_file())
+            self.assertEqual(modified.read_bytes(), b"changed plugin bytes")
+            self.assertTrue(non_file.is_dir())
+            self.assertEqual(manager.status("fixture-plugin").state, "integrity_error")
+            self.assertTrue(manager.uninstall("fixture-plugin"))
+            self.assertEqual(modified.read_bytes(), b"changed plugin bytes")
+            self.assertTrue(non_file.is_dir())
+            self.assertEqual(manager.status("fixture-plugin").state, "integrity_error")
 
     def test_bepinex_plugin_requires_game_and_bepinex(self) -> None:
         content = b"fixture plugin bytes"
@@ -368,6 +523,59 @@ class ModManagerTests(unittest.TestCase):
         self.assertIn(
             "Count -ne 61",
             (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8"),
+        )
+        superseded = {
+            descriptor.mod_id: tuple(
+                (spec.path, spec.size_bytes, spec.sha256)
+                for spec in descriptor.operation.superseded_files
+            )
+            for descriptor in catalog.entries
+            if descriptor.operation.superseded_files
+        }
+        self.assertEqual(
+            superseded,
+            {
+                "damage-meter": (
+                    (
+                        "失落城堡2伤害统计v1.5.1.dll",
+                        59_392,
+                        "64677F4DBEA9316911862D68A09B67615C1CA1B8BC7742A0108D0CC7D579A8D6",
+                    ),
+                ),
+                "enhancement-plan": (
+                    (
+                        "LC2EnhancementPlan_v4.8.dll",
+                        328_192,
+                        "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+                    ),
+                ),
+                "monster-treasure": (
+                    (
+                        "怪物宝藏v11.dll",
+                        86_016,
+                        "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+                    ),
+                    (
+                        "怪物宝藏v11.6.dll",
+                        107_008,
+                        "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
+                    ),
+                ),
+                "player-live-stats": (
+                    (
+                        "实时数据1.3.dll",
+                        27_136,
+                        "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
+                    ),
+                ),
+                "thunder-hammer-summon": (
+                    (
+                        "LC2.ThunderHammer真雷神之锤.dll",
+                        31_744,
+                        "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
+                    ),
+                ),
+            },
         )
         self.require_local_community_payloads()
         bundled_root = PROJECT_ROOT / "third_party"
@@ -942,6 +1150,11 @@ class ModManagerTests(unittest.TestCase):
             with self.assertRaises(ModConflictError) as context:
                 manager.install("second-plugin", second_source)
             self.assertEqual(context.exception.conflicts, ("Fixture Tool",))
+
+            manager.installed_path("fixture-plugin").write_bytes(b"tampered")
+            self.assertEqual(manager.status("fixture-plugin").state, "integrity_error")
+            with self.assertRaises(ModConflictError):
+                manager.install("second-plugin", second_source)
 
 
 if __name__ == "__main__":

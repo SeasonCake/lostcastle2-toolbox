@@ -72,6 +72,16 @@ class MacroModelTests(unittest.TestCase):
         with self.assertRaises(MacroProfileError):
             parse_macro_profile(bad)
 
+    def test_disabled_empty_draft_is_valid_but_cannot_be_enabled(self) -> None:
+        draft = profile_data()
+        draft["enabled"] = False
+        draft["steps"] = []
+        self.assertEqual(parse_macro_profile(draft).steps, ())
+
+        draft["enabled"] = True
+        with self.assertRaisesRegex(MacroProfileError, "至少需要 1 个动作步骤"):
+            parse_macro_profile(draft)
+
 
 class MacroControllerTests(unittest.TestCase):
     def setUp(self) -> None:

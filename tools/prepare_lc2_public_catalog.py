@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 from pathlib import Path, PurePosixPath
+import re
 import sys
 from typing import Any
 
@@ -18,6 +19,7 @@ FORBIDDEN_LOCAL_KEYS = {
     "source_path",
     "source_root",
 }
+SHA256_PATTERN = re.compile(r"^[0-9A-Fa-f]{64}$")
 
 
 class PublicCatalogError(ValueError):
@@ -75,11 +77,43 @@ def _required_entries(payload: Any) -> list[dict[str, Any]]:
 def _validate_relative_identity(value: Any, label: str) -> None:
     if not isinstance(value, str) or not value.strip():
         raise PublicCatalogError(f"{label} must be a non-empty relative path.")
-    path = PurePosixPath(value.replace("\\", "/"))
-    if path.is_absolute() or ".." in path.parts or "." in path.parts:
+    normalized = value.replace("\\", "/")
+    path = PurePosixPath(normalized)
+    if (
+        value != value.strip()
+        or normalized.startswith("/")
+        or normalized.endswith("/")
+        or path.is_absolute()
+        or any(
+            part in {"", ".", ".."} or ":" in part
+            for part in normalized.split("/")
+        )
+    ):
         raise PublicCatalogError(f"{label} must stay inside the selected source folder.")
-    if ":" in path.parts[0]:
-        raise PublicCatalogError(f"{label} must not contain a drive-qualified path.")
+
+
+def _validate_file_specs(operation: dict[str, Any], section: str) -> None:
+    specs = operation.get(section)
+    if specs is None:
+        return
+    label = f"operation.{section}"
+    if not isinstance(specs, list) or not specs:
+        raise PublicCatalogError(f"{label} must be a non-empty array.")
+    paths: set[str] = set()
+    for spec in specs:
+        file_spec = _required_mapping(spec, f"{label} entry")
+        path = file_spec.get("path")
+        _validate_relative_identity(path, f"{label}.path")
+        folded = str(path).replace("\\", "/").casefold()
+        if folded in paths:
+            raise PublicCatalogError(f"{label} paths must be unique.")
+        paths.add(folded)
+        size_bytes = file_spec.get("size_bytes")
+        if type(size_bytes) is not int or size_bytes <= 0:
+            raise PublicCatalogError(f"{label} size_bytes must be a positive integer.")
+        sha256 = file_spec.get("sha256")
+        if not isinstance(sha256, str) or not SHA256_PATTERN.fullmatch(sha256):
+            raise PublicCatalogError(f"{label} sha256 must contain 64 hexadecimal characters.")
 
 
 def _reject_local_path_fields(value: Any, label: str = "catalog") -> None:
@@ -112,15 +146,11 @@ def validate_public_catalog(payload: Any) -> None:
             )
         expected_filename = operation.get("expected_filename")
         _validate_relative_identity(expected_filename, "operation.expected_filename")
-        if PurePosixPath(str(expected_filename)).name != expected_filename:
+        normalized_expected = str(expected_filename).replace("\\", "/")
+        if PurePosixPath(normalized_expected).name != normalized_expected:
             raise PublicCatalogError("operation.expected_filename must be one filename.")
-        files = operation.get("files")
-        if files is not None:
-            if not isinstance(files, list) or not files:
-                raise PublicCatalogError("operation.files must be a non-empty array.")
-            for spec in files:
-                file_spec = _required_mapping(spec, "operation.files entry")
-                _validate_relative_identity(file_spec.get("path"), "operation.files.path")
+        _validate_file_specs(operation, "files")
+        _validate_file_specs(operation, "superseded_files")
 
 
 def public_catalog_from_payload(payload: Any) -> dict[str, Any]:
