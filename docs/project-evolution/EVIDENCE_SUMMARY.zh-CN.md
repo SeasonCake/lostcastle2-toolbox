@@ -71,12 +71,12 @@
 - Distribution为1,770文件/167,021,045 B，EXE `F881D798…28660`、Bridge `190B8B4A…7DED`，诊断/默认记录关闭、exports不存在、维护者精确个人目录与测试数据扫描0命中；同名桌面目录逐文件一致。UTF-8分享ZIP为137,406,593 B，逐文件内容一致，SHA-256 `8905A9DE…CF7C5`。
 - 群分享说明只保留用户操作和不落对局明细的边界，诊断演进留在GitHub文档。public-core为1,712文件/84,931,341 B，EXE `1C6DB28B…364C9`；只带公开catalog、官方固定运行时和Distribution Bridge，不带本地第三方MOD载荷。`v1.7.4`标签与发布提交均为`be1f1ba115…`，58,012,289 B公开资产的服务器digest、Draft与正式下载回读均为`B68160E1…D2A4C4`，GitHub Release已发布为Latest。
 
-## v1.7.5 诊断闭环与 v1.7.6 本地发布候选
+## v1.7.5 诊断闭环与 v1.7.6 发布
 
 - v1.7.5 实测关闭首次 HUD 裁切、按键窗首次显示/切回游戏、副屏位置和宏空白新建；该版本只保留为诊断候选。单人强退旧段为7,354条事件，新段为26,112条事件，两段session/event交集均为0；新段最终三项官方值和真实`session_ended`完整到达。
 - 局中 Statistics 活动记录已验证 Damage/Boss，但没有运行时证据证明`mTakeDamageValue`在局中持续更新、跨房守恒并按重进回滚；因此不把静态存在的字段冒充官方实时承伤。样本过程承伤242、终局官方345，归类为可校准估算差异而非跨局污染。
 - v1.7.6 Distribution为1,770文件/167,032,427 B，EXE `62EAB72B…14E88B`；群ZIP 137,672,732 B / `CBD10F98…FE275`。public-core为1,712文件/84,942,701 B，EXE `862C5ECC…EA7CB`；ZIP 58,229,771 B / `1CAD53F9…B80A9`。两包config0、无exports、诊断关闭，个人绝对路径与测试标识扫描0命中，逐文件ZIP对照0差异。
-- 当前源码359项通过；更新后interop下Bridge1.7.4 Distribution重新编译0 warning/0 error且字节仍为`190B8B4A…E7DED`。F10从进程启动前到receipt完成始终按下的压力条件下，本任务3个Distribution首显进程、独立观察侧主屏/副屏2个进程及public-core 1个进程均得到600×365原生可见键盘窗，无误开设置、反向隐藏或裁切；正常启动反向臂只显示主窗并报告键盘隐藏。commit、push、tag、Release和公开下载回读尚未运行。
+- 当前源码359项通过；更新后interop下Bridge1.7.4 Distribution重新编译0 warning/0 error且字节仍为`190B8B4A…E7DED`。F10从进程启动前到receipt完成始终按下的压力条件下，本任务3个Distribution首显进程、独立观察侧主屏/副屏2个进程及public-core 1个进程均得到600×365原生可见键盘窗，无误开设置、反向隐藏或裁切；正常启动反向臂只显示主窗并报告键盘隐藏。群包已由维护者确认分发；`main`、`v1.7.6`与Latest Release完成，发布提交`f369490cc9…982dd5`，GitHub服务器digest、Draft回读和公开下载回读均为58,229,771 B / `1CAD53F9…B80A9`。
 
 ## 明确不外推
 
