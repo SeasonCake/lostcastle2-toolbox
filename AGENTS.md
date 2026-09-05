@@ -1,8 +1,12 @@
 # Lost Castle 2 Toolbox agent entry
 
 This project is a compact Windows/Tk toolbox. Keep product work small, reversible,
-and centered on the author's visible and functional request. The workspace-level
-If a parent workspace `AGENTS.md` exists, it also applies.
+and centered on the author's visible and functional request. If a parent workspace
+`AGENTS.md` exists, it also applies.
+
+For bounded investigation, intent questions and task consolidation, read
+`docs/agent_guides/MAINTENANCE_WORKFLOW.zh-CN.md`. This maintenance entry does not
+replace product/release records or authorize another product stage.
 
 ## Startup and scope
 
