@@ -350,12 +350,16 @@ class SupportDiagnostics:
         """Bounded low-frequency operations only; never per-hit or global key capture."""
         try:
             age = details.get("ui_tick_age_seconds")
-            if event == "combat_transport_health" and isinstance(age, (int, float)) and age >= 3:
+            sampled_ui = event == "combat_transport_health" and isinstance(age, (int, float)) and age >= 3
+            if sampled_ui:
                 # The existing five-second worker health callback can still run
                 # while Tk stops dispatching timers or a UI callback blocks.
                 details["ui_main_thread"] = _main_thread_stack()
             row = self.redactor().value({"at": _utc(), "run_id": self.run_id, "event": event, **details})
             encoded = json.dumps(row, ensure_ascii=False, allow_nan=False)
+            if len(encoded.encode("utf-8")) > 16 * 1024 and sampled_ui:
+                row["ui_main_thread"] = {"status": "omitted", "reason": "journal_entry_limit"}
+                encoded = json.dumps(row, ensure_ascii=False, allow_nan=False)
             if len(encoded.encode("utf-8")) > 16 * 1024:
                 row = {"at": _utc(), "run_id": self.run_id, "event": event, "details_truncated": True}
                 encoded = json.dumps(row, ensure_ascii=False)

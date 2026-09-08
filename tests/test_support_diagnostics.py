@@ -113,6 +113,23 @@ class SupportDiagnosticsTests(unittest.TestCase):
             with patch("toolbox.support_diagnostics.sys._current_frames", return_value={}):
                 self.assertEqual(_main_thread_stack(), {"status": "unavailable"})
 
+    def test_stack_size_limit_preserves_health_but_keeps_existing_oversize_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            exporter, _game = fixture(Path(temporary), game_present=False)
+            long_stack = {"status": "captured", "frames": [{"file": "a" * 512, "function": "f" * 128, "line": 123}] * 24, "older_frames_truncated": False}
+            with patch("toolbox.support_diagnostics._main_thread_stack", return_value=long_stack):
+                exporter.record_event("combat_transport_health", ui_tick_age_seconds=3.5, counts={"processed": 17})
+                exporter.record_event("combat_transport_health", ui_tick_age_seconds=3.5, original_oversize="x" * 20000)
+                exporter.record_event("another_event", original_oversize="x" * 20000)
+            rows = [json.loads(line) for line in (exporter.config_dir / "support/operations.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(rows[0].get("counts"), {"processed": 17})
+            self.assertEqual(rows[0]["ui_tick_age_seconds"], 3.5)
+            self.assertEqual(rows[0]["ui_main_thread"], {"status": "omitted", "reason": "journal_entry_limit"})
+            self.assertNotIn("details_truncated", rows[0])
+            self.assertTrue(rows[1]["details_truncated"])
+            self.assertTrue(rows[2]["details_truncated"])
+            self.assertIsNone(exporter.journal_error)
+
     def test_cli_export_works_before_ui_and_profile_startup_validation(self) -> None:
         import keyview
         with tempfile.TemporaryDirectory() as temporary:

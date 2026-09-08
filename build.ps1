@@ -4,7 +4,7 @@ param(
     [string]$GameDir = '',
     [string]$DotNetPath = '',
     [ValidateRange(1, 999)]
-    [int]$CandidateRevision = 4,
+    [int]$CandidateRevision = 5,
     [string]$OutputRoot = ''
 )
 

@@ -53,6 +53,8 @@ from toolbox.windows_windowing import (
     move_tk_window_no_activate,
     nearest_monitor_work_area,
     place_tk_window,
+    start_ui_message_timer,
+    stop_ui_message_timer,
     tk_geometry,
 )
 
@@ -3685,9 +3687,12 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
         root.after_idle(begin_qa_capture)
     if args.exit_after > 0:
         root.after(round(args.exit_after * 1000), close_all)
+    message_timer = start_ui_message_timer()
+    support_exporter.record_event("ui_message_timer", enabled=bool(message_timer), interval_ms=250)
     try:
         root.mainloop()
     finally:
+        stop_ui_message_timer(message_timer)
         kernel32.CloseHandle(mutex)
     return 0
 

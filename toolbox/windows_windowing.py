@@ -39,6 +39,24 @@ _user32.SetWindowPos.argtypes = (
     wintypes.UINT,
 )
 _user32.SetWindowPos.restype = wintypes.BOOL
+_user32.SetTimer.argtypes = (wintypes.HWND, ctypes.c_size_t, wintypes.UINT, ctypes.c_void_p)
+_user32.SetTimer.restype = ctypes.c_size_t
+_user32.KillTimer.argtypes = (wintypes.HWND, ctypes.c_size_t)
+_user32.KillTimer.restype = wintypes.BOOL
+
+
+def start_ui_message_timer() -> int:
+    """Keep native message waits bounded independently of Tcl's after timers.
+
+    Call on the UI thread. A NULL callback produces WM_TIMER messages only;
+    it never calls Tk from another thread or changes application state.
+    """
+    return int(_user32.SetTimer(None, 0, 250, None))
+
+
+def stop_ui_message_timer(timer_id: int) -> bool:
+    """Release a timer on the same UI thread that created it."""
+    return bool(_user32.KillTimer(None, timer_id)) if timer_id else True
 
 
 def clamp_window_position(
