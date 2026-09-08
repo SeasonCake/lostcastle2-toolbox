@@ -21,7 +21,7 @@
 
 当前稳定版：[v1.7.6](https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.7.6)。完整变化、验证结果与已知边界见 [v1.7.6 发布说明](docs/LC2_1.7.6_RELEASE_NOTES_2026-09-04.zh-CN.md)。
 
-1.7.7 各候选仅作诊断内测，不公开发布。r1 实测遇到队列溢出后永久停收，正在以它为基线验证恢复机制；后续正式版本从 1.7.8 开始。已验证范围与原始故障见 [1.7.7 候选说明](docs/LC2_1.7.7_RELEASE_NOTES.zh-CN.md)，恢复行为见 [恢复说明](docs/LC2_1.7.7_RECOVERY.zh-CN.md)。
+1.7.7 各候选仅作诊断内测，不公开发布。r1 实测遇到队列溢出后永久停收；r3已通过原始输入回放、异常隔离、重连和相关可见检查，等待真实游戏反馈。后续正式版本从 1.7.8 开始。已验证范围与原始故障见 [1.7.7 候选说明](docs/LC2_1.7.7_RELEASE_NOTES.zh-CN.md)，恢复行为见 [恢复说明](docs/LC2_1.7.7_RECOVERY.zh-CN.md)。
 
 GitHub Release 提供 `public-core` Windows x64 包：包含工具箱、官方 BepInEx、项目自有 Bridge 和公开 MOD 目录，但不包含灵魂石修改器、金币编辑器或社区 MOD 的第三方二进制载荷。用户可自行提供取得的原包，由工具箱按目录登记的文件身份校验。群内中文命名全量包由维护者单独分发，两者不是相同字节。
 
