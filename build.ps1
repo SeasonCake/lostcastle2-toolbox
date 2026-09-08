@@ -264,23 +264,23 @@ py -3 -m PyInstaller `
     --distpath (Join-Path $buildOutputRoot 'dist') `
     --specpath (Join-Path $buildOutputRoot 'build') `
     --name '失落城堡2工具箱' `
-    --icon '.\assets\keyview.ico' `
-    --version-file '.\version_info.txt' `
+    --icon (Join-Path $projectRoot 'assets\keyview.ico') `
+    --version-file (Join-Path $projectRoot 'version_info.txt') `
     --collect-data 'rfc3987_syntax' `
-    --add-data '.\assets\combat_sources.json;assets' `
-    --add-data '.\assets\game_locations.json;assets' `
-    --add-data '.\assets\mod_catalog.json;assets' `
-    --add-data '.\assets\community_mod_catalog.json;assets' `
+    --add-data "$(Join-Path $projectRoot 'assets\combat_sources.json');assets" `
+    --add-data "$(Join-Path $projectRoot 'assets\game_locations.json');assets" `
+    --add-data "$(Join-Path $projectRoot 'assets\mod_catalog.json');assets" `
+    --add-data "$(Join-Path $projectRoot 'assets\community_mod_catalog.json');assets" `
     --add-data "$stagedManifestPath;assets" `
-    --add-data '.\assets\keyview.ico;assets' `
+    --add-data "$(Join-Path $projectRoot 'assets\keyview.ico');assets" `
     --add-data "$stagedProfilePath;assets" `
-    --add-data '.\contracts\combat_event.schema.json;contracts' `
+    --add-data "$(Join-Path $projectRoot 'contracts\combat_event.schema.json');contracts" `
     --add-data "$trainerPath;third_party" `
     --add-data "$goldEditorPath;third_party" `
     --add-data "$communityModsPath;third_party/community_mods" `
     --add-data "$stagedRuntimeBundlePath;third_party/lc2_runtime" `
     --add-data "$sevenZipPath;third_party/7zip" `
-    '.\keyview.py'
+    (Join-Path $projectRoot 'keyview.py')
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE."
 }

@@ -279,7 +279,10 @@ class KeyViewTests(unittest.TestCase):
         build_source = (Path(__file__).resolve().parents[1] / "build.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertIn("assets\\keyview.ico;assets", build_source)
+        self.assertIn(
+            '--add-data "$(Join-Path $projectRoot \'assets\\keyview.ico\');assets"',
+            build_source,
+        )
 
         from PIL import Image
 
