@@ -41,6 +41,11 @@ class ModSourceRequired(ModManagerError):
 class ModIntegrityError(ModManagerError):
     """Raised when a selected or installed file differs from the catalog."""
 
+    def __init__(self, message: str, *, code: str = "integrity_mismatch", **details: Any) -> None:
+        super().__init__(message)
+        self.code = code
+        self.details = details
+
 
 class ModGamePathRequired(ModManagerError):
     """Raised when an in-game plugin has no usable Lost Castle 2 location."""
@@ -278,14 +283,12 @@ class ModCatalog:
                 )
             if bundled and bundle_dir is None:
                 raise ModManagerError("Bundled multi-file MODs require bundle_dir.")
-        active_paths = {spec.path.casefold() for spec in files} or {
-            expected_filename.casefold()
+        active_identities = {spec.path.casefold(): spec.sha256 for spec in files} or {
+            expected_filename.casefold(): sha256
         }
-        if any(
-            spec.path.casefold() in active_paths for spec in superseded_files
-        ):
+        if any(active_identities.get(spec.path.casefold()) == spec.sha256 for spec in superseded_files):
             raise ModManagerError(
-                "Superseded MOD payload paths must differ from current payload paths."
+                "Superseded MOD payload bytes must differ from current payload bytes."
             )
         integrity_policy = ModIntegrityPolicy(
             version_note=ModCatalog._required_string(
@@ -535,11 +538,14 @@ class ModManager:
             directory = self._installed_directory(descriptor)
         except ModGamePathRequired:
             return ModStatus("game_not_configured", source_bundled, False)
+        except ModIntegrityError:
+            return ModStatus("integrity_error", source_bundled, False)
         specs = self._file_specs(descriptor)
         targets = [self._join_relative(directory, spec.path) for spec in specs]
         superseded_targets = [
             self._join_relative(directory, spec.path)
             for spec in descriptor.operation.superseded_files
+            if spec.path.casefold() not in {active.path.casefold() for active in specs}
         ]
         superseded_present = any(
             target.exists() or target.is_symlink() for target in superseded_targets
@@ -594,6 +600,7 @@ class ModManager:
             self._validate_file(source, descriptor)
             self._remove_exact_superseded_files(descriptor)
             return target
+        self._validate_write_targets(descriptor)
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + ".installing")
         try:
@@ -677,22 +684,17 @@ class ModManager:
         return subprocess.Popen([str(target)], cwd=str(target.parent), close_fds=True)
 
     def _install_package(self, descriptor: ModDescriptor, source: Path) -> Path:
-        if not source.is_dir():
-            raise ModIntegrityError("Bundled MOD payload directory is missing.")
+        contents = self._read_package_source(descriptor, source)
         directory = self._installed_directory(descriptor)
         specs = self._file_specs(descriptor)
+        self._validate_write_targets(descriptor)
         for spec in specs:
-            source_file = self._join_relative(source, spec.path).resolve()
-            self._ensure_contained(source_file, source)
-            self._validate_spec_file(source_file, spec)
-        for spec in specs:
-            source_file = self._join_relative(source, spec.path).resolve()
             target = self._join_relative(directory, spec.path).resolve()
             self._ensure_contained(target, directory)
             target.parent.mkdir(parents=True, exist_ok=True)
             temporary = target.with_name(target.name + ".installing")
             try:
-                shutil.copyfile(source_file, temporary)
+                temporary.write_bytes(contents[spec.path])
                 self._hash_cache.pop(temporary, None)
                 self._validate_spec_file(temporary, spec)
                 os.replace(temporary, target)
@@ -703,6 +705,163 @@ class ModManager:
                     temporary.unlink()
         self._remove_exact_superseded_files(descriptor, directory=directory)
         return self.installed_path(descriptor.mod_id)
+
+    def _validate_write_targets(self, descriptor: ModDescriptor) -> None:
+        directory = self._installed_directory(descriptor)
+        known = self._file_specs(descriptor) + descriptor.operation.superseded_files
+        for spec in self._file_specs(descriptor):
+            target = self._join_relative(directory, spec.path)
+            current = directory
+            for part in PurePosixPath(spec.path).parts:
+                current /= part
+                if current.is_symlink() or getattr(current, "is_junction", lambda: False)():
+                    raise ModIntegrityError("MOD target is a link.", code="target_modified", path=spec.path)
+            if not target.exists():
+                continue
+            if target.is_file():
+                actual_size = target.stat().st_size
+                actual_sha = self._sha256(target, use_cache=False)
+                if any(
+                    old.path.casefold() == spec.path.casefold()
+                    and old.size_bytes == actual_size and old.sha256 == actual_sha
+                    for old in known
+                ):
+                    continue
+            raise ModIntegrityError(
+                "Existing MOD target is not a registered version; retained unchanged.",
+                code="target_modified", path=spec.path,
+            )
+
+    def _read_package_source(self, descriptor: ModDescriptor, source: Path) -> dict[str, bytes]:
+        """Read only hash-bound payloads; never unpack a source tree into the game."""
+        from .mod_inspector import ModInspectionError, ModPackageInspector, PackageMember
+
+        specs = self._file_specs(descriptor)
+        if not source.exists():
+            raise ModIntegrityError("Selected MOD source is missing.", code="source_missing", path=source.name)
+        if sum(spec.size_bytes for spec in specs) > 128 * 1024 * 1024:
+            raise ModIntegrityError("Selected MOD payload is too large.", code="source_limit")
+
+        if source.is_file() and source.suffix.casefold() == ".dll":
+            if len(specs) != 1:
+                raise ModIntegrityError(
+                    "This MOD requires the whole source package.", code="source_requires_package",
+                    required_files=[spec.path for spec in specs],
+                )
+            spec = specs[0]
+            self._validate_spec_file(source, spec)
+            content = source.read_bytes()
+            self._validate_spec_content(content, spec)
+            return {spec.path: content}
+
+        try:
+            if source.is_dir():
+                # User folders can have wrappers. Bound traversal and do not follow links.
+                members: list[PackageMember] = []
+                pending = [(source, 0)]
+                visited = 0
+                while pending:
+                    folder, depth = pending.pop()
+                    with os.scandir(folder) as entries:
+                        for entry in entries:
+                            visited += 1
+                            if visited > 512 or depth > 8:
+                                raise ModInspectionError("MOD 来源目录过大或层级过深。")
+                            path = Path(entry.path)
+                            if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
+                                continue
+                            if entry.is_dir(follow_symlinks=False):
+                                pending.append((path, depth + 1))
+                            elif entry.is_file(follow_symlinks=False):
+                                members.append(PackageMember(path.relative_to(source).as_posix(), entry.stat().st_size))
+
+                def read_member(relative: str) -> bytes:
+                    path = self._join_relative(source, relative)
+                    current = source
+                    for part in PurePosixPath(relative).parts:
+                        current /= part
+                        if current.is_symlink() or getattr(current, "is_junction", lambda: False)():
+                            raise ModInspectionError("MOD 来源包含链接。")
+                    self._ensure_contained(path.resolve(), source)
+                    if path.stat().st_size > 128 * 1024 * 1024:
+                        raise ModInspectionError("MOD 来源文件过大。")
+                    return path.read_bytes()
+            elif source.suffix.casefold() in {".zip", ".7z", ".rar"}:
+                inspector = ModPackageInspector(self.bundled_root / "7zip" / "7z.exe")
+                archive_members, read_member, _kind = inspector._open_source(source)
+                if len(archive_members) > 512:
+                    raise ModInspectionError("MOD 压缩包成员过多。")
+                members = [member for member in archive_members if not member.is_directory]
+            else:
+                raise ModIntegrityError(
+                    "Selected MOD source type is unsupported.", code="source_type_unsupported", path=source.name,
+                )
+
+            contents: dict[str, bytes] = {}
+            scanned_bytes = 0
+            for spec in specs:
+                named_candidates = [
+                    member for member in members
+                    if PurePosixPath(member.path).name.casefold() == PurePosixPath(spec.path).name.casefold()
+                ]
+                # Curated sources may rename a DLL or repair a mojibake filename.
+                # Content identity remains authoritative in an original archive too.
+                candidates = named_candidates + [
+                    member for member in members if member not in named_candidates
+                    and member.size_bytes == spec.size_bytes
+                    and PurePosixPath(member.path).suffix.casefold() == PurePosixPath(spec.path).suffix.casefold()
+                ]
+                if not candidates:
+                    raise ModIntegrityError(
+                        "Selected MOD source is missing a required member.",
+                        code="source_member_missing", path=spec.path,
+                    )
+                candidates.sort(key=lambda member: (member not in named_candidates, member.path.casefold() != spec.path.casefold(), member.path))
+                first_error: ModIntegrityError | None = None
+                for member in candidates:
+                    try:
+                        if member.size_bytes != spec.size_bytes:
+                            raise ModIntegrityError(
+                                "Selected MOD payload size mismatch.", code="source_size_mismatch",
+                                path=spec.path, expected=spec.size_bytes, actual=member.size_bytes,
+                            )
+                        scanned_bytes += member.size_bytes
+                        if scanned_bytes > 128 * 1024 * 1024:
+                            raise ModInspectionError("MOD 来源匹配读取量过大。")
+                        content = read_member(member.path)
+                        self._validate_spec_content(content, spec)
+                    except ModIntegrityError as error:
+                        first_error = first_error or error
+                        continue
+                    contents[spec.path] = content
+                    break
+                else:
+                    if not named_candidates:
+                        raise ModIntegrityError(
+                            "Selected MOD source has no matching registered payload.",
+                            code="source_member_missing", path=spec.path,
+                        )
+                    assert first_error is not None
+                    raise first_error
+            return contents
+        except ModInspectionError as error:
+            raise ModIntegrityError(
+                "Unable to read the selected MOD source.", code="source_unreadable", reason=str(error),
+            ) from error
+
+    @staticmethod
+    def _validate_spec_content(content: bytes, spec: ModFileSpec) -> None:
+        if len(content) != spec.size_bytes:
+            raise ModIntegrityError(
+                "Selected MOD payload size mismatch.", code="source_size_mismatch",
+                path=spec.path, expected=spec.size_bytes, actual=len(content),
+            )
+        actual = hashlib.sha256(content).hexdigest().upper()
+        if actual != spec.sha256:
+            raise ModIntegrityError(
+                "Selected MOD payload SHA-256 mismatch.", code="source_hash_mismatch",
+                path=spec.path, expected=spec.sha256, actual=actual,
+            )
 
     def _remove_exact_superseded_files(
         self,
@@ -760,6 +919,11 @@ class ModManager:
             game_exe = game_exe.resolve()
             if not game_exe.is_file():
                 raise ModGamePathRequired("Lost Castle 2 executable does not exist.")
+            current = game_exe.parent
+            for part in ("BepInEx", "plugins", descriptor.mod_id):
+                current /= part
+                if current.is_symlink() or getattr(current, "is_junction", lambda: False)():
+                    raise ModIntegrityError("MOD target directory is a link.", code="target_modified", path=part)
             plugins_root = (game_exe.parent / "BepInEx" / "plugins").resolve()
             bepinex_root = (game_exe.parent / "BepInEx").resolve()
             if not bepinex_root.is_dir():
@@ -803,11 +967,18 @@ class ModManager:
 
     def _validate_spec_file(self, path: Path, spec: ModFileSpec) -> None:
         if not path.is_file():
-            raise ModIntegrityError("Bundled MOD payload file is missing.")
+            raise ModIntegrityError("MOD payload file is missing.", code="source_member_missing", path=spec.path)
         if path.stat().st_size != spec.size_bytes:
-            raise ModIntegrityError("Bundled MOD payload size mismatch.")
-        if self._sha256(path, use_cache=False) != spec.sha256:
-            raise ModIntegrityError("Bundled MOD payload SHA-256 mismatch.")
+            raise ModIntegrityError(
+                "MOD payload size mismatch.", code="source_size_mismatch", path=spec.path,
+                expected=spec.size_bytes, actual=path.stat().st_size,
+            )
+        actual = self._sha256(path, use_cache=False)
+        if actual != spec.sha256:
+            raise ModIntegrityError(
+                "MOD payload SHA-256 mismatch.", code="source_hash_mismatch", path=spec.path,
+                expected=spec.sha256, actual=actual,
+            )
 
     @staticmethod
     def _is_archive_source(path: Path, descriptor: ModDescriptor) -> bool:

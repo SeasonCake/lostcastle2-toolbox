@@ -211,6 +211,8 @@ def main() -> int:
         }
         if panel_hotkey is not None:
             operation["panel_hotkey"] = panel_hotkey.strip()
+        if raw.get("superseded_files"):
+            operation["superseded_files"] = raw["superseded_files"]
         catalog_entries.append(
             {
                 "id": mod_id,
@@ -224,8 +226,10 @@ def main() -> int:
                     "size_bytes": primary_spec["size_bytes"],
                     "signature_status": "not_assessed",
                     "risk_level": "high",
-                    "capabilities": ["gameplay modification"],
-                    "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02",
+                    "capabilities": raw.get("capabilities", ["gameplay modification"]),
+                    "redistribution_status": raw.get(
+                        "redistribution_status", "maintainer_authorized_public_bundle_2026-09-02"
+                    ),
                 },
             }
         )

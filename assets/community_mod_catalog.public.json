@@ -103,6 +103,49 @@
       }
     },
     {
+      "id": "inventory-source-panel",
+      "display": {
+        "name": "多人背包与装备",
+        "version": "1.0.17",
+        "author": "懒虫桑",
+        "summary": "查看自己与队友的装备、宝藏获取记录、炼金材料、刻印和生效灵魂石",
+        "usage_hint": "安装后重启游戏，按 Alt+Q 或点击“打开 MOD 面板”；选择玩家页签查看装备与获取记录。未记录或无法读取的数据会显示提示；5–16人及不同联机角色的完整性尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LostCastle2.InventorySourcePanel.dll",
+        "bundled": false,
+        "files": [
+          {
+            "path": "LostCastle2.InventorySourcePanel.dll",
+            "size_bytes": 83456,
+            "sha256": "AC8B680B97D6BC0C6D4E0B79113AC03E07A79ED33374C571353C35C4AA9A9C5F"
+          }
+        ],
+        "provides": [
+          "lostcastle2.inventorysourcepanel.dll"
+        ],
+        "hotkeys": [
+          "Alt+Q"
+        ],
+        "panel_hotkey": "Alt+Q"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.17",
+        "author_source": "作者提供群文件与实际界面截图；DLL内嵌作者懒虫桑及BepInPlugin 1.0.17",
+        "author_channel": "local community package",
+        "sha256": "AC8B680B97D6BC0C6D4E0B79113AC03E07A79ED33374C571353C35C4AA9A9C5F",
+        "size_bytes": 83456,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "game state display"
+        ],
+        "redistribution_status": "public_core_user_supplied_required",
+        "source_redistribution_status": "maintainer_selected_for_1.7.7_2026-09-08"
+      }
+    },
+    {
       "id": "resource-transfer-f1",
       "display": {
         "name": "一键丢钱",
@@ -310,34 +353,63 @@
     {
       "id": "lightning-enhance-plate",
       "display": {
-        "name": "雷击与轰雷强化",
-        "version": "1.0.1",
+        "name": "雷系流派增强方案",
+        "version": "2.2.0",
         "author": "脆毛肚",
-        "summary": "强化雷击与轰雷前后期联动，并为三件雷击宝藏追加可叠加成长效果",
-        "usage_hint": "安装后重启游戏自动生效；适用于单人、联机房主或房主与客机共同安装的房间，仅客机安装时不生效。属于玩法数值修改，联机建议使用一致版本。"
+        "summary": "整合雷击、轰雷与电花强化，支持宝藏、职业限制和伤害参数调节",
+        "usage_hint": "安装后重启游戏，按 F9 打开面板；需同时安装主程序与面板。F9 与服装幻化及按键窗鼠标穿透重叠。新版说明仅确认单人/房主完整生效，客机效果未验证；请勿与旧雷击强化版同时使用。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "LC2LightningEnhancePlatev1.0.1.dll",
+        "expected_filename": "LC2LightlingSystemUpgradeV2.2.0.dll",
         "bundled": false,
         "files": [
+          {
+            "path": "LC2LightlingSystemUpgradeV2.2.0.dll",
+            "size_bytes": 56320,
+            "sha256": "37769266F5F1D6BA1544EB41358B7583CF82537BA33DF0229C3E1383D232EFE0"
+          },
+          {
+            "path": "LC2LightlingSystemUpgradePanel.dll",
+            "size_bytes": 31744,
+            "sha256": "2239EE9F2BB17189BD47595F9EDB6C75D7214ED7283098F8347E3F19C732A58D"
+          }
+        ],
+        "provides": [
+          "lc2lightningenhanceplatev1.0.1.dll",
+          "lc2lightningenhanceplatev1.1.0.dll",
+          "lc2lightningenhanceplatepanel.dll",
+          "lc2lightlingsystemupgradev2.2.0.dll",
+          "lc2lightlingsystemupgradepanel.dll"
+        ],
+        "hotkeys": [
+          "F9"
+        ],
+        "panel_hotkey": "F9",
+        "superseded_files": [
           {
             "path": "LC2LightningEnhancePlatev1.0.1.dll",
             "sha256": "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
             "size_bytes": 35328
+          },
+          {
+            "path": "LC2LightningEnhancePlatev1.1.0.dll",
+            "size_bytes": 39936,
+            "sha256": "377660D5AA0B3A03152E44BFABCBBCF82B77790A953EEA7150F0AAB63C793BC0"
+          },
+          {
+            "path": "LC2LightningEnhancePlatePanel.dll",
+            "size_bytes": 23040,
+            "sha256": "CD23E449E51DDE6A4C0A94CCDE4502BE2892109776BA5C053A2DDAED8324A924"
           }
-        ],
-        "provides": [
-          "lc2lightningenhanceplatev1.0.1.dll"
-        ],
-        "hotkeys": []
+        ]
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 1.0.1",
-        "author_source": "BepInPlugin 1.0.1元数据；随包说明以群内ID“脆毛肚”作为制作反馈联系人，群文件上传者同名",
+        "version_note": "curated community bundle 2.2.0",
+        "author_source": "9月8日群文件上传截图与2.2.0面板内署名脆毛肚；主程序及面板BepInPlugin 2.2.0、随包2.2.0更新说明",
         "author_channel": "local community package",
-        "sha256": "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
-        "size_bytes": 35328,
+        "sha256": "37769266F5F1D6BA1544EB41358B7583CF82537BA33DF0229C3E1383D232EFE0",
+        "size_bytes": 56320,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -1486,10 +1558,10 @@
       "id": "hideyoshi-summon",
       "display": {
         "name": "召唤狐狸剑姬",
-        "version": "2.0",
+        "version": "3.0",
         "author": "兔子王お",
-        "summary": "让豹骑士契约连协召唤狐狸剑姬",
-        "usage_hint": "安装后重启游戏，触发对应契约连协时自动生效。"
+        "summary": "持有增援发信仪时召唤失落剑客，并提供每玩家1–2只上限设置",
+        "usage_hint": "安装后重启游戏，由房主或单机持有增援发信仪触发，可在配置文件中设置每玩家1–2只上限；与其它增援发信仪召唤MOD建议二选一。本工具箱尚未实战验证。"
       },
       "operation": {
         "kind": "bepinex_plugin",
@@ -1498,21 +1570,28 @@
         "files": [
           {
             "path": "LC2.HideyoshiSummon召唤狐狸剑姬.dll",
-            "sha256": "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C",
-            "size_bytes": 21504
+            "size_bytes": 26112,
+            "sha256": "48EBBEA31C682372A65312AC6D75D4D06C272E7A965266FD8AC678FB9A36FACE"
           }
         ],
         "provides": [
           "lc2.hideyoshisummon召唤狐狸剑姬.dll"
         ],
-        "hotkeys": []
+        "hotkeys": [],
+        "superseded_files": [
+          {
+            "path": "LC2.HideyoshiSummon召唤狐狸剑姬.dll",
+            "sha256": "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C",
+            "size_bytes": 21504
+          }
+        ]
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 2.0",
-        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "version_note": "curated community bundle 3.0",
+        "author_source": "作者提供群文件截图、9月8日更新说明书兔子王署名；说明已改为增援发信仪，与HasReinforceItem检查GController物品一致，组件版本仍1.0.0",
         "author_channel": "local community package",
-        "sha256": "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C",
-        "size_bytes": 21504,
+        "sha256": "48EBBEA31C682372A65312AC6D75D4D06C272E7A965266FD8AC678FB9A36FACE",
+        "size_bytes": 26112,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
@@ -2094,6 +2173,46 @@
       }
     },
     {
+      "id": "niya-summon",
+      "display": {
+        "name": "恶魔士兵契约召唤尼娅",
+        "version": "1.0.0",
+        "author": "兔子王お",
+        "summary": "持有恶魔士兵契约时召唤并维护尼娅同伴",
+        "usage_hint": "安装后重启游戏，由房主或单机持有恶魔士兵契约触发；来源说明称客机无需安装。与大召唤师等同类功能建议分开使用，本工具箱尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "NiyaSummonV2召唤尼娅.dll",
+        "bundled": false,
+        "files": [
+          {
+            "path": "NiyaSummonV2召唤尼娅.dll",
+            "size_bytes": 31744,
+            "sha256": "8C5F876C1DE1BA7B4D34B95D614397A6BB898FB1A5FF60EDCA31AC5DD05342EF"
+          }
+        ],
+        "provides": [
+          "niyasummonv2召唤尼娅.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "3.0说明书署名兔子王、作者提供群文件截图；BepInPlugin local.lc2.niyasummon.v2 1.0.0",
+        "author_channel": "local community package",
+        "sha256": "8C5F876C1DE1BA7B4D34B95D614397A6BB898FB1A5FF60EDCA31AC5DD05342EF",
+        "size_bytes": 31744,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "public_core_user_supplied_required",
+        "source_redistribution_status": "maintainer_selected_for_1.7.7_2026-09-08"
+      }
+    },
+    {
       "id": "damage-meter",
       "display": {
         "name": "游戏内伤害统计",
@@ -2432,34 +2551,42 @@
     {
       "id": "hand-color-white",
       "display": {
-        "name": "手掌变白",
-        "version": "2.0",
+        "name": "手掌与幽影配色",
+        "version": "1.11.0",
         "author": "兔子王お",
-        "summary": "调整角色手掌显示颜色",
-        "usage_hint": "安装后重启游戏自动生效。"
+        "summary": "调整本地玩家手掌、玩家标记和所属召唤物的显示颜色",
+        "usage_hint": "安装后重启游戏，默认使用白色，可在生成的配置文件中调整颜色及作用范围；没有独立设置面板。新版与旧手掌变白使用同一插件身份，请勿重复安装。"
       },
       "operation": {
         "kind": "bepinex_plugin",
-        "expected_filename": "LC2.HandColorWhite手掌变白.dll",
+        "expected_filename": "LC2.HandColorWhite手掌 幽影底色强制变白.dll",
         "bundled": false,
         "files": [
+          {
+            "path": "LC2.HandColorWhite手掌 幽影底色强制变白.dll",
+            "size_bytes": 22528,
+            "sha256": "520302E61E45F5221C068F56A9D51EC48B55B3C4428562A4213B1359562C8C4C"
+          }
+        ],
+        "provides": [
+          "lc2.handcolorwhite手掌变白.dll",
+          "lc2.handcolorwhite手掌 幽影底色强制变白.dll"
+        ],
+        "hotkeys": [],
+        "superseded_files": [
           {
             "path": "LC2.HandColorWhite手掌变白.dll",
             "sha256": "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
             "size_bytes": 10752
           }
-        ],
-        "provides": [
-          "lc2.handcolorwhite手掌变白.dll"
-        ],
-        "hotkeys": []
+        ]
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 2.0",
-        "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）",
+        "version_note": "curated community bundle 1.11.0",
+        "author_source": "3.0说明书兔子王署名与群文件截图；同GUID com.workbuddy.lc2.handcolorwhite 由1.2.0更新至1.11.0，文件名变化",
         "author_channel": "local community package",
-        "sha256": "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
-        "size_bytes": 10752,
+        "sha256": "520302E61E45F5221C068F56A9D51EC48B55B3C4428562A4213B1359562C8C4C",
+        "size_bytes": 22528,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [

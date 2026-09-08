@@ -41,7 +41,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $goldEditorPath).Hash -ne $gold
 if (-not (Test-Path -LiteralPath $communityModsPath -PathType Container)) {
     throw 'Missing prepared community MOD payloads.'
 }
-if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 61) {
+if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 64) {
     throw 'Prepared community MOD payload file count mismatch.'
 }
 $runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
@@ -268,9 +268,9 @@ if ($LASTEXITCODE -ne 0) {
 
 $packageParent = Join-Path $projectRoot 'package'
 $packageName = if ($BuildProfile -eq 'Diagnostic') {
-    '失落城堡2工具箱1.7.6-诊断候选-r1'
+    '失落城堡2工具箱1.7.7-诊断候选-r1'
 } else {
-    '失落城堡2工具箱1.7.6-实时数值监测+一键MOD安装'
+    '失落城堡2工具箱1.7.7-实时数值监测+一键MOD安装'
 }
 $packageRoot = Join-Path $packageParent $packageName
 if (Test-Path -LiteralPath $packageRoot) {

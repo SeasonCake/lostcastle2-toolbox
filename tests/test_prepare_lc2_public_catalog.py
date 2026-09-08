@@ -25,7 +25,7 @@ class PublicCatalogTests(unittest.TestCase):
     def test_tracked_public_catalogs_are_exact_deterministic_derivatives(self) -> None:
         pairs = (
             ("mod_catalog.json", "mod_catalog.public.json", 2),
-            ("community_mod_catalog.json", "community_mod_catalog.public.json", 60),
+            ("community_mod_catalog.json", "community_mod_catalog.public.json", 62),
         )
         for source_name, public_name, expected_count in pairs:
             with self.subTest(public_name=public_name):

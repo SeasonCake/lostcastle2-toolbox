@@ -292,6 +292,9 @@ class ModManagerTests(unittest.TestCase):
         overlapping["entries"][0]["operation"]["superseded_files"][0]["path"] = (
             "fixture.dll"
         )
+        # A hash-bound previous version may keep its filename during an upgrade.
+        self.assertEqual(ModCatalog.from_payload(overlapping).entries[0].operation.superseded_files[0].path, "fixture.dll")
+        overlapping["entries"][0]["operation"]["superseded_files"][0]["sha256"] = hashlib.sha256(current).hexdigest().upper()
         with self.assertRaises(ModManagerError):
             ModCatalog.from_payload(overlapping)
 
@@ -500,10 +503,10 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 60)
+        self.assertEqual(len(catalog.entries), 62)
         self.assertEqual(
             sum(len(descriptor.operation.files) for descriptor in catalog.entries),
-            61,
+            64,
         )
         self.assertEqual(
             sum(
@@ -511,17 +514,21 @@ class ModManagerTests(unittest.TestCase):
                 for descriptor in catalog.entries
                 for spec in descriptor.operation.files
             ),
-            3_665_869,
+            3_850_189,
         )
         self.assertTrue(
             all(
                 descriptor.integrity_policy.redistribution_status
-                == "maintainer_authorized_public_bundle_2026-09-02"
+                == (
+                    "maintainer_selected_for_1.7.7_2026-09-08"
+                    if descriptor.mod_id in {"inventory-source-panel", "niya-summon"}
+                    else "maintainer_authorized_public_bundle_2026-09-02"
+                )
                 for descriptor in catalog.entries
             )
         )
         self.assertIn(
-            "Count -ne 61",
+            "Count -ne 64",
             (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8"),
         )
         superseded = {
@@ -535,6 +542,13 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(
             superseded,
             {
+                "lightning-enhance-plate": (
+                    ("LC2LightningEnhancePlatev1.0.1.dll", 35_328, "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3"),
+                    ("LC2LightningEnhancePlatev1.1.0.dll", 39_936, "377660D5AA0B3A03152E44BFABCBBCF82B77790A953EEA7150F0AAB63C793BC0"),
+                    ("LC2LightningEnhancePlatePanel.dll", 23_040, "CD23E449E51DDE6A4C0A94CCDE4502BE2892109776BA5C053A2DDAED8324A924"),
+                ),
+                "hideyoshi-summon": (("LC2.HideyoshiSummon召唤狐狸剑姬.dll", 21_504, "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C"),),
+                "hand-color-white": (("LC2.HandColorWhite手掌变白.dll", 10_752, "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623"),),
                 "damage-meter": (
                     (
                         "失落城堡2伤害统计v1.5.1.dll",
@@ -615,6 +629,10 @@ class ModManagerTests(unittest.TestCase):
             "coil-summon-bobo",
             "thunder-hammer-summon",
             "bobo-staff",
+            "inventory-source-panel",
+            "niya-summon",
+            "hideyoshi-summon",
+            "hand-color-white",
         ):
             with self.subTest(mod_id=mod_id), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
@@ -670,7 +688,7 @@ class ModManagerTests(unittest.TestCase):
             metadata_by_id[descriptor.mod_id] = metadata
             ids_by_guid.setdefault(metadata[0].casefold(), []).append(descriptor.mod_id)
 
-        self.assertEqual(len(metadata_by_id), 60)
+        self.assertEqual(len(metadata_by_id), 62)
         self.assertEqual(
             {guid: ids for guid, ids in ids_by_guid.items() if len(ids) > 1},
             {},
@@ -682,9 +700,9 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(
             metadata_by_id["lightning-enhance-plate"],
             (
-                "local.lc2.lightningenhanceplatev1.0.1",
-                "LC2LightningEnhancePlatev1.0.1",
-                "1.0.1",
+                "local.lc2.lightlingsystemupgradev2.2.0",
+                "LC2LightlingSystemUpgradeV2.2.0",
+                "2.2.0",
             ),
         )
         self.assertEqual(
@@ -955,21 +973,22 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(bobo_staff.integrity_policy.size_bytes, 31_744)
 
         lightning = catalog.get("lightning-enhance-plate")
-        self.assertEqual(lightning.display.name, "雷击与轰雷强化")
-        self.assertEqual(lightning.display.version, "1.0.1")
+        self.assertEqual(lightning.display.name, "雷系流派增强方案")
+        self.assertEqual(lightning.display.version, "2.2.0")
         self.assertEqual(lightning.display.author, "脆毛肚")
         self.assertEqual(
             lightning.operation.expected_filename,
-            "LC2LightningEnhancePlatev1.0.1.dll",
+            "LC2LightlingSystemUpgradeV2.2.0.dll",
         )
-        self.assertEqual(lightning.operation.hotkeys, ())
-        self.assertIsNone(lightning.operation.panel_hotkey)
-        self.assertIn("仅客机安装时不生效", lightning.display.usage_hint)
+        self.assertEqual(lightning.operation.hotkeys, ("F9",))
+        self.assertEqual(lightning.operation.panel_hotkey, "F9")
+        self.assertIn("客机效果未验证", lightning.display.usage_hint)
+        self.assertEqual(len(lightning.operation.files), 2)
         self.assertEqual(
             lightning.integrity_policy.sha256,
-            "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
+            "37769266F5F1D6BA1544EB41358B7583CF82537BA33DF0229C3E1383D232EFE0",
         )
-        self.assertEqual(lightning.integrity_policy.size_bytes, 35_328)
+        self.assertEqual(lightning.integrity_policy.size_bytes, 56_320)
 
         unchanged_summon_payloads = {
             "evil-fire-crusher-summon": (
@@ -979,14 +998,6 @@ class ModManagerTests(unittest.TestCase):
             "nightmare-doll-skin": (
                 "2.0",
                 "C1256E175D6C8F95E014A1BD39F1CD35639E281D065A05DBC25748398D8D345E",
-            ),
-            "hideyoshi-summon": (
-                "2.0",
-                "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C",
-            ),
-            "hand-color-white": (
-                "2.0",
-                "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
             ),
             "coil-summon-bobo": (
                 "1.0.0",
@@ -1020,8 +1031,8 @@ class ModManagerTests(unittest.TestCase):
         ids = [descriptor.mod_id for descriptor in catalog.entries]
 
         self.assertEqual(
-            ids[:3],
-            ["player-live-stats", "enhancement-plan", "resource-transfer-f1"],
+            ids[:4],
+            ["player-live-stats", "enhancement-plan", "inventory-source-panel", "resource-transfer-f1"],
         )
         self.assertLess(ids.index("enhancement-plan"), ids.index("resource-transfer-f1"))
         self.assertLess(ids.index("multiplayer-room-fix"), ids.index("max-players-16"))

@@ -184,6 +184,16 @@ class CombatEventPump:
         self.aggregator = aggregator
         self.event_batch_sink = event_batch_sink
         self.fault_code: str | None = None
+        self._diagnostic_counts = {"processed": 0, "duplicates": 0, "notices": 0, "rejected": 0}
+        self._last_accepted_at: float | None = None
+        self._last_notice: dict[str, Any] | None = None
+
+    def diagnostic_state(self) -> dict[str, Any]:
+        return {
+            "counts": dict(self._diagnostic_counts), "fault_code": self.fault_code,
+            "last_accepted_at": self._last_accepted_at, "last_notice": self._last_notice,
+            "inbox_accepting": self.inbox.accepting,
+        }
 
     def drain(self, *, limit: int = MAX_QUEUE_ITEMS) -> CombatDrainReport:
         processed = 0
@@ -192,9 +202,11 @@ class CombatEventPump:
         accepted_events: list[Mapping[str, Any]] = []
         for item in self.inbox.drain(limit=limit):
             if self.fault_code is not None:
+                self._diagnostic_counts["rejected"] += 1
                 continue
             if isinstance(item, TransportNotice):
                 notices += 1
+                self._last_notice = {"state": item.state, "detail_code": item.detail_code, "observed_at": time.time()}
                 try:
                     self.aggregator.apply_transport_state(item.state)
                 except CombatEventError:
@@ -206,10 +218,12 @@ class CombatEventPump:
                 self.validator.validate(item)
                 accepted = self.aggregator.ingest(item)
             except (CombatSchemaError, CombatEventError) as exception:
+                self._diagnostic_counts["rejected"] += 1
                 self._fault(self._fault_from(exception))
                 continue
             if accepted:
                 processed += 1
+                self._last_accepted_at = time.time()
                 accepted_events.append(dict(item))
                 if (
                     item.get("event_type") == "status"
@@ -220,6 +234,9 @@ class CombatEventPump:
             else:
                 duplicates += 1
         self._publish_accepted_events(accepted_events)
+        self._diagnostic_counts["processed"] += processed
+        self._diagnostic_counts["duplicates"] += duplicates
+        self._diagnostic_counts["notices"] += notices
         return CombatDrainReport(processed, duplicates, notices, self.fault_code)
 
     def _publish_accepted_events(

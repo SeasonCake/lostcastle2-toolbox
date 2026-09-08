@@ -21,6 +21,8 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 
 Current stable release: [v1.7.6](https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.7.6). See the [v1.7.6 release notes](docs/LC2_1.7.6_RELEASE_NOTES_2026-09-04.zh-CN.md) for the exact changes, verification, and known limits.
 
+The 1.7.7 source work adds support diagnostics, fixes MOD source selection, and updates the community catalog. No 1.7.7 test package or release has been produced. See the [source notes](docs/LC2_1.7.7_SOURCE_NOTES.zh-CN.md) for changes and validation limits.
+
 The GitHub Release provides a Windows x64 `public-core` package. It contains the toolbox, the official BepInEx artifact, the project-owned Bridge, and public MOD catalog metadata, but excludes the third-party Soul Stone Trainer, Gold Editor, and community MOD binary/resource payloads. Users can provide packages they obtained independently and let the toolbox verify them against the catalog. The separately distributed Chinese community bundle is not byte-identical to the GitHub asset.
 
 ## Project status

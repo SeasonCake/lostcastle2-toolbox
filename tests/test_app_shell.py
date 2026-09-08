@@ -77,15 +77,17 @@ class AppShellModelTests(unittest.TestCase):
         source = inspect.getsource(ToolboxShell._refresh_module_statuses)
         self.assertIn("self.keyboard.is_visible_on_desktop()", source)
 
-    def test_candidate_diagnostics_controls_are_optional_and_stay_on_detail_page(self) -> None:
+    def test_support_export_and_candidate_combat_recording_have_separate_entries(self) -> None:
         constructor = inspect.getsource(ToolboxShell.__init__)
         header_builder = inspect.getsource(ToolboxShell._build)
         combat_builder = inspect.getsource(ToolboxShell._build_combat_page)
         self.assertIn("combat_diagnostics", constructor)
-        self.assertNotIn("导出诊断", header_builder)
+        self.assertIn("导出诊断", header_builder)
+        self.assertIn("self._export_support_diagnostics", header_builder)
         self.assertIn("if self.combat_diagnostics is not None", combat_builder)
         self.assertIn("暂停记录", combat_builder)
-        self.assertIn("导出诊断", combat_builder)
+        self.assertIn("导出对局", combat_builder)
+        self.assertNotIn("self._export_support_diagnostics", combat_builder)
         self.assertEqual(combat_builder.count("compact=True"), 2)
         self.assertNotIn("diagnostics = tk.Frame(page", combat_builder)
         self.assertLess(

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import os
 from pathlib import Path
 import queue
@@ -17,6 +17,7 @@ from .combat_transport import CombatEventPump
 from .macro_model import MacroProfile
 from .mod_manager import (
     ModConflictError,
+    ModDescriptor,
     ModGamePathRequired,
     ModIntegrityError,
     ModManager,
@@ -24,6 +25,7 @@ from .mod_manager import (
 )
 from .mod_inspector import ModDraft, ModInspectionError, ModPackageInspector
 from .user_mod_registry import UserModRegistry, UserModRegistryError, draft_fingerprint
+from .support_diagnostics import SupportDiagnostics, SupportExport
 from .windows_windowing import clamp_to_nearest_work_area, place_tk_window
 
 
@@ -1722,6 +1724,7 @@ class ToolboxShell:
         user_mod_registry: UserModRegistry,
         mod_inbox: Path,
         support_directory: Path | None = None,
+        support_exporter: SupportDiagnostics | None = None,
         combat_aggregator: CombatAggregator,
         combat_event_pump: CombatEventPump | None,
         combat_diagnostics: CombatDiagnosticsController | None,
@@ -1749,6 +1752,15 @@ class ToolboxShell:
         self.combat_aggregator = combat_aggregator
         self.combat_event_pump = combat_event_pump
         self.combat_diagnostics = combat_diagnostics
+        self.support_exporter = support_exporter
+        self.support_export_button: tk.Button | None = None
+        self._support_export_busy = False
+        self._support_export_results: queue.Queue[tuple[str, Any]] = queue.Queue()
+        self._support_export_dialog: tk.Toplevel | None = None
+        self._support_export_status: tk.Label | None = None
+        self._support_export_open: tk.Button | None = None
+        self._last_support_connection: tuple[str, str | None] | None = None
+        self.last_support_export: Path | None = None
         self.keyboard_preview_provider = keyboard_preview_provider
         self.launch_game = launch_game
         self.ensure_game_runtime = ensure_game_runtime
@@ -1909,7 +1921,6 @@ class ToolboxShell:
         header.pack(fill="x")
         self._main_roots.append(header)
         title = tk.Frame(header, bg="#F8F4EB")
-        title.pack(side="left", fill="x", expand=True)
         tk.Label(
             title,
             text="失落城堡 2 工具箱",
@@ -1926,6 +1937,11 @@ class ToolboxShell:
             accent=True,
             width=10,
         ).pack(side="right")
+        if self.support_exporter is not None:
+            self.support_export_button = self._button(
+                header_actions, "导出诊断", self._export_support_diagnostics, width=10,
+            )
+            self.support_export_button.pack(side="right", padx=(0, 8))
         self.labels["app_version"] = tk.Label(
             header_actions,
             text=f"v{self.app_version}",
@@ -1934,6 +1950,7 @@ class ToolboxShell:
             font=("Segoe UI", 8, "bold"),
         )
         self.labels["app_version"].pack(side="right", padx=(0, 12))
+        title.pack(side="left", fill="x", expand=True)
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True)
         self.sidebar = tk.Frame(body, bg=SIDEBAR, width=150, padx=9, pady=12)
@@ -2395,7 +2412,7 @@ class ToolboxShell:
         if self.combat_diagnostics is not None:
             self.diagnostics_export_button = self._button(
                 heading,
-                "导出诊断",
+                "导出对局",
                 self._export_candidate_diagnostics,
                 compact=True,
                 width=9,
@@ -2841,7 +2858,8 @@ class ToolboxShell:
             self.mod_detail_labels["summary"].configure(wraplength=width)
             self.mod_detail_labels["usage"].configure(wraplength=width)
 
-        detail.bind("<Configure>", wrap_detail)
+        # Preserve RoundedPanel's auto-height handler when the description wraps.
+        detail.bind("<Configure>", wrap_detail, add="+")
         self.mod_search_var.trace_add("write", lambda *_args: self._populate_mod_tree())
         self._populate_mod_tree()
 
@@ -3310,22 +3328,14 @@ class ToolboxShell:
             return
         descriptor = self.mod_manager.descriptor(mod_id)
         source = self.mod_manager.bundled_source(mod_id)
+        self._record_support_event(
+            "mod_source", mod_id=mod_id, bundled=descriptor.operation.bundled,
+            bundled_source_found=source is not None, version=descriptor.display.version,
+        )
         if source is None:
-            archive = descriptor.operation.archive_source
-            filetypes = [("MOD 文件", "*.dll")]
-            if archive is not None:
-                filetypes[0] = ("MOD 文件", "*.dll *.7z *.zip *.rar")
-            if descriptor.operation.kind == "external_trainer":
-                filetypes[0] = ("Windows 应用程序", "*.exe")
-            filetypes.append(("所有文件", "*.*"))
-            selected = filedialog.askopenfilename(
-                parent=self.root,
-                title=f"选择 {descriptor.display.name} 文件",
-                filetypes=tuple(filetypes),
-            )
-            if not selected:
+            source = self._choose_mod_source(descriptor)
+            if source is None:
                 return
-            source = Path(selected)
         if descriptor.operation.kind == "bepinex_plugin" and not messagebox.askyesno(
             "安装游戏插件",
             f"将“{descriptor.display.name}”安装到游戏插件目录。\n\n安装后需重启游戏，是否继续？",
@@ -3339,16 +3349,212 @@ class ToolboxShell:
             return
         self._mod_busy = True
         self._refresh_mod_page()
+        self._record_support_event(
+            "mod_install_begin", mod_id=mod_id, source=str(source),
+            source_kind="directory" if source.is_dir() else source.suffix.lower(),
+        )
 
         def install() -> None:
             try:
                 self.mod_manager.install(mod_id, source)
             except Exception as exception:
+                self._record_support_event(
+                    "mod_install_failed", mod_id=mod_id, error_type=type(exception).__name__,
+                    code=getattr(exception, "code", "operation_failed"),
+                    details=getattr(exception, "details", {}), message=str(exception),
+                )
                 self._finish_mod_action(False, exception)
             else:
+                self._record_support_event("mod_install_complete", mod_id=mod_id)
                 self._finish_mod_action(True, None)
 
         threading.Thread(target=install, name="LC2ModInstall", daemon=True).start()
+
+    def _record_support_event(self, event: str, **details: Any) -> None:
+        exporter = getattr(self, "support_exporter", None)
+        if exporter is not None:
+            exporter.record_event(event, **details)
+
+    def _support_snapshot(self) -> dict[str, Any]:
+        """Read Tk and live models on the UI thread before starting the I/O worker."""
+        snapshot = self.combat_aggregator.snapshot()
+        macro_snapshot: dict[str, Any] = {"profiles": []}
+        for profile in self.macro_feature.profiles:
+            macro_snapshot["profiles"].append({
+                "id": profile.id, "enabled": profile.enabled,
+                "trigger": asdict(profile.trigger), "limits": asdict(profile.limits),
+                "steps": [asdict(step) for step in profile.steps],
+                "state": self.macro_feature.controller.state(profile.id).value,
+            })
+        macro_snapshot["configuration_errors"] = list(getattr(self.macro_feature, "errors", []))
+        macro_snapshot["last_runtime_state"] = str(getattr(self.macro_feature, "_runtime_state", "unknown"))
+        macro_snapshot["unsaved_changes"] = bool(getattr(self.macro_feature, "_dirty", False))
+        macro_snapshot["unapplied_step"] = bool(getattr(self.macro_feature, "_step_draft_dirty", False))
+        return {
+            "combat": snapshot.to_dict(),
+            "transport": self.combat_event_pump.diagnostic_state() if self.combat_event_pump else {"state": "not_started"},
+            "ui": {
+                "main_geometry": self.root.winfo_geometry(), "main_viewable": bool(self.root.winfo_viewable()),
+                "tk_scaling": float(self.root.tk.call("tk", "scaling")),
+                "screen_width": self.root.winfo_screenwidth(), "screen_height": self.root.winfo_screenheight(),
+                "selected_mod": self.mod_selected_id, "mod_busy": self._mod_busy,
+                "keyboard_viewable": self.keyboard.is_visible_on_desktop(),
+                "keyboard_click_through": bool(getattr(self.keyboard, "click_through", False)),
+                "hud_visible": bool(self.hud.window and self.hud.window.winfo_viewable()),
+                "hud_geometry": self.hud.window.winfo_geometry() if self.hud.window else None,
+            },
+            "macro": macro_snapshot,
+            "combat_recording": {
+                "available": self.combat_diagnostics is not None,
+                "enabled": bool(self.combat_diagnostics and self.combat_diagnostics.enabled),
+                "history_included": False,
+            },
+        }
+
+    def _export_support_diagnostics(self) -> None:
+        if self.support_exporter is None or self._support_export_busy:
+            return
+        self._support_export_busy = True
+        if self.support_export_button is not None:
+            self.support_export_button.configure(state="disabled", text="正在导出…")
+        try:
+            live_snapshot = self._support_snapshot()
+        except Exception as error:
+            live_snapshot = {"state": "snapshot_failed", "error_type": type(error).__name__}
+            self._record_support_event("support_snapshot_failed", error_type=type(error).__name__, message=str(error))
+        self._record_support_event("support_export_requested")
+        if self._support_export_dialog is not None:
+            try:
+                self._support_export_dialog.destroy()
+            except tk.TclError:
+                pass
+        dialog = tk.Toplevel(self.root)
+        self._support_export_dialog = dialog
+        dialog.title("导出诊断")
+        dialog.configure(bg=SURFACE)
+        dialog.transient(self.root)
+        body = tk.Frame(dialog, bg=SURFACE, padx=20, pady=18)
+        body.pack(fill="both", expand=True)
+        tk.Label(body, text="导出支持诊断", bg=SURFACE, fg=TEXT, font=("Microsoft YaHei UI", 12, "bold")).pack(anchor="w")
+        status = tk.Label(
+            body, text="正在收集版本、运行环境和近期错误…", bg=SURFACE, fg=MUTED,
+            font=("Microsoft YaHei UI", 10), wraplength=440, justify="left",
+        )
+        status.pack(anchor="w", pady=(10, 16))
+        self._support_export_status = status
+        actions = tk.Frame(body, bg=SURFACE)
+        actions.pack(fill="x")
+        self._support_export_open = self._button(actions, "打开所在文件夹", self._open_support_export_folder)
+        self._support_export_open.configure(state="disabled")
+        self._support_export_open.pack(side="left")
+        self._button(actions, "关闭", dialog.destroy).pack(side="right", padx=(30, 0))
+        dialog.bind("<Escape>", lambda _event: dialog.destroy())
+
+        def export() -> None:
+            try:
+                assert self.support_exporter is not None
+                result = self.support_exporter.export(
+                    live_snapshot, progress=lambda text: self._support_export_results.put(("progress", text)),
+                )
+                self._support_export_results.put(("complete", result))
+            except Exception as error:
+                self._record_support_event("support_export_failed", error_type=type(error).__name__, message=str(error))
+                self._support_export_results.put(("error", error))
+
+        threading.Thread(target=export, name="LC2SupportExport", daemon=True).start()
+
+    def _open_support_export_folder(self) -> None:
+        if self.last_support_export is None:
+            return
+        try:
+            os.startfile(self.last_support_export.parent)
+        except OSError:
+            messagebox.showinfo("诊断位置", str(self.last_support_export), parent=self.root)
+
+    def _drain_support_export_results(self) -> None:
+        while True:
+            try:
+                kind, value = self._support_export_results.get_nowait()
+            except queue.Empty:
+                return
+            if kind == "progress":
+                text = str(value) + "…"
+            else:
+                self._support_export_busy = False
+                if self.support_export_button is not None:
+                    self.support_export_button.configure(state="normal", text="导出诊断")
+                if kind == "complete":
+                    result: SupportExport = value
+                    self.last_support_export = result.path
+                    text = "诊断包已保存。"
+                    if result.partial:
+                        text += "部分信息未能读取，已在报告中标明。"
+                    text += f"\n\n{result.path}\n\n请将这个 ZIP 私发维护者，并说明操作步骤。"
+                else:
+                    text = "诊断包未能保存，请确认目标目录可写后重试。\n" + type(value).__name__
+            try:
+                if self._support_export_status is not None:
+                    self._support_export_status.configure(text=text)
+                if kind == "complete" and self._support_export_open is not None:
+                    self._support_export_open.configure(state="normal")
+            except tk.TclError:
+                pass  # Closing the progress window does not cancel an in-flight export.
+
+    def _choose_mod_source(self, descriptor: ModDescriptor) -> Path | None:
+        operation = descriptor.operation
+        if not operation.files:
+            patterns = "*.exe" if operation.kind == "external_trainer" else "*.dll *.zip *.7z *.rar"
+            selected = filedialog.askopenfilename(
+                parent=self.root, title=f"选择 {descriptor.display.name} {descriptor.display.version}",
+                filetypes=(("MOD 文件", patterns), ("所有文件", "*.*")),
+            )
+            return Path(selected) if selected else None
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("选择 MOD 来源")
+        dialog.configure(bg=SURFACE)
+        dialog.transient(self.root)
+        dialog.resizable(False, False)
+        body = tk.Frame(dialog, bg=SURFACE, padx=20, pady=18)
+        body.pack(fill="both", expand=True)
+        tk.Label(
+            body, text=f"{descriptor.display.name}  {descriptor.display.version}",
+            bg=SURFACE, fg=TEXT, font=("Microsoft YaHei UI", 11, "bold"),
+            wraplength=440, justify="left",
+        ).pack(anchor="w")
+        explanation = (
+            "随包 MOD 文件缺失。请完整解压工具箱，或选择这个版本的原包。"
+            if operation.bundled else "此版本需要你提供 MOD 文件，请选择对应版本的原包或解压目录。"
+        )
+        if len(operation.files) > 1:
+            explanation += f"\n这个 MOD 需要 {len(operation.files)} 个文件，请提供完整来源。"
+        tk.Label(
+            body, text=explanation, bg=SURFACE, fg=MUTED,
+            font=("Microsoft YaHei UI", 10), wraplength=440, justify="left",
+        ).pack(anchor="w", pady=(8, 16))
+        actions = tk.Frame(body, bg=SURFACE)
+        actions.pack(fill="x")
+        choice: list[Path] = []
+
+        def choose(folder: bool) -> None:
+            if folder:
+                selected = filedialog.askdirectory(parent=dialog, title="选择 MOD 解压目录", mustexist=True)
+            else:
+                selected = filedialog.askopenfilename(
+                    parent=dialog, title=f"选择 {descriptor.display.name} 原包或 DLL",
+                    filetypes=(("MOD 原包或 DLL", "*.zip *.7z *.rar *.dll"), ("所有文件", "*.*")),
+                )
+            if selected:
+                choice.append(Path(selected))
+                dialog.destroy()
+
+        self._button(actions, "选择原包 / DLL", lambda: choose(False), accent=True).pack(side="left")
+        self._button(actions, "选择文件夹", lambda: choose(True)).pack(side="left", padx=(8, 0))
+        self._button(actions, "取消", dialog.destroy).pack(side="right", padx=(16, 0))
+        dialog.bind("<Escape>", lambda _event: dialog.destroy())
+        dialog.grab_set()
+        self.root.wait_window(dialog)
+        return choice[0] if choice else None
 
     def _finish_mod_action(self, success: bool, error: Exception | None) -> None:
         self._mod_results.put((success, error))
@@ -3371,6 +3577,19 @@ class ToolboxShell:
             names = "、".join(error.conflicts)
             return f"检测到提供同名插件的已安装 MOD：{names}。请先卸载冲突项。"
         if isinstance(error, ModIntegrityError):
+            messages = {
+                "source_missing": "选择的 MOD 来源已不存在，请重新选择。",
+                "source_member_missing": f"来源中缺少所需文件：{error.details.get('path', '')}。请提供完整原包或解压目录。",
+                "source_requires_package": "这个 MOD 需要多个文件，请选择完整原包或解压目录，不能只选其中一个 DLL。",
+                "source_type_unsupported": "这个来源格式不支持，请选择 DLL、ZIP、7Z、RAR 或解压目录。",
+                "source_unreadable": "无法读取这个来源，可能是压缩包损坏或目录结构不支持。请完整解压后选择文件夹。",
+                "source_limit": "这个来源过大，请选择只包含所需 MOD 的原包或目录。",
+                "target_modified": f"游戏内已有不同或修改过的文件：{error.details.get('path', '')}。已保留原文件，请先备份并确认需要使用的版本。",
+                "source_size_mismatch": f"文件与登记版本大小不同：{error.details.get('path', '')}。请重新选择对应版本。",
+                "source_hash_mismatch": f"文件内容与登记版本不同：{error.details.get('path', '')}。请重新选择对应版本。",
+            }
+            if error.code in messages:
+                return messages[error.code]
             return "所选文件与登记版本不一致；请重新选择对应版本。"
         if isinstance(error, ModGamePathRequired):
             return "未找到可用的游戏或 BepInEx 目录；请先在设置中定位游戏程序。"
@@ -3707,6 +3926,9 @@ class ToolboxShell:
         widths = mod_tree_column_widths(event.width)
         for column, width in widths.items():
             tree.column(column, width=width)
+        selected = self.mod_selected_id
+        if selected and tree.exists(selected):
+            tree.see(selected)
 
     def _display_control_row(
         self,
@@ -4174,7 +4396,7 @@ class ToolboxShell:
             )
         finally:
             if button is not None:
-                button.configure(state="normal", text="导出诊断")
+                button.configure(state="normal", text="导出对局")
             self._refresh_candidate_diagnostics()
 
     def _resize_combat_team_grid(self, _event: tk.Event[Any] | None = None) -> None:
@@ -4349,6 +4571,11 @@ class ToolboxShell:
             self.combat_event_pump.drain()
         self._drain_mod_results()
         self._drain_mod_import_results()
+        self._drain_support_export_results()
+        connection = (self.combat_aggregator.connection_state, self.combat_event_pump.fault_code if self.combat_event_pump else None)
+        if connection != self._last_support_connection:
+            self._record_support_event("combat_connection", state=connection[0], fault_code=connection[1])
+            self._last_support_connection = connection
         self.refresh()
         self._after_id = self.root.after(500, self._tick)
 

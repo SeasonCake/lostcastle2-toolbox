@@ -48,6 +48,13 @@ third_party/community_mods/
 artifacts/**
 !artifacts/**/
 !artifacts/**/README.zh-CN.md
+artifacts/source-publication/
+
+# Local coordination records; publish separate source notes instead.
+docs/agent_guides/MAINTENANCE_PILOT_2026-09-05.zh-CN.md
+docs/agent_guides/LC2_GOVERNANCE_FEEDBACK_2026-09-08.zh-CN.md
+docs/LC2_1.7.7_PREPARATION_2026-09-07.zh-CN.md
+docs/LC2_1.7.7_SOURCE_IMPLEMENTATION_2026-09-08.zh-CN.md
 
 # Editor / operating system
 .idea/

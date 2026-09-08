@@ -13,6 +13,7 @@ import subprocess
 import struct
 import sys
 import time
+import traceback
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import tkinter.font as tkfont
@@ -44,6 +45,7 @@ from toolbox.runtime_setup import (
     RuntimeSetupManager,
 )
 from toolbox.user_mod_registry import UserModRegistry
+from toolbox.support_diagnostics import SupportDiagnostics
 from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, send_hotkey
 from toolbox.windows_windowing import (
     clamp_to_nearest_work_area,
@@ -56,7 +58,7 @@ from toolbox.windows_windowing import (
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.7.6"
+APP_VERSION = "1.7.7"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -2222,13 +2224,16 @@ class KeyViewApp:
             self.canvas.itemconfigure(self.running_text, text="● 就绪", fill="#7DDC9B")
 
     def launch_game(self) -> None:
+        self._record_support_event("game_launch_requested")
         if self.game_process_id and focus_process_window(self.game_process_id):
+            self._record_support_event("game_window_focused", pid=self.game_process_id)
             return
         if self.before_game_launch is not None and not self.before_game_launch():
             return
         game_exe = resolve_game_exe(self.settings.get("game_path"))
         try:
             os.startfile(f"steam://rungameid/{STEAM_APP_ID}")
+            self._record_support_event("game_launch_dispatched", method="steam")
             self.canvas.itemconfigure(self.running_text, text="● 正在启动", fill="#FFD66B")
             return
         except OSError:
@@ -2236,13 +2241,20 @@ class KeyViewApp:
         if game_exe:
             try:
                 subprocess.Popen([str(game_exe)], cwd=str(game_exe.parent))
+                self._record_support_event("game_launch_dispatched", method="executable", path=str(game_exe))
                 self.canvas.itemconfigure(self.running_text, text="● 正在启动", fill="#FFD66B")
                 return
             except OSError as exc:
+                self._record_support_event("game_launch_failed", error_type=type(exc).__name__, message=str(exc))
                 messagebox.showerror(APP_NAME, f"无法启动游戏：\n{exc}")
                 return
         if messagebox.askyesno(APP_NAME, "没有找到 LostCastle2.exe，是否现在手动定位？"):
             self.choose_game_path()
+
+    def _record_support_event(self, event: str, **details: Any) -> None:
+        sink = getattr(self, "support_event_sink", None)
+        if sink is not None:
+            sink(event, **details)
 
     def open_game_panel_hotkey(self, hotkey: str) -> bool:
         process_id = self.game_process_id or find_game_process_id()
@@ -3150,6 +3162,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help=argparse.SUPPRESS,
     )
     parser.add_argument("--self-test", action="store_true", help="运行无界面结构检查")
+    parser.add_argument("--export-diagnostics", action="store_true", help="不打开主窗口，收集支持诊断")
+    parser.add_argument("--diagnostics-output", type=Path, help="支持诊断的保存目录")
     args = parser.parse_args(argv)
     if bool(args.qa_ui_receipt) != bool(args.qa_ui_screenshot):
         parser.error("--qa-ui-receipt and --qa-ui-screenshot must be used together")
@@ -3220,10 +3234,23 @@ def self_test() -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     if args.self_test:
         return self_test()
+    if support_exporter is None:
+        support_exporter = SupportDiagnostics(APP_DIR, RESOURCE_DIR, CONFIG_DIR, app_version=APP_VERSION)
+    support_exporter.game_exe_provider = lambda: resolve_game_exe(load_settings(CONFIG_FILE).get("game_path"))
+    if args.diagnostics_output is not None:
+        support_exporter.output_directory = args.diagnostics_output
+    if args.export_diagnostics:
+        result = support_exporter.export()
+        if sys.stdout is not None:
+            print(str(result.path))
+        else:
+            messagebox.showinfo("诊断已导出", f"诊断包已保存：\n{result.path}\n\n请私发维护者。")
+        return 2 if result.partial else 0
+    support_exporter.record_event("application_start", version=APP_VERSION, demo=bool(args.demo), frozen=bool(getattr(sys, "frozen", False)))
     build_profile = load_build_profile()
     validate_packaged_build_profile(
         build_profile,
@@ -3235,6 +3262,15 @@ def main(argv: list[str] | None = None) -> int:
     if mutex is None:
         return 0
     root = tk.Tk()
+
+    def report_callback_exception(error_type: type[BaseException], error: BaseException, tb: Any) -> None:
+        support_exporter.record_event(
+            "ui_callback_failed", error_type=error_type.__name__, message=str(error),
+            traceback="".join(traceback.format_exception(error_type, error, tb)),
+        )
+        traceback.print_exception(error_type, error, tb)
+
+    root.report_callback_exception = report_callback_exception
     apply_app_window_icon(root)
     root.withdraw()
     if args.tk_scaling is not None:
@@ -3249,6 +3285,8 @@ def main(argv: list[str] | None = None) -> int:
         on_request_close=lambda: keyboard_app.hide_overlay(),
     )
     keyboard_app.hide_overlay()
+    keyboard_app.support_event_sink = support_exporter.record_event
+    support_exporter.game_exe_provider = lambda: resolve_game_exe(keyboard_app.settings.get("game_path"))
     builtin_mod_catalog = ModCatalog.from_file(
         RESOURCE_DIR / "assets" / "mod_catalog.json"
     )
@@ -3284,6 +3322,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def ensure_game_runtime() -> bool:
         status = runtime_setup.status()
+        support_exporter.record_event("runtime_status", state=status.state, detail=status.detail)
         if status.ready:
             return True
         if status.state == "game_not_configured":
@@ -3296,7 +3335,7 @@ def main(argv: list[str] | None = None) -> int:
         if status.state == "conflict":
             messagebox.showerror(
                 APP_NAME,
-                f"检测到不同的现有 BepInEx 运行环境，盒子没有覆盖。\n\n{status.detail}",
+                f"检测到不同的现有 BepInEx 运行环境，盒子没有覆盖。\n\n{status.detail}\n\n可点击右上角“导出诊断”，将诊断包私发维护者。",
                 parent=root,
             )
             return False
@@ -3310,13 +3349,17 @@ def main(argv: list[str] | None = None) -> int:
             ),
             parent=root,
         ):
+            support_exporter.record_event("runtime_initialization_cancelled")
             return False
         try:
+            support_exporter.record_event("runtime_initialization_begin")
             runtime_setup.install()
         except RuntimeSetupGameRunning as error:
+            support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
             messagebox.showerror(APP_NAME, str(error), parent=root)
             return False
         except RuntimeSetupConflict as error:
+            support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
             messagebox.showerror(
                 APP_NAME,
                 f"检测到不同的现有运行环境，盒子没有覆盖。\n\n{error}",
@@ -3324,12 +3367,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             return False
         except (RuntimeSetupError, OSError) as error:
+            support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
             messagebox.showerror(
                 APP_NAME,
                 f"初始化失败，游戏尚未启动。\n\n{error}",
                 parent=root,
             )
             return False
+        support_exporter.record_event("runtime_initialization_complete")
         messagebox.showinfo(
             "初始化完成",
             "HUD / MOD 运行环境已就绪。首次启动游戏会生成兼容文件，可能比平时稍慢。",
@@ -3402,6 +3447,7 @@ def main(argv: list[str] | None = None) -> int:
     closing = False
 
     def close_all() -> None:
+        support_exporter.record_event("application_exit")
         nonlocal closing
         if closing:
             return
@@ -3442,6 +3488,7 @@ def main(argv: list[str] | None = None) -> int:
             os.environ.get("KEYVIEW_MOD_INBOX_DIR", APP_DIR / "用户MOD")
         ),
         support_directory=support_directory,
+        support_exporter=support_exporter,
         combat_aggregator=combat_aggregator,
         combat_event_pump=combat_pump,
         combat_diagnostics=combat_diagnostics,
@@ -3611,5 +3658,14 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def run_entrypoint() -> int:
+    exporter = SupportDiagnostics(APP_DIR, RESOURCE_DIR, CONFIG_DIR, app_version=APP_VERSION)
+    try:
+        return main(support_exporter=exporter)
+    except Exception as error:
+        exporter.record_event("application_failed", error_type=type(error).__name__, message=str(error), traceback=traceback.format_exc())
+        raise
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run_entrypoint())

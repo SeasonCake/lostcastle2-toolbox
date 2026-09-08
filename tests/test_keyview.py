@@ -267,8 +267,8 @@ class KeyViewTests(unittest.TestCase):
             "verify_packaged_runtime.py --package $packageRoot",
             build_source,
         )
-        self.assertIn("失落城堡2工具箱1.7.6-诊断候选-r1", build_source)
-        self.assertIn("失落城堡2工具箱1.7.6-实时数值监测+一键MOD安装", build_source)
+        self.assertIn("失落城堡2工具箱1.7.7-诊断候选-r1", build_source)
+        self.assertIn("失落城堡2工具箱1.7.7-实时数值监测+一键MOD安装", build_source)
 
     def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:
         root = mock.Mock()
@@ -328,11 +328,12 @@ class KeyViewTests(unittest.TestCase):
         self.assertIn("Mini HUD 局中", usage)
         self.assertIn("正式分享版不保存逐事件对局明细", usage)
         self.assertIn("正式分享版不保存逐事件对局明细", runtime)
+        self.assertIn("导出诊断", usage)
+        self.assertIn("当前统计快照", usage)
         self.assertIn("documented in the repository", notices)
         for text in (usage, runtime, notices):
             for internal_term in (
                 "诊断候选",
-                "导出诊断",
                 "128 MiB",
                 "network SyncEnd",
                 "r5 Bridge",
