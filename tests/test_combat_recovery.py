@@ -91,6 +91,46 @@ class CombatRecoveryTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(CombatSchemaError):
                 self.validator.validate(damage(1, applied_hp_damage_unused=value))
 
+    def test_escaped_surrogate_isolation_preserves_both_neighbors_and_exportable_evidence(self) -> None:
+        for use_decoder in (False, True):
+            for invalid in ("invalid", chr(0xd800), chr(0xdc00)):
+                with self.subTest(decoder=use_decoder, invalid=repr(invalid)):
+                    inbox, aggregator, accepted = CombatInbox(), CombatAggregator(), []
+                    pump = CombatEventPump(inbox, self.validator, aggregator,
+                                           event_batch_sink=lambda events: accepted.extend(events))
+                    bad = damage(2)
+                    bad["settlement_damage"] = invalid
+                    events = [status_event(), damage(1, 11), bad, damage(3, 17)]
+                    items = CombatLineDecoder(recover=True).feed(encoded(*events)) if use_decoder else events
+                    for item in items:
+                        if isinstance(item, TransportNotice):
+                            inbox.publish_notice(item.state, item.detail_code, sample=item.sample)
+                        else:
+                            inbox.publish_event(item)
+                    report = pump.drain()
+                    self.assertEqual(report.processed_events, 3)
+                    self.assertEqual(aggregator.snapshot().total_damage, 28)
+                    self.assertEqual(aggregator.snapshot().last_sequence, 3)
+                    self.assertEqual([event["sequence"] for event in accepted], [0, 1, 3])
+                    self.assertTrue(aggregator.snapshot().data_incomplete)
+                    diagnostics = pump.diagnostic_state()
+                    self.assertEqual(diagnostics["counts"]["rejected"], 1)
+                    self.assertEqual(json.loads(diagnostics["recent_issues"][0]["sample"]), bad)
+                    json.dumps(diagnostics, ensure_ascii=False).encode("utf-8", errors="strict")
+
+    def test_valid_unicode_remains_accepted_but_invalid_unicode_in_status_cannot_poison_snapshot(self) -> None:
+        self.validator.validate(status_event(1, detail="继续采集 😀"))
+        with self.assertRaisesRegex(CombatSchemaError, "invalid_unicode"):
+            self.validator.validate(status_event(1, detail=chr(0xd800)))
+        inbox, aggregator = CombatInbox(), CombatAggregator()
+        pump = CombatEventPump(inbox, self.validator, aggregator)
+        inbox.publish_event(status_event())
+        inbox.publish_notice("degraded", "invalid_json", sample=chr(0xd800))
+        inbox.publish_event(damage(1, 17))
+        self.assertEqual(pump.drain().processed_events, 2)
+        self.assertEqual(aggregator.snapshot().total_damage, 17)
+        self.assertEqual(pump.diagnostic_state()["recent_issues"][0]["sample"], r"\ud800")
+
     def test_single_bad_record_keeps_valid_totals_and_next_room_with_bounded_evidence(self) -> None:
         inbox, aggregator = CombatInbox(), CombatAggregator()
         journal = []

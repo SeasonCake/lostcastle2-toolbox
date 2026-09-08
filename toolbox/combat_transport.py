@@ -92,7 +92,7 @@ class CombatLineDecoder:
                 continue
             try:
                 payload = json.loads(raw_line.decode("utf-8", errors="strict"))
-                _validate_finite(payload)
+                _validate_json_values(payload)
             except UnicodeDecodeError:
                 records.append(self._reject("invalid_utf8", raw_line))
                 continue
@@ -118,15 +118,21 @@ class CombatLineDecoder:
         return None
 
 
-def _validate_finite(value: Any) -> None:
+def _validate_json_values(value: Any) -> None:
     if isinstance(value, float) and not math.isfinite(value):
         raise CombatSchemaError("non_finite_number")
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8", errors="strict")
+        except UnicodeEncodeError as exception:
+            raise CombatSchemaError("invalid_unicode") from exception
     if isinstance(value, Mapping):
-        for child in value.values():
-            _validate_finite(child)
+        for key, child in value.items():
+            _validate_json_values(key)
+            _validate_json_values(child)
     elif isinstance(value, list):
         for child in value:
-            _validate_finite(child)
+            _validate_json_values(child)
 
 
 class CombatEventValidator:
@@ -143,7 +149,7 @@ class CombatEventValidator:
 
     def validate(self, event: Mapping[str, Any]) -> None:
         try:
-            _validate_finite(event)
+            _validate_json_values(event)
         except RecursionError as exception:
             raise CombatSchemaError("event_too_deep") from exception
         error = next(self._validator.iter_errors(event), None)
@@ -223,8 +229,12 @@ class CombatInbox:
 
 def _sample(item: Any) -> str:
     if isinstance(item, TransportNotice):
-        return item.sample or item.detail_code
-    return json.dumps(item, ensure_ascii=False, default=str)[:4096]
+        text = item.sample or item.detail_code
+    else:
+        text = json.dumps(item, ensure_ascii=False, default=str)
+    # Diagnostics must remain writable even when the rejected value contains
+    # escaped lone surrogates accepted by Python's JSON parser.
+    return text[:4096].encode("utf-8", errors="backslashreplace").decode("utf-8")[:4096]
 
 
 class CombatEventPump:
