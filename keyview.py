@@ -104,6 +104,7 @@ class BuildProfile:
     combat_diagnostics_available: bool
     bridge_diagnostics_enabled: bool
     default_recording_enabled: bool
+    candidate_revision: int | None = None
 
 
 def load_build_profile(
@@ -137,7 +138,13 @@ def load_build_profile(
     expected = profile_id == "diagnostic"
     if fields != (expected, expected, expected):
         raise BuildProfileError("构建配置开关与名称不一致。")
-    return BuildProfile(profile_id, *fields)
+    candidate_revision = payload.get("candidate_revision")
+    if candidate_revision is not None and (
+        profile_id != "diagnostic" or type(candidate_revision) is not int
+        or not 1 <= candidate_revision <= 999
+    ):
+        raise BuildProfileError("诊断候选序号无效。")
+    return BuildProfile(profile_id, *fields, candidate_revision)
 
 
 def validate_packaged_build_profile(
@@ -3240,6 +3247,7 @@ def self_test() -> int:
                 "runtime_bundle": runtime_bundle_status,
                 "build_profile": build_profile.profile_id,
                 "combat_diagnostics": build_profile.combat_diagnostics_available,
+                "candidate_revision": build_profile.candidate_revision,
             },
             ensure_ascii=False,
         )
@@ -3458,6 +3466,9 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
             event_batch_sink=combat_diagnostics.record_events
             if combat_diagnostics is not None
             else None,
+            diagnostic_sink=support_exporter.record_event,
+            event_batch_context=combat_diagnostics.capture_batch
+            if combat_diagnostics is not None else None,
         )
         combat_client = CombatBridgeClient(combat_inbox)
     shell: ToolboxShell | None = None
@@ -3472,7 +3483,10 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
         if combat_client is not None:
             combat_client.stop()
         if combat_pump is not None:
-            combat_pump.drain()
+            if combat_pump.stop():
+                combat_pump.drain()
+            else:
+                support_exporter.record_event("combat_consumer_stop_timeout")
         if combat_diagnostics is not None:
             combat_diagnostics.checkpoint()
         if shell is not None:
@@ -3514,9 +3528,12 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
         ensure_game_runtime=ensure_game_runtime,
         choose_game_path=keyboard_app.choose_game_path,
         close_command=close_all,
-        app_version=APP_VERSION,
+        app_version=(f"{APP_VERSION}-r{build_profile.candidate_revision} 内测"
+                     if build_profile.candidate_revision is not None else APP_VERSION),
         persist_window_geometry=args.window_size is None,
     )
+    if combat_pump is not None:
+        combat_pump.start()
     if combat_client is not None:
         combat_client.start()
     if args.window_size is not None:

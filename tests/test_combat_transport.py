@@ -435,10 +435,14 @@ class CombatTransportContractTests(unittest.TestCase):
         self.assertTrue(inbox.publish_event(status_event(1)))
         self.assertFalse(inbox.publish_event(status_event(2)))
         self.assertFalse(inbox.accepting)
-        self.assertEqual(
-            inbox.drain(),
-            [TransportNotice("error", "queue_overflow")],
-        )
+        items = inbox.drain()
+        self.assertEqual(items[:2], [status_event(), status_event(1)])
+        self.assertEqual(items[2].detail_code, "queue_overflow")
+        self.assertEqual(json.loads(items[2].sample), status_event(2))
+        self.assertTrue(inbox.accepting)
+        self.assertTrue(inbox.publish_event(status_event(3)))
+        self.assertEqual(inbox.drain(), [status_event(3)])
+        self.assertEqual(inbox.diagnostic_state()["dropped_lower_bound"], 1)
 
     def test_sixteen_player_batched_event_pump_stays_live_under_load(self) -> None:
         inbox = CombatInbox()
@@ -527,17 +531,22 @@ class CombatTransportContractTests(unittest.TestCase):
         self.assertIsNone(report.fault_code)
         self.assertEqual(aggregator.snapshot().connection_state, "live")
 
-    def test_schema_failure_stops_further_aggregation(self) -> None:
+    def test_schema_failure_is_retained_and_valid_new_session_still_starts(self) -> None:
         inbox = CombatInbox()
         aggregator = CombatAggregator()
         pump = CombatEventPump(inbox, self.validator, aggregator)
         inbox.publish_event({"schema_version": 2})
         inbox.publish_event(status_event())
         report = pump.drain()
-        self.assertEqual(report.processed_events, 0)
-        self.assertIsNotNone(report.fault_code)
-        self.assertEqual(aggregator.snapshot().connection_state, "error")
-        self.assertIsNone(aggregator.snapshot().session_id)
+        self.assertEqual(report.processed_events, 1)
+        self.assertIsNone(report.fault_code)
+        self.assertEqual(aggregator.snapshot().connection_state, "live")
+        self.assertEqual(aggregator.snapshot().session_id, "session-a")
+        self.assertFalse(aggregator.snapshot().data_incomplete)
+        diagnostics = pump.diagnostic_state()
+        self.assertEqual(diagnostics["counts"]["rejected"], 1)
+        self.assertEqual(json.loads(diagnostics["recent_issues"][0]["sample"]), {"schema_version": 2})
+        self.assertEqual(diagnostics["recovery_count"], 1)
 
     def test_client_thread_never_mutates_aggregator(self) -> None:
         inbox = CombatInbox()

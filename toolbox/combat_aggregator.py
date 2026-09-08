@@ -4,6 +4,7 @@ from collections import Counter, defaultdict, deque
 from dataclasses import asdict, dataclass, field
 import json
 from pathlib import Path
+import threading
 import time
 from typing import Any, Callable, Mapping
 
@@ -263,6 +264,9 @@ class CombatSnapshot:
     player_breakdown: dict[str, dict[str, Any]]
     unattributed_damage: int
     unattributed_boss_damage: int
+    data_incomplete: bool = False
+    data_gap_count: int = 0
+    last_data_gap: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -281,6 +285,7 @@ class CombatAggregator:
     )
 
     def __post_init__(self) -> None:
+        self._lock = threading.RLock()
         if self.dps_window_ms <= 0:
             raise ValueError("dps_window_ms must be positive")
         if self.ended_retention_ms is not None and self.ended_retention_ms < 0:
@@ -288,7 +293,13 @@ class CombatAggregator:
         self.reset()
 
     def reset(self, session_id: str | None = None) -> None:
+        with self._lock:
+            self._reset_locked(session_id)
+
+    def _reset_locked(self, session_id: str | None) -> None:
         self.session_id = session_id
+        self.data_gap_count = 0
+        self.last_data_gap: str | None = None
         self.connection_state = "disconnected"
         self.last_sequence: int | None = None
         self.last_monotonic_ms: int | None = None
@@ -344,6 +355,10 @@ class CombatAggregator:
         self.shield_layers_consumed = 0.0
 
     def ingest(self, event: Mapping[str, Any]) -> bool:
+        with self._lock:
+            return self._ingest_locked(event)
+
+    def _ingest_locked(self, event: Mapping[str, Any]) -> bool:
         self._validate_common(event)
         event_id = str(event["event_id"])
         if event_id in self._seen_event_ids:
@@ -386,6 +401,9 @@ class CombatAggregator:
                 f"Monotonic time moved backwards: {monotonic_ms} < {self.last_monotonic_ms}."
             )
 
+        if self.last_sequence is not None and sequence > self.last_sequence + 1:
+            self.mark_data_gap("sequence_gap")
+
         self._seen_event_ids.add(event_id)
         self._seen_sequences[sequence] = event_id
         self.last_sequence = sequence
@@ -412,9 +430,22 @@ class CombatAggregator:
         """Apply a local transport observation without forging a game event."""
         if state not in VALID_TRANSPORT_STATES:
             raise CombatEventError(f"Unsupported transport state: {state!r}")
-        self.connection_state = state
+        with self._lock:
+            self.connection_state = state
+
+    def mark_data_gap(self, code: str) -> None:
+        """Keep valid totals while identifying a partial session until its next boundary."""
+        with self._lock:
+            if self.session_id is not None:
+                self.data_gap_count += 1
+                self.last_data_gap = code
+                self._clear_recent_dps_tracking()
 
     def snapshot(self, monotonic_ms: int | None = None) -> CombatSnapshot:
+        with self._lock:
+            return self._snapshot_locked(monotonic_ms)
+
+    def _snapshot_locked(self, monotonic_ms: int | None) -> CombatSnapshot:
         self._expire_ended_metrics()
         now = self.last_monotonic_ms if monotonic_ms is None else monotonic_ms
         if now is None:
@@ -776,6 +807,9 @@ class CombatAggregator:
             player_breakdown=player_breakdown,
             unattributed_damage=self.unattributed_damage,
             unattributed_boss_damage=self.unattributed_boss_damage,
+            data_incomplete=self.data_gap_count > 0,
+            data_gap_count=self.data_gap_count,
+            last_data_gap=self.last_data_gap,
         )
 
     def _validate_common(self, event: Mapping[str, Any]) -> None:
@@ -1009,7 +1043,7 @@ class CombatAggregator:
                 self.diagnostic_warning = None
                 self._diagnostic_warning_rooms_remaining = 0
             if detail == "degraded:transport_reconnected":
-                self._clear_recent_dps_tracking()
+                self.mark_data_gap("transport_reconnected")
         elif (
             status == "live"
             and isinstance(detail, str)

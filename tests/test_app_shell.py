@@ -529,14 +529,14 @@ class AppShellModelTests(unittest.TestCase):
                 self._combat_status_snapshot(degraded=True),
                 compact=True,
             ).text,
-            "● 实时",
+            "● 数据有缺口",
         )
         self.assertEqual(
             combat_status_presentation(
                 self._combat_status_snapshot(degraded=True),
                 compact=True,
             ).color,
-            GREEN,
+            GOLD,
         )
         official_degraded = combat_status_presentation(
             self._combat_status_snapshot(
@@ -560,13 +560,13 @@ class AppShellModelTests(unittest.TestCase):
                 ),
                 compact=True,
             ).text,
-            "● 官方",
+            "● 数据有缺口",
         )
 
         expected = {
             "connecting": "● 正在连接战斗桥接",
             "stale": "● 战斗桥接响应延迟",
-            "error": "● 战斗数据异常，本轮统计已停止",
+            "error": "● 战斗数据异常，正在重连",
             "disconnected": "● 等待战斗桥接数据",
         }
         for state, label in expected.items():

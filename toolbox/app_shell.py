@@ -155,7 +155,7 @@ def combat_state_label(state: str, *, compact: bool = False) -> str:
         "live": ("● 实时", "● 实时估算"),
         "connecting": ("● 连接中", "● 正在连接战斗桥接"),
         "stale": ("● 延迟", "● 战斗桥接响应延迟"),
-        "error": ("● 异常", "● 战斗数据异常，本轮统计已停止"),
+        "error": ("● 重连中", "● 战斗数据异常，正在重连"),
         "ended": ("● 已结束", "● 本轮战斗已结束"),
         "disconnected": ("● 等待数据", "● 等待战斗桥接数据"),
     }
@@ -198,6 +198,7 @@ def combat_status_presentation(
 
     state = snapshot.connection_state
     degraded = bool(snapshot.diagnostic_warning)
+    incomplete = bool(getattr(snapshot, "data_incomplete", False))
     official_complete = bool(
         snapshot.official_damage_complete
         and snapshot.official_boss_damage_complete
@@ -210,9 +211,25 @@ def combat_status_presentation(
     if state in {"connecting", "stale", "error", "disconnected"}:
         return CombatStatusPresentation(
             kind=state,
-            label=combat_state_label(state, compact=compact),
-            color=combat_state_color(state),
+            label=("● 重连中" if compact else "● 正在恢复连接（本轮数据有缺口）")
+            if incomplete else combat_state_label(state, compact=compact),
+            color=GOLD if incomplete else combat_state_color(state),
         )
+
+    if incomplete:
+        return CombatStatusPresentation(
+            kind="incomplete",
+            label="● 数据有缺口" if compact else "● 本轮数据有缺口",
+            color=GOLD,
+            explanation="" if compact else (
+                "结算值已更新，过程数据仅供参考" if official_complete
+                else "已结束，已采集数据仅供参考" if state == "ended"
+                else "继续采集中，累计值仅供参考"
+            ),
+        )
+
+    if degraded and compact:
+        return CombatStatusPresentation(kind="degraded", label="● 数据有缺口", color=GOLD)
 
     if official_complete:
         label = "● 官方" if compact else "● 官方结算"
@@ -4578,11 +4595,13 @@ class ToolboxShell:
         if self._closed:
             return
         if self.combat_event_pump is not None:
-            self.combat_event_pump.drain()
+            self.combat_event_pump.note_ui_tick()
+            if not self.combat_event_pump.running:
+                self.combat_event_pump.drain()
         self._drain_mod_results()
         self._drain_mod_import_results()
         self._drain_support_export_results()
-        connection = (self.combat_aggregator.connection_state, self.combat_event_pump.fault_code if self.combat_event_pump else None)
+        connection = (self.combat_aggregator.snapshot().connection_state, self.combat_event_pump.fault_code if self.combat_event_pump else None)
         if connection != self._last_support_connection:
             self._record_support_event("combat_connection", state=connection[0], fault_code=connection[1])
             self._last_support_connection = connection

@@ -635,10 +635,17 @@ class SupportDiagnostics:
             except Exception as error:
                 modules[name] = {"status": "not_collected", "reason": str(error), "error_type": type(error).__name__}
                 context.partial = True
+        live = dict(live_snapshot or {"state": "ui_not_running"})
+        transport = live.get("transport", {})
+        combat = live.get("combat", {})
+        if isinstance(transport, Mapping) and transport.get("fault_code"):
+            context.findings.append({"code": "combat_transport_fault", "detail": transport["fault_code"]})
+        if isinstance(combat, Mapping) and combat.get("data_incomplete"):
+            context.findings.append({"code": "combat_data_incomplete", "detail": combat.get("last_data_gap")})
         report = {
             "schema_version": SCHEMA_VERSION, "created_at": _utc(), "run_id": self.run_id,
             "toolbox_version": self.app_version, "game_resolution_error": game_error,
-            "modules": modules, "live_snapshot": dict(live_snapshot or {"state": "ui_not_running"}),
+            "modules": modules, "live_snapshot": live,
             "findings": context.findings, "partial": context.partial,
             "collection": {"elapsed_seconds": round(time.monotonic() - context.started, 3), "bytes_read": context.read_bytes, "files_read": context.files_read, "max_seconds": self.seconds, "max_read_bytes": self.max_bytes},
             "scope": {"automatic_upload": False, "detailed_combat_events": "not_included", "historical_key_capture": False},
@@ -649,7 +656,7 @@ class SupportDiagnostics:
         summary = [
             "失落城堡2工具箱 · 支持诊断", f"工具箱版本：{self.app_version}",
             "收集结果：" + ("部分信息未能读取，见 report.json。" if context.partial else "已完成本次收集。"),
-            f"需关注的文件/插件检查结果：{len(context.findings)} 项。", "",
+            f"需关注的检查结果：{len(context.findings)} 项。", "",
             "本包包括版本、运行环境、MOD文件情况、近期日志与可用的界面/战斗快照。",
             "日志保留原时间，旧错误不代表当前仍在发生；未提前记录的操作和对局无法追溯。",
             "请将这个ZIP私发维护者，并说明遇到问题的时间、操作步骤和实际表现。", "",
@@ -657,7 +664,7 @@ class SupportDiagnostics:
         for name, module in modules.items():
             summary.append(f"{name}: {module['status']}")
         for finding in context.findings[:30]:
-            summary.append(redactor.text(f"{finding['code']}: {finding.get('path', finding.get('guid', ''))}"))
+            summary.append(redactor.text(f"{finding['code']}: {finding.get('path', finding.get('guid', finding.get('detail', '')))}"))
         files["诊断说明.txt"] = "\n".join(summary) + "\n"
         encoded = {name: redactor.text(text).encode("utf-8") for name, text in files.items()}
         manifest = {"schema_version": SCHEMA_VERSION, "created_at": report["created_at"], "partial": context.partial, "files": [

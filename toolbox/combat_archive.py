@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
@@ -577,12 +579,24 @@ class CombatDiagnosticsController:
         on_enabled_changed: Callable[[bool], None] | None = None,
     ) -> None:
         self.archiver = archiver
+        self._lock = threading.RLock()
         self._enabled = bool(enabled)
         self.on_enabled_changed = on_enabled_changed
 
     @property
     def enabled(self) -> bool:
-        return self._enabled
+        with self._lock:
+            return self._enabled
+
+    @contextmanager
+    def capture_batch(self):
+        """Keep a live summary and its accepted event batch atomic to UI exports.
+
+        Lock order is controller -> archiver -> aggregator. The consumer takes
+        this boundary before ingestion, and releases aggregator locks before I/O.
+        """
+        with self._lock:
+            yield
 
     @property
     def root(self) -> Path:
@@ -593,6 +607,10 @@ class CombatDiagnosticsController:
         return self.archiver.last_error
 
     def set_enabled(self, enabled: bool) -> None:
+        with self._lock:
+            self._set_enabled_locked(enabled)
+
+    def _set_enabled_locked(self, enabled: bool) -> None:
         next_enabled = bool(enabled)
         if next_enabled == self._enabled:
             return
@@ -608,6 +626,10 @@ class CombatDiagnosticsController:
             raise
 
     def record_events(self, events: Iterable[Mapping[str, Any]]) -> None:
+        with self._lock:
+            self._record_events_locked(events)
+
+    def _record_events_locked(self, events: Iterable[Mapping[str, Any]]) -> None:
         batch = tuple(dict(event) for event in events)
         if not batch:
             return
@@ -626,7 +648,9 @@ class CombatDiagnosticsController:
             self.archiver.record_events(endings)
 
     def export_manual(self) -> Path:
-        return self.archiver.export_manual()
+        with self._lock:
+            return self.archiver.export_manual()
 
     def checkpoint(self) -> None:
-        self.archiver.checkpoint()
+        with self._lock:
+            self.archiver.checkpoint()

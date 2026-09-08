@@ -225,6 +225,20 @@ class KeyViewTests(unittest.TestCase):
         self.assertTrue(diagnostic.combat_diagnostics_available)
         self.assertTrue(diagnostic.bridge_diagnostics_enabled)
 
+        with tempfile.TemporaryDirectory() as revision_dir:
+            revision_root = Path(revision_dir)
+            (revision_root / "assets").mkdir()
+            revision_path = revision_root / "assets/build_profile.json"
+            payload = json.loads((project_root / "assets/build_profiles/diagnostic/build_profile.json").read_text(encoding="utf-8"))
+            payload["candidate_revision"] = 2
+            revision_path.write_text(json.dumps(payload), encoding="utf-8")
+            self.assertEqual(keyview.load_build_profile(revision_root, packaged=True).candidate_revision, 2)
+            for invalid in (True, 0, 1000, "2"):
+                payload["candidate_revision"] = invalid
+                revision_path.write_text(json.dumps(payload), encoding="utf-8")
+                with self.subTest(revision=invalid), self.assertRaises(keyview.BuildProfileError):
+                    keyview.load_build_profile(revision_root, packaged=True)
+
         with tempfile.TemporaryDirectory() as temp_dir:
             resource_root = Path(temp_dir)
             assets = resource_root / "assets"
@@ -290,7 +304,8 @@ class KeyViewTests(unittest.TestCase):
             "verify_packaged_runtime.py --package $packageRoot",
             build_source,
         )
-        self.assertIn("失落城堡2工具箱1.7.7-诊断候选-r1", build_source)
+        self.assertIn('"失落城堡2工具箱1.7.7-诊断候选-r$CandidateRevision"', build_source)
+        self.assertIn("[int]$CandidateRevision = 2", build_source)
         self.assertIn("失落城堡2工具箱1.7.7-实时数值监测+一键MOD安装", build_source)
 
     def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:
