@@ -2853,15 +2853,25 @@ class ToolboxShell:
         )
         self.mod_action_buttons["configure"].pack(side="right", padx=(0, 6))
 
-        def wrap_detail(_event: tk.Event[Any]) -> None:
-            width = max(180, detail.winfo_width() - 24)
-            self.mod_detail_labels["summary"].configure(wraplength=width)
-            self.mod_detail_labels["usage"].configure(wraplength=width)
-
-        # Preserve RoundedPanel's auto-height handler when the description wraps.
-        detail.bind("<Configure>", wrap_detail, add="+")
+        # The label's allocated width excludes the surrounding panel padding.
+        # Keep the panel's existing content-height binding intact.
+        for name in ("summary", "usage"):
+            self.mod_detail_labels[name].bind(
+                "<Configure>", self._wrap_mod_description, add="+"
+            )
         self.mod_search_var.trace_add("write", lambda *_args: self._populate_mod_tree())
         self._populate_mod_tree()
+
+    @staticmethod
+    def _wrap_mod_description(event: tk.Event[Any]) -> None:
+        label = event.widget
+        inset = 2 * sum(
+            label.winfo_pixels(label.cget(option))
+            for option in ("padx", "borderwidth", "highlightthickness")
+        )
+        width = max(1, int(event.width) - inset)
+        if label.winfo_pixels(label.cget("wraplength")) != width:
+            label.configure(wraplength=width)
 
     def _populate_mod_tree(self) -> None:
         tree = self.mod_tree

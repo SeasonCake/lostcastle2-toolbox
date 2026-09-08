@@ -658,6 +658,20 @@ class AppShellModelTests(unittest.TestCase):
             source,
         )
 
+    def test_mod_description_wrap_uses_allocated_label_width_and_padding(self) -> None:
+        from unittest.mock import Mock
+
+        values = {"padx": 1, "borderwidth": 1, "highlightthickness": 0, "wraplength": 528}
+        label = Mock()
+        label.cget.side_effect = values.__getitem__
+        label.winfo_pixels.side_effect = int
+        ToolboxShell._wrap_mod_description(SimpleNamespace(widget=label, width=522))
+        label.configure.assert_called_once_with(wraplength=518)
+        values["wraplength"] = 518
+        label.configure.reset_mock()
+        ToolboxShell._wrap_mod_description(SimpleNamespace(widget=label, width=522))
+        label.configure.assert_not_called()
+
     def test_mod_panel_action_tracks_install_and_game_load_order(self) -> None:
         operation = SimpleNamespace(launchable=False, has_game_panel=True)
         install_required = mod_launch_action(

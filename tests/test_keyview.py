@@ -18,6 +18,29 @@ import keyview
 
 
 class KeyViewTests(unittest.TestCase):
+    def test_wrapped_receipt_keeps_tk_size_requirement_instead_of_paragraph_width(self) -> None:
+        widget = mock.Mock()
+        values = {"font": "TkDefaultFont", "text": "long wrapped text", "wraplength": 524}
+        widget.cget.side_effect = values.__getitem__
+        widget.winfo_pixels.side_effect = int
+        widget.winfo_rootx.return_value = widget.winfo_rooty.return_value = 0
+        widget.winfo_width.return_value = 522
+        widget.winfo_height.return_value = 60
+        widget.winfo_reqwidth.return_value = 528
+        widget.winfo_reqheight.return_value = 60
+        font = mock.Mock()
+        font.measure.return_value = 918
+        font.metrics.return_value = 18
+        with mock.patch.object(keyview.tkfont, "Font", return_value=font):
+            receipt = keyview._widget_receipt(widget, window_left=0, window_top=0)
+        self.assertEqual(receipt["font"]["unwrapped_measure"], 918)
+        self.assertEqual(receipt["font"]["measure"], 528)
+        self.assertGreater(receipt["requested_width"], receipt["actual"]["width"])
+        values["wraplength"] = 0
+        with mock.patch.object(keyview.tkfont, "Font", return_value=font):
+            unwrapped = keyview._widget_receipt(widget, window_left=0, window_top=0)
+        self.assertEqual(unwrapped["font"]["measure"], 918)
+
     def test_receipt_multiline_width_uses_the_widest_rendered_line(self) -> None:
         text = "● 游戏未运行\n可从顶部启动"
         known_measurements = {

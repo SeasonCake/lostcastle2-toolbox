@@ -1064,6 +1064,16 @@ def _widget_receipt(
         font,
         widget.cget("text"),
     )
+    unwrapped_text_width = measured_text_width
+    try:
+        wraplength = widget.winfo_pixels(widget.cget("wraplength"))
+    except tk.TclError:
+        wraplength = 0
+    if wraplength > 0:
+        # Tk's requested width includes the wrapped text and padding. It is a
+        # conservative bound; the checker still rejects allocated width/height
+        # below the request, including a wraplength wider than the actual label.
+        measured_text_width = min(measured_text_width, requested_width)
     font_linespace = font.metrics("linespace")
     return {
         "actual": {
@@ -1079,6 +1089,9 @@ def _widget_receipt(
         "font": {
             "measure": measured_text_width,
             "linespace": font_linespace,
+            "unwrapped_measure": unwrapped_text_width,
+            "wraplength": wraplength,
+            "measurement": "tk_wrapped_request" if wraplength > 0 else "widest_line",
         },
         # Flat aliases keep the receipt compatible with the acceptance
         # checker's original schema as well as its newer grouped fields.
