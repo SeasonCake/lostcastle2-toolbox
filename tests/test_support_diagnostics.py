@@ -5,12 +5,13 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 import zipfile
 
 from tests.test_mod_manager import plugin_catalog_payload
-from toolbox.support_diagnostics import DiagnosticRedactor, SupportDiagnostics
+from toolbox.support_diagnostics import DiagnosticRedactor, SupportDiagnostics, _main_thread_stack
 
 
 def fixture(root: Path, *, game_present: bool = True, bundled: bool = False) -> tuple[SupportDiagnostics, Path]:
@@ -59,6 +60,59 @@ def read_report(path: Path) -> dict:
 
 
 class SupportDiagnosticsTests(unittest.TestCase):
+    def test_worker_health_captures_blocked_main_thread_without_frame_locals(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            exporter, _game = fixture(Path(temporary), game_present=False)
+            main_waiting = threading.Event()
+            captured = threading.Event()
+            sensitive_local = "private-value-must-not-be-recorded"
+
+            def background_health() -> None:
+                main_waiting.wait(2)
+                exporter.record_event("combat_transport_health", ui_tick_age_seconds=3.5, counts={"processed": 12})
+                captured.set()
+
+            worker = threading.Thread(target=background_health)
+            worker.start()
+            main_waiting.set()
+            self.assertTrue(captured.wait(2))
+            worker.join(2)
+            self.assertFalse(worker.is_alive())
+            self.assertIsNone(exporter.journal_error)
+            journal = (exporter.config_dir / "support/operations.jsonl").read_text(encoding="utf-8")
+            row = json.loads(journal)
+            stack = row["ui_main_thread"]
+            self.assertEqual(stack["status"], "captured")
+            self.assertTrue(any(frame["function"] == "test_worker_health_captures_blocked_main_thread_without_frame_locals" for frame in stack["frames"]))
+            self.assertTrue(all(set(frame) == {"file", "function", "line"} for frame in stack["frames"]))
+            self.assertLessEqual(len(stack["frames"]), 24)
+            self.assertNotIn(sensitive_local, journal)
+            self.assertEqual(row["counts"]["processed"], 12)
+
+    def test_normal_heartbeat_and_unrelated_event_do_not_sample_main_thread(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            exporter, _game = fixture(Path(temporary), game_present=False)
+            with patch("toolbox.support_diagnostics._main_thread_stack", side_effect=AssertionError("unexpected stack capture")) as capture:
+                for age in (None, 0.6, 2.999, "3.5"):
+                    exporter.record_event("combat_transport_health", ui_tick_age_seconds=age)
+                exporter.record_event("another_event", ui_tick_age_seconds=8)
+            capture.assert_not_called()
+            rows = [json.loads(line) for line in (exporter.config_dir / "support/operations.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(rows), 5)
+            self.assertTrue(all("ui_main_thread" not in row for row in rows))
+
+    def test_stack_unavailable_keeps_transport_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            exporter, _game = fixture(Path(temporary), game_present=False)
+            with patch("toolbox.support_diagnostics.sys._current_frames", side_effect=RuntimeError("probe unavailable")):
+                exporter.record_event("combat_transport_health", ui_tick_age_seconds=4, counts={"processed": 17})
+            row = json.loads((exporter.config_dir / "support/operations.jsonl").read_text(encoding="utf-8"))
+            self.assertEqual(row["ui_main_thread"], {"status": "unavailable", "reason": "RuntimeError"})
+            self.assertEqual(row["counts"]["processed"], 17)
+            self.assertIsNone(exporter.journal_error)
+            with patch("toolbox.support_diagnostics.sys._current_frames", return_value={}):
+                self.assertEqual(_main_thread_stack(), {"status": "unavailable"})
+
     def test_cli_export_works_before_ui_and_profile_startup_validation(self) -> None:
         import keyview
         with tempfile.TemporaryDirectory() as temporary:

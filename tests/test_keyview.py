@@ -305,7 +305,7 @@ class KeyViewTests(unittest.TestCase):
             build_source,
         )
         self.assertIn('"失落城堡2工具箱1.7.7-诊断候选-r$CandidateRevision"', build_source)
-        self.assertIn("[int]$CandidateRevision = 3", build_source)
+        self.assertIn("[int]$CandidateRevision = 4", build_source)
         self.assertIn("失落城堡2工具箱1.7.7-实时数值监测+一键MOD安装", build_source)
 
     def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:

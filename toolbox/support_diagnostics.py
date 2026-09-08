@@ -53,6 +53,28 @@ class DiagnosticLimitError(RuntimeError):
     pass
 
 
+def _main_thread_stack() -> dict[str, Any]:
+    """Read code locations only, without querying Tk, source files, or frame locals."""
+    frame = None
+    try:
+        frame = sys._current_frames().get(threading.main_thread().ident)
+        if frame is None:
+            return {"status": "unavailable"}
+        frames = []
+        while frame is not None and len(frames) < 24:
+            frames.append({
+                "file": frame.f_code.co_filename[-512:],
+                "function": frame.f_code.co_name[:128],
+                "line": frame.f_lineno,
+            })
+            frame = frame.f_back
+        return {"status": "captured", "frames": list(reversed(frames)), "older_frames_truncated": frame is not None}
+    except Exception as error:
+        return {"status": "unavailable", "reason": type(error).__name__}
+    finally:
+        del frame
+
+
 class DiagnosticRedactor:
     def __init__(self, roots: Mapping[Path, str]) -> None:
         self.roots = sorted(
@@ -327,6 +349,11 @@ class SupportDiagnostics:
     def record_event(self, event: str, **details: Any) -> None:
         """Bounded low-frequency operations only; never per-hit or global key capture."""
         try:
+            age = details.get("ui_tick_age_seconds")
+            if event == "combat_transport_health" and isinstance(age, (int, float)) and age >= 3:
+                # The existing five-second worker health callback can still run
+                # while Tk stops dispatching timers or a UI callback blocks.
+                details["ui_main_thread"] = _main_thread_stack()
             row = self.redactor().value({"at": _utc(), "run_id": self.run_id, "event": event, **details})
             encoded = json.dumps(row, ensure_ascii=False, allow_nan=False)
             if len(encoded.encode("utf-8")) > 16 * 1024:
