@@ -420,7 +420,7 @@ class CombatMatchArchiverTests(unittest.TestCase):
 
             manual_result = archiver.export_manual()
 
-            self.assertEqual(manual_result, automatic)
+            self.assertTrue(manual_result.samefile(automatic))
             with zipfile.ZipFile(manual_result) as archive:
                 self.assertEqual(
                     len(archive.read("events.jsonl").decode("utf-8").splitlines()),

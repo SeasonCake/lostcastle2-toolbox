@@ -131,7 +131,8 @@ class AppShellModelTests(unittest.TestCase):
             shell = SimpleNamespace(support_directory=support_directory, root=None)
             with patch("toolbox.app_shell.os.startfile") as starter:
                 ToolboxShell._open_support_directory(shell)
-            starter.assert_called_once_with(str(support_directory.resolve()))
+            starter.assert_called_once()
+            self.assertTrue(Path(starter.call_args.args[0]).samefile(support_directory))
 
     def test_game_loaded_mod_launch_reuses_existing_game_launcher(self) -> None:
         actions: list[str] = []

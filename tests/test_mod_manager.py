@@ -332,10 +332,7 @@ class ModManagerTests(unittest.TestCase):
             )
 
             target = manager.install("fixture-plugin", source)
-            self.assertEqual(
-                target,
-                plugins_root / "fixture-plugin" / "fixture.dll",
-            )
+            self.assertTrue(target.samefile(plugins_root / "fixture-plugin" / "fixture.dll"))
             self.assertTrue(manager.status("fixture-plugin").installed)
             with self.assertRaises(ModManagerError):
                 manager.launch("fixture-plugin")

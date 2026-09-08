@@ -42,7 +42,7 @@ class KeyViewTests(unittest.TestCase):
 
             marker = keyview.write_qa_capture_ready_marker(receipt, 123456789)
 
-            self.assertEqual(marker, receipt.with_suffix(".ready.json"))
+            self.assertTrue(marker.samefile(receipt.with_suffix(".ready.json")))
             self.assertEqual(
                 json.loads(marker.read_text(encoding="utf-8")),
                 {
@@ -58,7 +58,7 @@ class KeyViewTests(unittest.TestCase):
             marker = keyview.write_qa_progress_marker(receipt, "labels_measured")
             payload = json.loads(marker.read_text(encoding="utf-8"))
 
-            self.assertEqual(marker, receipt.with_suffix(".progress.json"))
+            self.assertTrue(marker.samefile(receipt.with_suffix(".progress.json")))
             self.assertEqual(payload["pid"], keyview.os.getpid())
             self.assertEqual(payload["stage"], "labels_measured")
             self.assertIsInstance(payload["recorded_ns"], int)
@@ -453,51 +453,47 @@ class KeyViewTests(unittest.TestCase):
     def test_self_test_reports_game_presence_without_exposing_local_path(self) -> None:
         private_path = Path("private-install") / "LostCastle2.exe"
         output = io.StringIO()
-        with mock.patch.object(keyview, "resolve_game_exe", return_value=private_path):
-            with redirect_stdout(output):
-                self.assertEqual(keyview.self_test(), 0)
+        # This test covers source-mode game presence/privacy, not a private bundle.
+        # Give it the same tracked-only inputs available to a clean public checkout.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            resource_root = Path(temp_dir)
+            self._copy_source_self_test_assets(resource_root)
+            with mock.patch.object(keyview, "RESOURCE_DIR", resource_root):
+                with mock.patch.object(keyview, "resolve_game_exe", return_value=private_path):
+                    with redirect_stdout(output):
+                        self.assertEqual(keyview.self_test(), 0)
         payload = json.loads(output.getvalue())
         self.assertTrue(payload["game_exe_found"])
-        self.assertEqual(payload["runtime_bundle"], "verified")
+        self.assertEqual(payload["runtime_bundle"], "not_present_source_checkout")
         self.assertEqual(payload["build_profile"], "diagnostic")
         self.assertTrue(payload["combat_diagnostics"])
         self.assertNotIn("game_exe", payload)
         self.assertNotIn(str(private_path), output.getvalue())
 
-    def test_source_self_test_is_explicit_when_third_party_runtime_is_absent(self) -> None:
+    @staticmethod
+    def _copy_source_self_test_assets(resource_root: Path) -> None:
         project_root = Path(__file__).resolve().parents[1]
+        for relative in (
+            "assets/build_profiles/diagnostic/build_profile.json",
+            "assets/lc2_runtime_manifest.json",
+        ):
+            target = resource_root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((project_root / relative).read_bytes())
+
+    def test_source_self_test_is_explicit_when_third_party_runtime_is_absent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             resource_root = Path(temp_dir)
-            (resource_root / "assets").mkdir()
-            profile_target = (
-                resource_root
-                / "assets"
-                / "build_profiles"
-                / "diagnostic"
-                / "build_profile.json"
-            )
-            profile_target.parent.mkdir(parents=True)
-            profile_target.write_text(
-                (
-                    project_root
-                    / "assets"
-                    / "build_profiles"
-                    / "diagnostic"
-                    / "build_profile.json"
-                ).read_text(encoding="utf-8"),
-                encoding="utf-8",
-            )
-            (resource_root / "assets" / "lc2_runtime_manifest.json").write_text(
-                (project_root / "assets" / "lc2_runtime_manifest.json").read_text(
-                    encoding="utf-8"
-                ),
-                encoding="utf-8",
-            )
+            self._copy_source_self_test_assets(resource_root)
             output = io.StringIO()
             with mock.patch.object(keyview, "RESOURCE_DIR", resource_root):
                 with mock.patch.object(keyview, "resolve_game_exe", return_value=None):
                     with redirect_stdout(output):
                         self.assertEqual(keyview.self_test(), 0)
+                    # A partially present bundle must still use strict verification.
+                    (resource_root / "third_party/lc2_runtime").mkdir(parents=True)
+                    with self.assertRaises(keyview.RuntimeSetupError):
+                        keyview.self_test()
         payload = json.loads(output.getvalue())
         self.assertFalse(payload["game_exe_found"])
         self.assertEqual(payload["runtime_bundle"], "not_present_source_checkout")
