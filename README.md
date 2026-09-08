@@ -79,6 +79,8 @@ Build the Windows package (diagnostic maintenance is the default; select the dis
 .\build.ps1 -BuildProfile Distribution
 ```
 
+To preserve earlier packages and build outputs, pass `-OutputRoot` to either build script with a new directory inside the project, for example `-OutputRoot artifacts/release/v1.7.7-community`. Existing destinations and paths outside the project are rejected. Use PowerShell 7 for this option.
+
 The pinned 7-Zip runtime and its license are included so source-mode archive inspection works after cloning. Other third-party executables, DLLs, archives, and the generated `third_party/community_mods` payload are intentionally excluded from Git. Before packaging, provision the exact local files recorded in `THIRD_PARTY_NOTICES.md` and `assets/community_mod_catalog.json`; `build.ps1` verifies their counts, sizes, and SHA-256 identities and stops if an input is missing or different.
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.

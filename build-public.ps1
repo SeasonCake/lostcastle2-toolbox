@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$ValidateOnly
+    [switch]$ValidateOnly,
+    [string]$OutputRoot = ''
 )
 
 Set-StrictMode -Version Latest
@@ -8,14 +9,29 @@ $ErrorActionPreference = 'Stop'
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $projectRoot
+$buildOutputRoot = $projectRoot
+if (-not [string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $buildOutputRoot = [System.IO.Path]::GetFullPath($OutputRoot, $projectRoot)
+    if (-not $buildOutputRoot.StartsWith(($projectRoot + [System.IO.Path]::DirectorySeparatorChar), [System.StringComparison]::OrdinalIgnoreCase) -or
+        (Test-Path -LiteralPath $buildOutputRoot)) {
+        throw 'OutputRoot must be a new directory inside the project.'
+    }
+    $ancestor = [System.IO.DirectoryInfo]::new($buildOutputRoot).Parent
+    while ($null -ne $ancestor) {
+        if ($ancestor.Exists -and ($ancestor.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            throw "OutputRoot crosses a reparse point: $($ancestor.FullName)"
+        }
+        $ancestor = $ancestor.Parent
+    }
+}
 
 $packageName = '失落城堡2工具箱1.7.7-public-core'
 $appName = '失落城堡2工具箱'
-$publicBuildParent = Join-Path $projectRoot 'build'
+$publicBuildParent = Join-Path $buildOutputRoot 'build'
 $publicBuildRoot = Join-Path $publicBuildParent 'public-core'
-$publicDistParent = Join-Path $projectRoot 'dist'
+$publicDistParent = Join-Path $buildOutputRoot 'dist'
 $publicDistRoot = Join-Path $publicDistParent 'public-core'
-$publicPackageParent = Join-Path $projectRoot 'package\public-core'
+$publicPackageParent = Join-Path $buildOutputRoot 'package\public-core'
 $publicPackageRoot = Join-Path $publicPackageParent $packageName
 $publicStageAssets = Join-Path $publicBuildRoot 'staging\assets'
 
@@ -498,7 +514,7 @@ Invoke-PythonChecked @('keyview.py', '--self-test') 'Source self-test'
 
 Remove-ExactGeneratedRoot $publicBuildRoot $publicBuildParent
 Remove-ExactGeneratedRoot $publicDistRoot $publicDistParent
-Remove-ExactGeneratedRoot $publicPackageParent (Join-Path $projectRoot 'package')
+Remove-ExactGeneratedRoot $publicPackageParent (Join-Path $buildOutputRoot 'package')
 
 New-Item -ItemType Directory -Path $publicStageAssets -Force | Out-Null
 Copy-Item -LiteralPath $publicModCatalogPath -Destination (Join-Path $publicStageAssets 'mod_catalog.json')

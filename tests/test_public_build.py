@@ -46,14 +46,33 @@ def sha256(path: Path) -> str:
 
 
 class PublicBuildTests(unittest.TestCase):
+    def test_build_output_root_rejects_existing_or_external_paths_before_writes(self) -> None:
+        powershell = shutil.which("pwsh")
+        if powershell is None:
+            self.skipTest("PowerShell 7 is unavailable")
+        sentinel = PROJECT_ROOT / "README.md"
+        before = sha256(sentinel)
+        for script in (PROJECT_ROOT / "build.ps1", BUILD_SCRIPT):
+            for output in (PROJECT_ROOT, PROJECT_ROOT.parent / "outside-build-output"):
+                with self.subTest(script=script.name, output=str(output)):
+                    result = subprocess.run(
+                        [powershell, "-NoProfile", "-File", str(script),
+                         "-OutputRoot", str(output)],
+                        cwd=PROJECT_ROOT, capture_output=True, text=True,
+                        encoding="utf-8", errors="replace", timeout=30,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("OutputRoot must be a new directory", result.stderr)
+                    self.assertEqual(sha256(sentinel), before)
+
     def test_public_build_uses_isolated_roots_and_an_explicit_allowlist(self) -> None:
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("失落城堡2工具箱1.7.7-public-core", script)
-        self.assertIn("$publicBuildParent = Join-Path $projectRoot 'build'", script)
+        self.assertIn("$publicBuildParent = Join-Path $buildOutputRoot 'build'", script)
         self.assertIn(
             "$publicBuildRoot = Join-Path $publicBuildParent 'public-core'", script
         )
-        self.assertIn("$publicDistParent = Join-Path $projectRoot 'dist'", script)
+        self.assertIn("$publicDistParent = Join-Path $buildOutputRoot 'dist'", script)
         self.assertIn(
             "$publicDistRoot = Join-Path $publicDistParent 'public-core'", script
         )

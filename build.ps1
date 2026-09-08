@@ -2,12 +2,28 @@ param(
     [ValidateSet('Diagnostic', 'Distribution')]
     [string]$BuildProfile = 'Diagnostic',
     [string]$GameDir = '',
-    [string]$DotNetPath = ''
+    [string]$DotNetPath = '',
+    [string]$OutputRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location -LiteralPath $projectRoot
+$buildOutputRoot = $projectRoot
+if (-not [string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $buildOutputRoot = [System.IO.Path]::GetFullPath($OutputRoot, $projectRoot)
+    if (-not $buildOutputRoot.StartsWith(($projectRoot + [System.IO.Path]::DirectorySeparatorChar), [System.StringComparison]::OrdinalIgnoreCase) -or
+        (Test-Path -LiteralPath $buildOutputRoot)) {
+        throw 'OutputRoot must be a new directory inside the project.'
+    }
+    $ancestor = [System.IO.DirectoryInfo]::new($buildOutputRoot).Parent
+    while ($null -ne $ancestor) {
+        if ($ancestor.Exists -and ($ancestor.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            throw "OutputRoot crosses a reparse point: $($ancestor.FullName)"
+        }
+        $ancestor = $ancestor.Parent
+    }
+}
 $trainerPath = Join-Path $projectRoot 'third_party\LostCastle2SoulStoneTrainer v1.2.exe'
 $trainerSha256 = '025FB6CD01E79F9F2D8018BA9BF4FF592DE43EF2A7EDFD2E7A22F3C1842DF645'
 $goldEditorPath = Join-Path $projectRoot 'third_party\LC2GoldFree.dll'
@@ -188,7 +204,7 @@ if ([string]::IsNullOrWhiteSpace($resolvedGameDir) -or
     throw 'A validated Lost Castle 2 BepInEx/interop directory is required to build Bridge.'
 }
 
-$profileStageParent = Join-Path $projectRoot 'build\profile-stage'
+$profileStageParent = Join-Path $buildOutputRoot 'build\profile-stage'
 $profileStageRoot = Join-Path $profileStageParent $profileId
 if (Test-Path -LiteralPath $profileStageRoot) {
     $resolvedStageRoot = (Resolve-Path -LiteralPath $profileStageRoot).Path
@@ -244,6 +260,9 @@ py -3 -m PyInstaller `
     --clean `
     --onedir `
     --windowed `
+    --workpath (Join-Path $buildOutputRoot 'build\pyinstaller') `
+    --distpath (Join-Path $buildOutputRoot 'dist') `
+    --specpath (Join-Path $buildOutputRoot 'build') `
     --name '失落城堡2工具箱' `
     --icon '.\assets\keyview.ico' `
     --version-file '.\version_info.txt' `
@@ -266,7 +285,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE."
 }
 
-$packageParent = Join-Path $projectRoot 'package'
+$packageParent = Join-Path $buildOutputRoot 'package'
 $packageName = if ($BuildProfile -eq 'Diagnostic') {
     '失落城堡2工具箱1.7.7-诊断候选-r1'
 } else {
@@ -292,7 +311,7 @@ foreach ($directory in @($packageRoot, $packageConfig, $packageModules, $package
         New-Item -ItemType Directory -Path $directory | Out-Null
     }
 }
-$runtimeRoot = Join-Path $projectRoot 'dist\失落城堡2工具箱'
+$runtimeRoot = Join-Path $buildOutputRoot 'dist\失落城堡2工具箱'
 Get-ChildItem -LiteralPath $runtimeRoot -Force | Copy-Item -Destination $packageRoot -Recurse -Force
 Copy-Item -LiteralPath '.\package_assets\使用说明.txt' -Destination $packageRoot -Force
 Copy-Item -LiteralPath '.\package_assets\MOD自动添加说明.txt' -Destination $packageRoot -Force
