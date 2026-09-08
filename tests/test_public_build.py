@@ -67,7 +67,7 @@ class PublicBuildTests(unittest.TestCase):
 
     def test_public_build_uses_isolated_roots_and_an_explicit_allowlist(self) -> None:
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("失落城堡2工具箱1.7.7-public-core", script)
+        self.assertIn("失落城堡2工具箱1.7.8-public-core", script)
         self.assertIn("$publicBuildParent = Join-Path $buildOutputRoot 'build'", script)
         self.assertIn(
             "$publicBuildRoot = Join-Path $publicBuildParent 'public-core'", script

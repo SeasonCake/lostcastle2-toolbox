@@ -60,7 +60,7 @@ from toolbox.windows_windowing import (
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.7.7"
+APP_VERSION = "1.7.8"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(

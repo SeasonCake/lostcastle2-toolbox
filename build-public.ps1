@@ -25,7 +25,7 @@ if (-not [string]::IsNullOrWhiteSpace($OutputRoot)) {
     }
 }
 
-$packageName = '失落城堡2工具箱1.7.7-public-core'
+$packageName = '失落城堡2工具箱1.7.8-public-core'
 $appName = '失落城堡2工具箱'
 $publicBuildParent = Join-Path $buildOutputRoot 'build'
 $publicBuildRoot = Join-Path $publicBuildParent 'public-core'
@@ -392,7 +392,7 @@ function Assert-PublicPackage {
     $packageExe = Join-Path $PackageRoot "$appName.exe"
     Assert-LeafFile $packageExe 'public-core executable'
     $version = (Get-Item -LiteralPath $packageExe).VersionInfo.FileVersion.Trim()
-    Assert-Condition ($version -in @('1.7.7', '1.7.7.0')) "Packaged FileVersion is not 1.7.7: $version"
+    Assert-Condition ($version -in @('1.7.8', '1.7.8.0')) "Packaged FileVersion is not 1.7.8: $version"
 
     $internalRoot = Join-Path $PackageRoot '_internal'
     Assert-Condition (Test-Path -LiteralPath $internalRoot -PathType Container) 'Packaged PyInstaller _internal directory is missing.'
