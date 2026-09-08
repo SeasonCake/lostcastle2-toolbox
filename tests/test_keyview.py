@@ -481,6 +481,23 @@ class KeyViewTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((project_root / relative).read_bytes())
 
+    def test_self_test_cli_uses_utf8_on_an_english_windows_output_stream(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            resource_root = Path(temp_dir)
+            self._copy_source_self_test_assets(resource_root)
+            encoded = io.BytesIO()
+            output = io.TextIOWrapper(encoded, encoding="cp1252", write_through=True)
+            try:
+                with mock.patch.object(keyview, "RESOURCE_DIR", resource_root):
+                    with mock.patch.object(keyview, "resolve_game_exe", return_value=None):
+                        with redirect_stdout(output):
+                            self.assertEqual(keyview.main(["--self-test"]), 0)
+                result = json.loads(encoded.getvalue().decode("utf-8"))
+                self.assertEqual(result["app"], keyview.APP_NAME)
+                self.assertEqual(result["runtime_bundle"], "not_present_source_checkout")
+            finally:
+                output.close()
+
     def test_source_self_test_is_explicit_when_third_party_runtime_is_absent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             resource_root = Path(temp_dir)

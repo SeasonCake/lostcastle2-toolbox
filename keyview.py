@@ -3236,6 +3236,10 @@ def self_test() -> int:
 
 def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    if args.self_test or args.export_diagnostics:
+        reconfigure = getattr(sys.stdout, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
     if args.self_test:
         return self_test()
     if support_exporter is None:
