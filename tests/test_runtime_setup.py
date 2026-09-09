@@ -24,7 +24,7 @@ def sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest().upper()
 
 
-def runtime_fixture(root: Path) -> tuple[Path, Path, dict[str, bytes]]:
+def runtime_fixture(root: Path, *, include_config: bool = True) -> tuple[Path, Path, dict[str, bytes]]:
     bundle = root / "bundle"
     bundle.mkdir()
     files = {
@@ -41,6 +41,8 @@ def runtime_fixture(root: Path) -> tuple[Path, Path, dict[str, bytes]]:
         "winhttp.dll": b"doorstop",
     }
     archive = bundle / "bepinex-runtime.zip"
+    if not include_config:
+        files.pop("BepInEx/config/BepInEx.cfg")
     with zipfile.ZipFile(archive, "w") as output:
         for relative, content in files.items():
             output.writestr(relative, content)
@@ -66,11 +68,86 @@ def runtime_fixture(root: Path) -> tuple[Path, Path, dict[str, bytes]]:
         },
     }
     manifest_path = root / "manifest.json"
+    if not include_config:
+        manifest["configuration"] = {
+            "path": "BepInEx/config/BepInEx.cfg",
+            "fresh_console_enabled": False,
+            "fresh_unity_base_libraries_source": "https://unity.bepinex.dev/libraries/{VERSION}.zip",
+        }
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     return manifest_path, bundle, files
 
 
 class RuntimeSetupTests(unittest.TestCase):
+    def test_invalid_generated_configuration_is_rejected_without_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root, include_config=False)
+            original = json.loads(manifest.read_text(encoding="utf-8"))
+            for key, value in (("path", "../outside.cfg"), ("fresh_console_enabled", True), ("fresh_unity_base_libraries_source", "https://example.test/library.zip\nEnabled = true")):
+                with self.subTest(key=key):
+                    payload = json.loads(json.dumps(original))
+                    payload["configuration"][key] = value
+                    manifest.write_text(json.dumps(payload), encoding="utf-8")
+                    with self.assertRaises(RuntimeSetupError):
+                        RuntimeSetupManager(manifest, bundle, lambda: None)
+            self.assertFalse((root / "outside.cfg").exists())
+
+    def test_public_runtime_creates_declared_config_and_requires_it_for_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root, include_config=False)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game)
+            self.assertTrue(manager.install().ready)
+            config = game.parent / "BepInEx/config/BepInEx.cfg"
+            self.assertTrue(config.is_file())
+            text = config.read_text(encoding="utf-8")
+            self.assertFalse(console_is_enabled(text))
+            self.assertIn("[IL2CPP]\nUnityBaseLibrariesSource = https://unity.bepinex.dev/libraries/{VERSION}.zip", text)
+            self.assertTrue(manager.install().ready)
+            self.assertEqual(config.read_text(encoding="utf-8"), text)
+            config.unlink()
+            self.assertEqual(manager.status().state, "needs_configuration")
+
+    def test_public_runtime_preserves_existing_settings_and_backs_up_console_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root, include_config=False)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            config = game.parent / "BepInEx/config/BepInEx.cfg"
+            config.parent.mkdir(parents=True)
+            original = "[Logging.Console]\nEnabled = true\n\n[IL2CPP]\nUnityBaseLibrariesSource = custom.zip\n\n[Logging.Disk]\nEnabled = true\nCustom = keep\n"
+            config.write_text(original, encoding="utf-8")
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game, backup_root=root / "backups")
+            self.assertTrue(manager.install().ready)
+            text = config.read_text(encoding="utf-8")
+            self.assertEqual(text, original.replace("Enabled = true", "Enabled = false", 1))
+            backups = list((root / "backups").glob("BepInEx.cfg.*.bak"))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_text(encoding="utf-8"), original)
+
+    def test_public_unreadable_configuration_blocks_before_runtime_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root, include_config=False)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            config = game.parent / "BepInEx/config/BepInEx.cfg"
+            config.parent.mkdir(parents=True); config.write_bytes(b"\xff")
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game)
+            with self.assertRaises(RuntimeSetupConflict):
+                manager.install()
+            self.assertFalse((game.parent / "winhttp.dll").exists())
+            self.assertEqual(config.read_bytes(), b"\xff")
+
+    def test_console_missing_key_is_inserted_in_its_own_section(self) -> None:
+        text = disable_console("[Logging.Console]\n# keep\n[Logging.Disk]\nEnabled = true\n")
+        self.assertFalse(console_is_enabled(text))
+        self.assertIn("[Logging.Disk]\nEnabled = true", text)
+
     def test_fresh_game_gets_only_runtime_and_read_only_bridge(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

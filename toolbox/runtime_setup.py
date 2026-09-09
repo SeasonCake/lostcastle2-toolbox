@@ -100,11 +100,12 @@ def disable_console(text: str) -> str:
         if match:
             lines[index] = f"{match.group(1)}false"
             return "\n".join(lines) + "\n"
-    if lines and lines[-1]:
-        lines.append("")
-    if section_index is None:
-        lines.append(f"[{CONSOLE_SECTION}]")
-    lines.append(f"{CONSOLE_KEY} = false")
+    if section_index is not None:
+        lines.insert(section_index + 1, f"{CONSOLE_KEY} = false")
+    else:
+        if lines and lines[-1]:
+            lines.append("")
+        lines.extend((f"[{CONSOLE_SECTION}]", f"{CONSOLE_KEY} = false"))
     return "\n".join(lines) + "\n"
 
 
@@ -145,6 +146,23 @@ class RuntimeSetupManager:
         if any(path.casefold() not in self._spec_by_path for path in self.required_paths):
             raise RuntimeSetupError("游戏运行环境就绪标记未绑定文件身份。")
         self.bridge = self._parse_spec(payload.get("bridge"), target_key="target")
+        self.generated_config: tuple[str, str] | None = None
+        if "configuration" in payload:
+            configuration = payload["configuration"]
+            if not isinstance(configuration, dict):
+                raise RuntimeSetupError("运行环境配置声明无效。")
+            path = configuration.get("path")
+            source = configuration.get("fresh_unity_base_libraries_source")
+            if (
+                path != "BepInEx/config/BepInEx.cfg"
+                or configuration.get("fresh_console_enabled") is not False
+                or not isinstance(source, str)
+                or not source.startswith("https://")
+                or any(char in source for char in "\r\n")
+                or path.casefold() in self._spec_by_path
+            ):
+                raise RuntimeSetupError("运行环境配置声明无效。")
+            self.generated_config = (path, f"[Logging.Console]\nEnabled = false\n\n[IL2CPP]\nUnityBaseLibrariesSource = {source}\n")
 
     @staticmethod
     def _parse_file_identity(raw: object) -> RuntimeFileSpec:
@@ -211,6 +229,15 @@ class RuntimeSetupManager:
                 continue
             if not self._matches(target, spec):
                 return RuntimeSetupStatus("conflict", f"现有运行环境文件不同：{relative}")
+        if self.generated_config is not None:
+            config = self._target(game_root, self.generated_config[0])
+            if not config.exists():
+                return RuntimeSetupStatus("needs_configuration", "需生成 HUD / MOD 运行环境配置")
+            try:
+                if console_is_enabled(config.read_text(encoding="utf-8-sig")):
+                    return RuntimeSetupStatus("needs_configuration", "需关闭调试控制台")
+            except (OSError, UnicodeError):
+                return RuntimeSetupStatus("conflict", "现有 BepInEx 配置无法安全读取")
         bridge_target = self._target(game_root, self.bridge.path)
         if not bridge_target.exists():
             return RuntimeSetupStatus("missing", "战斗 HUD Bridge 尚未安装")
@@ -295,6 +322,18 @@ class RuntimeSetupManager:
         game_root = game_exe.parent
         contents = self._read_runtime_contents(archive_path)
 
+        config_update: tuple[Path, str | None, str] | None = None
+        if self.generated_config is not None:
+            config = self._target(game_root, self.generated_config[0])
+            if config.exists():
+                try:
+                    current = config.read_text(encoding="utf-8-sig")
+                except (OSError, UnicodeError) as exception:
+                    raise RuntimeSetupConflict("现有 BepInEx 配置无法安全读取。") from exception
+                config_update = (config, current, disable_console(current))
+            else:
+                config_update = (config, None, self.generated_config[1])
+
         config_relative = "BepInEx/config/BepInEx.cfg"
         for spec in self.runtime_files:
             if spec.path.casefold() == config_relative.casefold():
@@ -320,6 +359,13 @@ class RuntimeSetupManager:
                 continue
             if not target.exists():
                 self._write_atomic(target, contents[spec.path])
+
+        if config_update is not None:
+            config, current, updated = config_update
+            if current != updated:
+                if current is not None:
+                    self._backup(config, "BepInEx.cfg")
+                self._write_atomic(config, updated.encode("utf-8"))
 
         bridge_target = self._target(game_root, self.bridge.path)
         if bridge_target.exists() and not self._matches(bridge_target, self.bridge):
