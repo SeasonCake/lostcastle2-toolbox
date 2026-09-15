@@ -29,14 +29,14 @@ from .support_diagnostics import SupportDiagnostics, SupportExport
 from .windows_windowing import clamp_to_nearest_work_area, place_tk_window
 
 
-BG = "#F3EEE3"
-SURFACE = "#FBF9F4"
-SIDEBAR = "#E9E1D4"
-BORDER = "#D7CAB7"
-TEXT = "#292725"
-MUTED = "#7F766B"
-ACCENT = "#D86F4C"
-ACCENT_HOVER = "#C86040"
+BG = "#F2F5F5"
+SURFACE = "#FFFFFF"
+SIDEBAR = "#E5EDEE"
+BORDER = "#D3DFDF"
+TEXT = "#263A3D"
+MUTED = "#607477"
+ACCENT = "#286E70"
+ACCENT_HOVER = "#205A5C"
 GREEN = "#397B64"
 RED = "#C34B37"
 BLUE = "#3F739A"
@@ -49,7 +49,7 @@ HUD_LEFT_MOD_CLEARANCE = 500
 MAX_PARTY_MEMBERS = 16
 HUD_TEAMMATES_PER_COLUMN = 3
 MAX_HUD_TEAMMATES = MAX_PARTY_MEMBERS - 1
-SUPPORT_LABEL = "投喂"
+SUPPORT_LABEL = "支持我们"
 SUPPORT_TITLE = "一起为热爱投喂猫罐头"
 SUPPORT_NOTE = (
     "我们都是因为喜欢《失落城堡2》聚在这里。愿意支持加菲、顺便催催更新的话，"
@@ -832,7 +832,7 @@ class RoundedPanel(tk.Canvas):
         *,
         fill: str = SURFACE,
         outline: str = BORDER,
-        radius: int = 12,
+        radius: int = 18,
         height: int | None = 76,
         content_padx: int = 10,
         content_pady: int = 8,
@@ -1053,7 +1053,7 @@ class CombatHudWindow:
 
         outer = RoundedPanel(
             left_host,
-            fill="#F8F4EB",
+            fill="#FFFFFF",
             outline="#E9DED0",
             radius=self._px(18),
             height=self._px(400),
@@ -1062,12 +1062,12 @@ class CombatHudWindow:
         )
         outer.pack(fill="both", expand=True)
         surface = outer.content
-        header = tk.Frame(surface, bg="#F8F4EB", padx=self._px(10), pady=self._px(7))
+        header = tk.Frame(surface, bg="#FFFFFF", padx=self._px(10), pady=self._px(7))
         header.pack(fill="x")
         title_label = tk.Label(
             header,
             text="LC2 战斗",
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=TEXT,
             font=self._font("Microsoft YaHei UI", 11, "bold"),
         )
@@ -1075,7 +1075,7 @@ class CombatHudWindow:
         self.labels["hud_status"] = tk.Label(
             header,
             text="● 等待数据",
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=MUTED,
             font=self._font("Microsoft YaHei UI", 9),
         )
@@ -1084,7 +1084,7 @@ class CombatHudWindow:
             header,
             text="隐藏",
             command=window.withdraw,
-            bg="#EEE5D8",
+            bg="#E5EDED",
             fg=MUTED,
             activebackground="#E4D8C7",
             relief="flat",
@@ -1098,7 +1098,7 @@ class CombatHudWindow:
             widget.bind("<ButtonPress-1>", self._begin_drag)
             widget.bind("<B1-Motion>", self._drag_window)
 
-        body = tk.Frame(surface, bg="#F8F4EB", padx=self._px(5), pady=self._px(5))
+        body = tk.Frame(surface, bg="#FFFFFF", padx=self._px(5), pady=self._px(5))
         body.pack(fill="both", expand=True)
         self._build_damage_group(body)
         self._build_resource_group(body)
@@ -1795,6 +1795,7 @@ class ToolboxShell:
         self.nav_buttons: dict[str, tk.Button] = {}
         self.labels: dict[str, tk.Label] = {}
         self.module_action_buttons: dict[str, tk.Button] = {}
+        self.support_entry_buttons: dict[str, tk.Button] = {}
         self._macro_row_descriptions: list[str] = []
         self.mod_buttons: dict[str, dict[str, tk.Button]] = {}
         self.mod_tree: ttk.Treeview | None = None
@@ -1826,6 +1827,7 @@ class ToolboxShell:
         self._support_popup: tk.Toplevel | None = None
         self._support_qr_image: tk.PhotoImage | None = None
         self._support_button: tk.Button | None = None
+        self._support_popup_anchor: tk.Misc | None = None
         self._closed = False
         self._main_roots: list[tk.Misc] = []
         self._main_font_bases: dict[tk.Misc, tuple[str, int, str, str]] = {}
@@ -1870,7 +1872,7 @@ class ToolboxShell:
         )
         style.map(
             "Toolbox.Treeview",
-            background=[("selected", "#E4D6C4")],
+            background=[("selected", "#D9EBE8")],
             foreground=[("selected", TEXT)],
         )
 
@@ -1934,18 +1936,18 @@ class ToolboxShell:
         self.root.update_idletasks()
 
     def _build(self) -> None:
-        header = tk.Frame(self.root, bg="#F8F4EB", padx=20, pady=14)
+        header = tk.Frame(self.root, bg="#FFFFFF", padx=20, pady=14)
         header.pack(fill="x")
         self._main_roots.append(header)
-        title = tk.Frame(header, bg="#F8F4EB")
+        title = tk.Frame(header, bg="#FFFFFF")
         tk.Label(
             title,
             text="失落城堡 2 工具箱",
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=TEXT,
             font=("Microsoft YaHei UI", 17, "bold"),
         ).pack(anchor="w")
-        header_actions = tk.Frame(header, bg="#F8F4EB")
+        header_actions = tk.Frame(header, bg="#FFFFFF")
         header_actions.pack(side="right")
         self._button(
             header_actions,
@@ -1962,7 +1964,7 @@ class ToolboxShell:
         self.labels["app_version"] = tk.Label(
             header_actions,
             text=f"v{self.app_version}",
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=MUTED,
             font=("Segoe UI", 8, "bold"),
         )
@@ -1988,7 +1990,7 @@ class ToolboxShell:
                 command=lambda target=page_id: self.show_page(target),
                 bg=SIDEBAR,
                 fg=TEXT,
-                activebackground="#DED3C3",
+                activebackground="#D8E5E5",
                 activeforeground=TEXT,
                 relief="flat",
                 bd=0,
@@ -2023,15 +2025,15 @@ class ToolboxShell:
         self._build_mod_page()
         self._build_settings_page()
 
-        footer = tk.Frame(self.root, bg="#F8F4EB", padx=18, pady=7)
+        footer = tk.Frame(self.root, bg="#FFFFFF", padx=18, pady=7)
         footer.pack(fill="x")
         self._main_roots.append(footer)
-        footer_meta = tk.Frame(footer, bg="#F8F4EB")
+        footer_meta = tk.Frame(footer, bg="#FFFFFF")
         footer_meta.pack(side="left")
         tk.Label(
             footer_meta,
             text=toolbox_author_label(),
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=MUTED,
             font=("Microsoft YaHei UI", 8),
         ).pack(side="left")
@@ -2039,9 +2041,9 @@ class ToolboxShell:
             footer_meta,
             text="GitHub 仓库",
             command=self._open_repository,
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=BLUE,
-            activebackground="#EEE5D8",
+            activebackground="#E5EDED",
             activeforeground=BLUE,
             relief="flat",
             bd=0,
@@ -2053,7 +2055,7 @@ class ToolboxShell:
             footer_meta,
             text="bilibili",
             command=self._open_bilibili,
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg="#E05A72",
             activebackground="#F4E4E7",
             activeforeground="#C8435B",
@@ -2067,7 +2069,7 @@ class ToolboxShell:
             footer_meta,
             text=SUPPORT_LABEL,
             command=self._open_support_directory,
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=GOLD,
             activebackground="#F4E8CC",
             activeforeground=GOLD,
@@ -2084,9 +2086,9 @@ class ToolboxShell:
             footer,
             text="退出工具箱",
             command=self.close_command,
-            bg="#F8F4EB",
+            bg="#FFFFFF",
             fg=MUTED,
-            activebackground="#EEE5D8",
+            activebackground="#E5EDED",
             relief="flat",
             bd=0,
             cursor="hand2",
@@ -2181,6 +2183,54 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 8),
         ).pack(anchor="w", pady=(4, 0))
 
+        self._page_support_row(
+            page,
+            "home",
+            "喜欢这个工具箱？欢迎自愿支持，帮我们持续更新。",
+        )
+
+    def _page_support_row(self, parent: tk.Frame, page_id: str, message: str) -> None:
+        row = tk.Frame(parent, bg=BG)
+        row.pack(fill="x", pady=(8, 8))
+        button = tk.Button(
+            row,
+            text=SUPPORT_LABEL,
+            command=lambda: self._show_support_popup(anchor=button),
+            bg=BG,
+            fg=GOLD,
+            activebackground="#F4E8CC",
+            activeforeground=GOLD,
+            relief="flat",
+            bd=0,
+            padx=8,
+            pady=4,
+            cursor="hand2",
+            font=("Microsoft YaHei UI", 8, "bold"),
+        )
+        button.pack(side="right", padx=(8, 0))
+        button.bind("<Enter>", self._cancel_support_popup_hide)
+        button.bind("<Leave>", self._schedule_support_popup_hide)
+        self.support_entry_buttons[page_id] = button
+        label = tk.Label(
+            row,
+            text=message,
+            bg=BG,
+            fg=MUTED,
+            anchor="w",
+            justify="left",
+            wraplength=420,
+            font=("Microsoft YaHei UI", 8),
+        )
+        label.pack(side="left", fill="x", expand=True)
+        self.labels[f"{page_id}_support_note"] = label
+        row.bind(
+            "<Configure>",
+            lambda event: label.configure(
+                wraplength=max(120, event.width - button.winfo_reqwidth() - 12)
+            ),
+            add="+",
+        )
+
     def _module_card(
         self,
         parent: tk.Frame,
@@ -2232,7 +2282,6 @@ class ToolboxShell:
             text="—",
             bg=SURFACE,
             fg=TEXT,
-            width=36,
             anchor="e",
             justify="right",
             font=("Microsoft YaHei UI", 8),
@@ -2269,7 +2318,7 @@ class ToolboxShell:
         self.labels["combat_connection"] = tk.Label(
             page,
             text="● 等待战斗桥接数据",
-            bg="#EEE5D8",
+            bg="#E5EDED",
             fg=MUTED,
             anchor="w",
             padx=11,
@@ -2703,6 +2752,11 @@ class ToolboxShell:
     def _build_mod_page(self) -> None:
         page = self._new_page("mods")
         self._page_heading(page, "MOD 管理", "")
+        self._page_support_row(
+            page,
+            "mods",
+            "MOD收录与适配持续更新，欢迎自愿支持。",
+        )
 
         toolbar = tk.Frame(page, bg=BG)
         toolbar.pack(fill="x", pady=(0, 8))
@@ -3808,8 +3862,11 @@ class ToolboxShell:
                 parent=self.root,
             )
 
-    def _show_support_popup(self, _event: tk.Event[Any] | None = None) -> None:
+    def _show_support_popup(
+        self, _event: tk.Event[Any] | None = None, *, anchor: tk.Misc | None = None
+    ) -> None:
         self._cancel_support_popup_hide()
+        self._support_popup_anchor = anchor or self._support_button
         if self._support_popup is not None:
             try:
                 self._support_popup.deiconify()
@@ -3905,7 +3962,7 @@ class ToolboxShell:
 
     def _position_support_popup(self) -> None:
         popup = self._support_popup
-        button = self._support_button
+        button = self._support_popup_anchor or self._support_button
         if popup is None or button is None:
             return
         try:
@@ -4104,9 +4161,9 @@ class ToolboxShell:
             text=text,
             command=command,
             width=width,
-            bg=ACCENT if accent else "#F3EBDD",
-            fg="#FFFAF5" if accent else "#665C51",
-            activebackground=ACCENT_HOVER if accent else "#E8DDCD",
+            bg=ACCENT if accent else "#E9F0F0",
+            fg="#FFFAF5" if accent else "#3E5D60",
+            activebackground=ACCENT_HOVER if accent else "#D6E5E4",
             activeforeground="#FFFAF5" if accent else TEXT,
             relief="flat",
             bd=0,
@@ -4229,8 +4286,8 @@ class ToolboxShell:
         for mode, button in self.input_mode_buttons.items():
             selected = mode == self.keyboard.display_mode
             button.configure(
-                bg=ACCENT if selected else "#F3EBDD",
-                fg="#FFFAF5" if selected else "#665C51",
+                bg=ACCENT if selected else "#E9F0F0",
+                fg="#FFFAF5" if selected else "#3E5D60",
             )
 
     def _refresh_combat(self) -> None:

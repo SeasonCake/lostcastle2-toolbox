@@ -271,6 +271,57 @@
       }
     },
     {
+      "id": "unified-tools",
+      "display": {
+        "name": "懒虫整合工具",
+        "version": "1.0.0",
+        "author": "懒虫桑",
+        "summary": "整合背包检测、宝藏播报、怪物宝藏和数值查看",
+        "usage_hint": "安装后重启游戏，按 F6 打开统一面板；先卸载独立版怪物宝藏、多人背包与装备、玩家实时属性模块。F6也与刻印灵魂石管理器重叠；联机效果尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LostCastle2.UnifiedTools.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/unified-tools",
+        "files": [
+          {
+            "path": "LostCastle2.UnifiedTools.dll",
+            "sha256": "9DB7675D86935E3033FBF014FC260D21DDC78D837C493F4F0DD256C9A869DA4C",
+            "size_bytes": 258048
+          }
+        ],
+        "provides": [
+          "lostcastle2.unifiedtools.dll",
+          "怪物v11.7.dll",
+          "怪物宝藏v11.6.dll",
+          "怪物宝藏v11.dll",
+          "怪物宝藏v10.7.dll",
+          "怪物宝藏v10.5.dll",
+          "LostCastle2.MonsterPlusMod.dll",
+          "lostcastle2.inventorysourcepanel.dll",
+          "实时数值v2.0.dll"
+        ],
+        "hotkeys": [
+          "F6"
+        ],
+        "panel_hotkey": "F6"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "2026-09-13原包功能介绍及DLL内嵌“作者：懒虫桑”；BepInPlugin local.lc2.unified-tools 1.0.0。",
+        "author_channel": "local community package",
+        "sha256": "9DB7675D86935E3033FBF014FC260D21DDC78D837C493F4F0DD256C9A869DA4C",
+        "size_bytes": 258048,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
+      }
+    },
+    {
       "id": "multiplayer-room-fix",
       "display": {
         "name": "多人假人与结算修复",
@@ -348,6 +399,49 @@
           "gameplay modification"
         ],
         "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
+      }
+    },
+    {
+      "id": "weapon-picker",
+      "display": {
+        "name": "自选武器与附魔",
+        "version": "1.2.6",
+        "author": "水生凛凛、ddd（修改）",
+        "summary": "在面板中选择并生成武器，调整对应附魔",
+        "usage_hint": "进入营地或关卡后按 F4 打开面板。原文件名标1.2.7，内部版本为1.2.6；以内部版本展示。生成和附魔会改变当前装备，请按需使用；联机行为尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "自选装备_v1.2.7.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/weapon-picker",
+        "files": [
+          {
+            "path": "自选装备_v1.2.7.dll",
+            "sha256": "0384C2B7725E82F1B18350FFAC808A7D56F2910696EFF9483F6A2BC66ACF4F1F",
+            "size_bytes": 28672
+          }
+        ],
+        "provides": [
+          "自选装备_v1.2.7.dll"
+        ],
+        "hotkeys": [
+          "F4"
+        ],
+        "panel_hotkey": "F4"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.2.6",
+        "author_source": "DLL内嵌“作者：水生凛凛 二次修改：ddd”和F4说明；BepInPlugin 1.2.6，原文件名v1.2.7保留。",
+        "author_channel": "local community package",
+        "sha256": "0384C2B7725E82F1B18350FFAC808A7D56F2910696EFF9483F6A2BC66ACF4F1F",
+        "size_bytes": 28672,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
       }
     },
     {
@@ -526,10 +620,10 @@
       "id": "loot-combat-enhancement",
       "display": {
         "name": "战利品自选与战斗增强",
-        "version": "2.5.3",
-        "author": "茶橘柚、空容、刺心",
-        "summary": "调整战利品自选、掉落与战斗手感",
-        "usage_hint": "安装后启动游戏，按 F7 打开设置面板；与增强计划的掉落功能同时开启时请自行取舍。"
+        "version": "2.8.0",
+        "author": "rlyons（修改版上传）",
+        "summary": "调整战利品自选与掉落，支持分别设置装备品质来源",
+        "usage_hint": "安装后重启游戏，按 F7 打开面板。2.8.0将营地商人、开箱混沌装备升品和石座/祭坛品质分别控制，并修正自选候选兜底；请检查旧配置中的开关，与增强计划组合效果尚未实战验证。"
       },
       "operation": {
         "kind": "bepinex_plugin",
@@ -539,8 +633,8 @@
         "files": [
           {
             "path": "LC2LootWeightPatch.dll",
-            "sha256": "400CD89165C48B33BFE86AF89386C1117ACBAC2C975AFD8CCDB48EA35B0C50C2",
-            "size_bytes": 55808
+            "sha256": "4D6CA50762804119595B396C1C2017498501CCC22A4CBC44E7E7AB21BB09DB69",
+            "size_bytes": 98304
           }
         ],
         "provides": [
@@ -549,20 +643,27 @@
         "hotkeys": [
           "F7"
         ],
-        "panel_hotkey": "F7"
+        "panel_hotkey": "F7",
+        "superseded_files": [
+          {
+            "path": "LC2LootWeightPatch.dll",
+            "sha256": "524342AC2C0A49AAC13C582AC79DBC11B1BCAA293A25CB345C896EC88CCB563C",
+            "size_bytes": 95232
+          }
+        ]
       },
       "integrity_policy": {
-        "version_note": "curated community bundle 2.5.3",
-        "author_source": "随包 MOD使用说明.txt 的作者团队署名；QQ 上传者 rlyons",
+        "version_note": "curated community bundle 2.8.0",
+        "author_source": "2026-09-15截图上传者rlyons；原包MOD使用说明V2.8.0和BepInPlugin 2.8.0。修改版作者未独立确认，保留上传者标注。",
         "author_channel": "local community package",
-        "sha256": "400CD89165C48B33BFE86AF89386C1117ACBAC2C975AFD8CCDB48EA35B0C50C2",
-        "size_bytes": 55808,
+        "sha256": "4D6CA50762804119595B396C1C2017498501CCC22A4CBC44E7E7AB21BB09DB69",
+        "size_bytes": 98304,
         "signature_status": "not_assessed",
         "risk_level": "high",
         "capabilities": [
           "gameplay modification"
         ],
-        "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
+        "redistribution_status": "maintainer_selected_for_1.8.0_group_2026-09-15"
       }
     },
     {
@@ -649,6 +750,305 @@
           "gameplay modification"
         ],
         "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02"
+      }
+    },
+    {
+      "id": "fire-dragon-enhancement",
+      "display": {
+        "name": "火龙流派增强方案",
+        "version": "1.0.0",
+        "author": "脆毛肚（上传）",
+        "summary": "调整火龙系列宝藏与技能效果，并提供配置面板",
+        "usage_hint": "安装后重启游戏，按 F10 打开面板；主程序和面板一起安装。与合成火龙测试版分别使用；联机组合尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2FIreDragonSetEnhancementV1.0.0.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/fire-dragon-enhancement",
+        "files": [
+          {
+            "path": "LC2FIreDragonSetEnhancementPanel.dll",
+            "sha256": "C429DBF7D04322B49C24292A92CDDFF5DCF043C54C1E1123AB026C4AAEDEC510",
+            "size_bytes": 27136
+          },
+          {
+            "path": "LC2FIreDragonSetEnhancementV1.0.0.dll",
+            "sha256": "2FFD4F9F11CEEA67F48427FA89968FCDADD7FC8F30DEC85C1DFA6D72A73E6ACA",
+            "size_bytes": 65536
+          }
+        ],
+        "provides": [
+          "lc2firedragonsetenhancementpanel.dll",
+          "lc2firedragonsetenhancementv1.0.0.dll"
+        ],
+        "hotkeys": [
+          "F10"
+        ],
+        "panel_hotkey": "F10"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "2026-09-10截图上传者脆毛肚；原包更新日志、双插件1.0.0元数据及面板F10字符串。上传者不独立证明原作者。",
+        "author_channel": "local community package",
+        "sha256": "2FFD4F9F11CEEA67F48427FA89968FCDADD7FC8F30DEC85C1DFA6D72A73E6ACA",
+        "size_bytes": 65536,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
+      }
+    },
+    {
+      "id": "dual-blades-overhaul",
+      "display": {
+        "name": "双刀职业增强方案",
+        "version": "1.0.0",
+        "author": "脆毛肚（上传）",
+        "summary": "调整双刀刻印连击上限、终结攻击与终始双刃技能",
+        "usage_hint": "安装后重启游戏，按 F8 打开面板；主程序和面板一起安装。F8与多共鸣面板重叠，建议分别使用；联机效果尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2DualBladesOverhaulV1.0.0.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/dual-blades-overhaul",
+        "files": [
+          {
+            "path": "LC2DualBladesOverhaulPanle.dll",
+            "sha256": "D7C588D59DFDE210A24FEAABFA7713E543040596B5734C68CC5DD7E7B81FD80B",
+            "size_bytes": 19456
+          },
+          {
+            "path": "LC2DualBladesOverhaulV1.0.0.dll",
+            "sha256": "04E32BF33DFD632EFEF6F3C55804C6AFA52DBFDD07A23C415769AFB76E432D23",
+            "size_bytes": 28160
+          }
+        ],
+        "provides": [
+          "lc2dualbladesoverhaulpanle.dll",
+          "lc2dualbladesoverhaulv1.0.0.dll"
+        ],
+        "hotkeys": [
+          "F8"
+        ],
+        "panel_hotkey": "F8"
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "2026-09-12截图上传者脆毛肚；两个BepInPlugin均1.0.0，面板程序集引用主插件，内嵌F8与功能配置说明。",
+        "author_channel": "local community package",
+        "sha256": "04E32BF33DFD632EFEF6F3C55804C6AFA52DBFDD07A23C415769AFB76E432D23",
+        "size_bytes": 28160,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
+      }
+    },
+    {
+      "id": "icebound-wand-tuner",
+      "display": {
+        "name": "冰封魔杖附魔与触发调整",
+        "version": "0.4.3",
+        "author": "兔子王お（上传）",
+        "summary": "调整冰封魔杖触发间隔，并为本地玩家武器附加冰属性",
+        "usage_hint": "安装后重启游戏，持有冰封魔杖时生效；原配置默认冰附魔3点，可在生成的cfg中调整。与纵冰之杖加强是不同条目；实际效果尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.IceboundWandTuner冰杖获得3点冰附魔.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/icebound-wand-tuner",
+        "files": [
+          {
+            "path": "LC2.IceboundWandTuner冰杖获得3点冰附魔.dll",
+            "sha256": "0BE8C4FF2595A1785CEE82825BC17AE0485BD07ECC09A0F479486D4F35A002F3",
+            "size_bytes": 18432
+          }
+        ],
+        "provides": [
+          "lc2.iceboundwandtuner冰杖获得3点冰附魔.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 0.4.3",
+        "author_source": "2026-09-12截图上传者兔子王お；BepInPlugin 0.4.3，内嵌N5-009/IntervalSeconds/IceEnchantValue及默认3点说明。",
+        "author_channel": "local community package",
+        "sha256": "0BE8C4FF2595A1785CEE82825BC17AE0485BD07ECC09A0F479486D4F35A002F3",
+        "size_bytes": 18432,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
+      }
+    },
+    {
+      "id": "tornado-greatsword",
+      "display": {
+        "name": "超级旋风大剑",
+        "version": "1.0.0",
+        "author": "啊这（上传）",
+        "summary": "延长大剑三阶旋风斩的旋转时间",
+        "usage_hint": "安装后重启游戏，使用对应大剑旋风斩时生效；没有独立面板。本工具箱尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "TornadoSlashMod.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/tornado-greatsword",
+        "files": [
+          {
+            "path": "TornadoSlashMod.dll",
+            "sha256": "0322D96260F54203848B9C5E47631D9C2FB23BB760A257A98B79A1B0D1658296",
+            "size_bytes": 40448
+          }
+        ],
+        "provides": [
+          "tornadoslashmod.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "2026-09-10截图上传者啊这；原包说明文件名和BepInPlugin 1.0.0。上传者不独立证明原作者。",
+        "author_channel": "local community package",
+        "sha256": "0322D96260F54203848B9C5E47631D9C2FB23BB760A257A98B79A1B0D1658296",
+        "size_bytes": 40448,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
+      }
+    },
+    {
+      "id": "master-craftsman-cannon",
+      "display": {
+        "name": "大工匠之锤四门建造",
+        "version": "0.1.0",
+        "author": "ddd（上传）",
+        "summary": "让大工匠之锤刀盾技能同时建造四门炮台",
+        "usage_hint": "安装后重启游戏，使用对应刀盾技能时生效；没有独立面板。功能说明来自原包，实际效果尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2CannonDiagnostic.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/master-craftsman-cannon",
+        "files": [
+          {
+            "path": "LC2CannonDiagnostic.dll",
+            "sha256": "06213B8FEE7681380CF6D174B84BC67038424541D80A4F984B4E74E0AC6FD8C3",
+            "size_bytes": 17408
+          }
+        ],
+        "provides": [
+          "lc2cannondiagnostic.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 0.1.0",
+        "author_source": "2026-09-13截图上传者ddd；原包说明文件名及BepInPlugin local.lc2.mastercraftcannon 0.1.0。",
+        "author_channel": "local community package",
+        "sha256": "06213B8FEE7681380CF6D174B84BC67038424541D80A4F984B4E74E0AC6FD8C3",
+        "size_bytes": 17408,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
+      }
+    },
+    {
+      "id": "dark-matter-black-hole",
+      "display": {
+        "name": "暗物质火炮黑洞分裂",
+        "version": "1.0.0",
+        "author": "兔子王お（上传）",
+        "summary": "为暗物质火炮的虚空引力弹增加黑洞效果",
+        "usage_hint": "安装后重启游戏，使用暗物质火炮技能时生效；原文件标注分裂X3，实际数量与联机效果尚未实战验证。“黑洞火枪分裂X3”是同字节别名，只需安装一份。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.DarkMatterBlackHole黑洞炮分裂X3.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/dark-matter-black-hole",
+        "files": [
+          {
+            "path": "LC2.DarkMatterBlackHole黑洞炮分裂X3.dll",
+            "sha256": "90EB82BEA30130A1A562A919A435752631C558F7AEB263201FF9C5761B503902",
+            "size_bytes": 10752
+          }
+        ],
+        "provides": [
+          "lc2.darkmatterblackhole黑洞炮分裂x3.dll",
+          "lc2.darkmatterblackhole黑洞火枪分裂x3.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "2026-09-13 205844截图发送者兔子王お；BepInPlugin local.lc2.darkmatterblackhole 1.0.0。两文件名同SHA，上传者不独立证明原作者。",
+        "author_channel": "local community package",
+        "sha256": "90EB82BEA30130A1A562A919A435752631C558F7AEB263201FF9C5761B503902",
+        "size_bytes": 10752,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.8.0_group_2026-09-15"
+      }
+    },
+    {
+      "id": "goblin-cannon-dark-matter",
+      "display": {
+        "name": "哥布林大炮黑洞技能",
+        "version": "1.0.0",
+        "author": "兔子王お（上传）",
+        "summary": "将哥布林大炮技能替换为暗物质火炮的虚空引力弹",
+        "usage_hint": "安装后重启游戏，使用哥布林大炮技能时生效；没有独立面板。与黑洞分裂组合以及联机效果尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2.Gun2DarkMatter哥布林大炮技能替换黑洞大炮.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/goblin-cannon-dark-matter",
+        "files": [
+          {
+            "path": "LC2.Gun2DarkMatter哥布林大炮技能替换黑洞大炮.dll",
+            "sha256": "2C58ED28BAB6F98EF7CA085C720C78D43B79F6CCBE4E82BF1FDC8842AE845024",
+            "size_bytes": 8192
+          }
+        ],
+        "provides": [
+          "lc2.gun2darkmatter哥布林大炮技能替换黑洞大炮.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.0.0",
+        "author_source": "2026-09-13 205844截图发送者兔子王お；BepInPlugin local.lc2.gun2darkmatter 1.0.0，元数据注明Gun_023到Gun_034技能替换。",
+        "author_channel": "local community package",
+        "sha256": "2C58ED28BAB6F98EF7CA085C720C78D43B79F6CCBE4E82BF1FDC8842AE845024",
+        "size_bytes": 8192,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.8.0_group_2026-09-15"
       }
     },
     {
@@ -2210,6 +2610,58 @@
           "gameplay modification"
         ],
         "redistribution_status": "maintainer_selected_for_1.7.7_2026-09-08"
+      }
+    },
+    {
+      "id": "fire-dragon-synthesis",
+      "display": {
+        "name": "合成火龙（测试版）",
+        "version": "1.1",
+        "author": "啊这（上传）",
+        "summary": "通过火龙部件合成契约，并配合火龙之心召唤火龙",
+        "usage_hint": "按原包说明逐级合成，三个组件一起安装。原说明要求不要用于构筑玩法；与火龙增强方案分别使用。测试版效果尚未实战验证。"
+      },
+      "operation": {
+        "kind": "bepinex_plugin",
+        "expected_filename": "LC2NormalArmorManual.dll",
+        "bundled": true,
+        "bundle_dir": "community_mods/fire-dragon-synthesis",
+        "files": [
+          {
+            "path": "LC2ClothArmorManual.dll",
+            "sha256": "F263B6431B4EA859F49A129025F2ACAEEB7FC652C9DECDA343B6EE1ABE612598",
+            "size_bytes": 48128
+          },
+          {
+            "path": "LC2HeavyArmorManual.dll",
+            "sha256": "FC0A68BE12ED62FE7FBA0D4B0B7AA3B8BB9880E5292C7800BDD832072086E3EB",
+            "size_bytes": 51200
+          },
+          {
+            "path": "LC2NormalArmorManual.dll",
+            "sha256": "BB284B81B39B9AAC441B738189C1C9C80BEEEF263820A088A798857DD88DE318",
+            "size_bytes": 71680
+          }
+        ],
+        "provides": [
+          "lc2clotharmormanual.dll",
+          "lc2heavyarmormanual.dll",
+          "lc2normalarmormanual.dll"
+        ],
+        "hotkeys": []
+      },
+      "integrity_policy": {
+        "version_note": "curated community bundle 1.1",
+        "author_source": "2026-09-12截图上传者啊这；原包必看说明和组合包测试v1.1标签，内部插件分别为1.8.7/1.8.7/1.5.0。",
+        "author_channel": "local community package",
+        "sha256": "BB284B81B39B9AAC441B738189C1C9C80BEEEF263820A088A798857DD88DE318",
+        "size_bytes": 71680,
+        "signature_status": "not_assessed",
+        "risk_level": "high",
+        "capabilities": [
+          "gameplay modification"
+        ],
+        "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
       }
     },
     {

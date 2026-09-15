@@ -25,7 +25,7 @@ if (-not [string]::IsNullOrWhiteSpace($OutputRoot)) {
     }
 }
 
-$packageName = '失落城堡2工具箱1.7.8-public-core'
+$packageName = '失落城堡2工具箱1.8.0-public-core'
 $appName = '失落城堡2工具箱'
 $publicBuildParent = Join-Path $buildOutputRoot 'build'
 $publicBuildRoot = Join-Path $publicBuildParent 'public-core'
@@ -45,7 +45,7 @@ $supportAssetsSource = Join-Path $projectRoot 'package_assets\赞助与投喂'
 $publicRuntimeNoticesSource = Join-Path $projectRoot 'package_assets\运行环境\public-core'
 
 $expectedPublicModCatalogSha256 = '879388326B33DCCE722DCC4E4FD76802DC5628787713ED51D6EAA0999E12BE0C'
-$expectedPublicCommunityCatalogSha256 = '9E899C390CB56D88A96BA651B9C0903B66FDD3557F0921526F6E0F9D7A3CFB85'
+$expectedPublicCommunityCatalogSha256 = 'D19C6B036AAFD6264172DEC7C6D178B42D6D8E0A1C000679E214044553E7B396'
 $expectedPublicRuntimeManifestSha256 = '9CF1E7066EBDA04616C1EC7476AF582B0E230460EE2F2FD98D304ED0030115CC'
 $expectedOfficialRuntimeSha256 = '2A7CBF74D26ABE4765C3E662DB1721B923BAC39849EBFEF2CA5DC7DE7E2D9B7F'
 $expectedOfficialRuntimeSize = 34335572L
@@ -392,7 +392,7 @@ function Assert-PublicPackage {
     $packageExe = Join-Path $PackageRoot "$appName.exe"
     Assert-LeafFile $packageExe 'public-core executable'
     $version = (Get-Item -LiteralPath $packageExe).VersionInfo.FileVersion.Trim()
-    Assert-Condition ($version -in @('1.7.8', '1.7.8.0')) "Packaged FileVersion is not 1.7.8: $version"
+    Assert-Condition ($version -in @('1.8.0', '1.8.0.0')) "Packaged FileVersion is not 1.8.0: $version"
 
     $internalRoot = Join-Path $PackageRoot '_internal'
     Assert-Condition (Test-Path -LiteralPath $internalRoot -PathType Container) 'Packaged PyInstaller _internal directory is missing.'
@@ -485,7 +485,7 @@ function Assert-PublicPackage {
 
 # Preflight is read-only and fail-closed. It never consults the local/private payload roots.
 $publicModCatalog = Assert-PublicCatalog $publicModCatalogPath (Join-Path $projectRoot 'assets\mod_catalog.json') $expectedPublicModCatalogSha256 2 'public MOD catalog'
-$publicCommunityCatalog = Assert-PublicCatalog $publicCommunityCatalogPath (Join-Path $projectRoot 'assets\community_mod_catalog.json') $expectedPublicCommunityCatalogSha256 62 'public community MOD catalog'
+$publicCommunityCatalog = Assert-PublicCatalog $publicCommunityCatalogPath (Join-Path $projectRoot 'assets\community_mod_catalog.json') $expectedPublicCommunityCatalogSha256 72 'public community MOD catalog'
 $publicRuntimeManifest = Assert-PublicRuntime $publicRuntimeManifestPath
 Assert-LeafFile $publicProfilePath 'distribution build profile'
 Assert-SevenZipAndPackageAssets
@@ -578,7 +578,8 @@ Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $publicPa
 Copy-Item -LiteralPath (Join-Path $projectRoot 'PUBLIC_CORE_THIRD_PARTY_NOTICES.md') -Destination (Join-Path $publicPackageRoot 'THIRD_PARTY_NOTICES.md')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\用户MOD\请把MOD放到这里.txt') -Destination $packageUserMods
 Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\modules.README.txt') -Destination (Join-Path $packageModules 'README.txt')
-Get-ChildItem -LiteralPath $supportAssetsSource -File -Force | Copy-Item -Destination $packageSupport
+# Keep the JPG original in source; ship only the PNG used by the support popup.
+Get-ChildItem -LiteralPath $supportAssetsSource -File -Force | Where-Object { $_.Name -ne '微信赞助码.jpg' } | Copy-Item -Destination $packageSupport
 Get-ChildItem -LiteralPath $publicRuntimeNoticesSource -File -Force | Copy-Item -Destination $packageRuntimeNotices
 
 $forbiddenPayloadHashes = Get-ForbiddenPayloadHashes @($publicModCatalogPath, $publicCommunityCatalogPath)

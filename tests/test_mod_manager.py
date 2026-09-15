@@ -500,10 +500,10 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 62)
+        self.assertEqual(len(catalog.entries), 72)
         self.assertEqual(
             sum(len(descriptor.operation.files) for descriptor in catalog.entries),
-            64,
+            78,
         )
         self.assertEqual(
             sum(
@@ -511,13 +511,21 @@ class ModManagerTests(unittest.TestCase):
                 for descriptor in catalog.entries
                 for spec in descriptor.operation.files
             ),
-            3_850_189,
+            4_585_933,
         )
         self.assertTrue(
             all(
                 descriptor.integrity_policy.redistribution_status
                 == (
-                    "maintainer_selected_for_1.7.7_2026-09-08"
+                    "maintainer_selected_for_1.8.0_group_2026-09-15"
+                    if descriptor.mod_id in {"dark-matter-black-hole", "goblin-cannon-dark-matter", "loot-combat-enhancement"}
+                    else "maintainer_selected_for_1.7.9_group_2026-09-13"
+                    if descriptor.mod_id in {
+                        "fire-dragon-enhancement", "tornado-greatsword", "fire-dragon-synthesis",
+                        "dual-blades-overhaul", "icebound-wand-tuner", "unified-tools",
+                        "master-craftsman-cannon", "weapon-picker", "loot-combat-enhancement",
+                    }
+                    else "maintainer_selected_for_1.7.7_2026-09-08"
                     if descriptor.mod_id in {"inventory-source-panel", "niya-summon"}
                     else "maintainer_authorized_public_bundle_2026-09-02"
                 )
@@ -525,7 +533,7 @@ class ModManagerTests(unittest.TestCase):
             )
         )
         self.assertIn(
-            "Count -ne 64",
+            "Count -ne 78",
             (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8"),
         )
         superseded = {
@@ -539,6 +547,9 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(
             superseded,
             {
+                "loot-combat-enhancement": (
+                    ("LC2LootWeightPatch.dll", 95_232, "524342AC2C0A49AAC13C582AC79DBC11B1BCAA293A25CB345C896EC88CCB563C"),
+                ),
                 "lightning-enhance-plate": (
                     ("LC2LightningEnhancePlatev1.0.1.dll", 35_328, "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3"),
                     ("LC2LightningEnhancePlatev1.1.0.dll", 39_936, "377660D5AA0B3A03152E44BFABCBBCF82B77790A953EEA7150F0AAB63C793BC0"),
@@ -630,6 +641,17 @@ class ModManagerTests(unittest.TestCase):
             "niya-summon",
             "hideyoshi-summon",
             "hand-color-white",
+            "fire-dragon-enhancement",
+            "tornado-greatsword",
+            "fire-dragon-synthesis",
+            "dual-blades-overhaul",
+            "icebound-wand-tuner",
+            "unified-tools",
+            "master-craftsman-cannon",
+            "weapon-picker",
+            "dark-matter-black-hole",
+            "goblin-cannon-dark-matter",
+            "loot-combat-enhancement",
         ):
             with self.subTest(mod_id=mod_id), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
@@ -685,7 +707,7 @@ class ModManagerTests(unittest.TestCase):
             metadata_by_id[descriptor.mod_id] = metadata
             ids_by_guid.setdefault(metadata[0].casefold(), []).append(descriptor.mod_id)
 
-        self.assertEqual(len(metadata_by_id), 62)
+        self.assertEqual(len(metadata_by_id), 72)
         self.assertEqual(
             {guid: ids for guid, ids in ids_by_guid.items() if len(ids) > 1},
             {},
@@ -731,8 +753,8 @@ class ModManagerTests(unittest.TestCase):
         staff = catalog.get("staff-skin-swap")
         hide_fx = catalog.get("hide-weapon-fx")
 
-        self.assertEqual(loot.display.version, "2.5.3")
-        self.assertEqual(loot.display.author, "茶橘柚、空容、刺心")
+        self.assertEqual(loot.display.version, "2.8.0")
+        self.assertEqual(loot.display.author, "rlyons（修改版上传）")
         enhancement = catalog.get("enhancement-plan")
         self.assertEqual(enhancement.display.version, "5.0.0")
         self.assertEqual(enhancement.display.author, "茶橘柚、空容、刺心、木亦")

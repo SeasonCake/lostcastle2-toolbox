@@ -117,7 +117,7 @@ class AppShellModelTests(unittest.TestCase):
         opener.assert_called_once_with(TOOLBOX_BILIBILI_URL, new=2)
 
     def test_support_entry_keeps_the_product_free_and_opens_local_assets(self) -> None:
-        self.assertEqual(SUPPORT_LABEL, "投喂")
+        self.assertEqual(SUPPORT_LABEL, "支持我们")
         self.assertIn("喜欢《失落城堡2》", SUPPORT_NOTE)
         self.assertIn("自愿", SUPPORT_NOTE)
         self.assertNotIn("解锁", SUPPORT_NOTE)

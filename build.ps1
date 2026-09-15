@@ -59,7 +59,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $goldEditorPath).Hash -ne $gold
 if (-not (Test-Path -LiteralPath $communityModsPath -PathType Container)) {
     throw 'Missing prepared community MOD payloads.'
 }
-if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 64) {
+if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 78) {
     throw 'Prepared community MOD payload file count mismatch.'
 }
 $runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
@@ -292,9 +292,9 @@ if ($LASTEXITCODE -ne 0) {
 
 $packageParent = Join-Path $buildOutputRoot 'package'
 $packageName = if ($BuildProfile -eq 'Diagnostic') {
-    "失落城堡2工具箱1.7.8-诊断候选-r$CandidateRevision"
+    "失落城堡2工具箱1.8.0-诊断候选-r$CandidateRevision"
 } else {
-    '失落城堡2工具箱1.7.8-实时数值监测+一键MOD安装'
+    '失落城堡2工具箱1.8.0-实时数值监测+一键MOD安装'
 }
 $packageRoot = Join-Path $packageParent $packageName
 if (Test-Path -LiteralPath $packageRoot) {
@@ -321,7 +321,7 @@ Get-ChildItem -LiteralPath $runtimeRoot -Force | Copy-Item -Destination $package
 Copy-Item -LiteralPath '.\package_assets\使用说明.txt' -Destination $packageRoot -Force
 if ($diagnosticsExpected) {
     @"
-失落城堡2工具箱 1.7.8-r$CandidateRevision · 诊断内测版
+失落城堡2工具箱 1.8.0-r$CandidateRevision · 诊断内测版
 
 本包用于恢复验证，尚未作为正式分享版发布。
 对局事件记录默认开启，可在战斗统计页关闭；支持诊断另保留有界异常样本与消费状态。
@@ -335,7 +335,8 @@ Copy-Item -LiteralPath '.\LICENSE' -Destination $packageRoot -Force
 Copy-Item -LiteralPath '.\THIRD_PARTY_NOTICES.md' -Destination $packageRoot -Force
 Copy-Item -LiteralPath '.\package_assets\用户MOD\请把MOD放到这里.txt' -Destination $packageUserMods -Force
 Copy-Item -LiteralPath '.\package_assets\modules.README.txt' -Destination (Join-Path $packageModules 'README.txt') -Force
-Get-ChildItem -LiteralPath $supportAssetsPath -File | Copy-Item -Destination $packageSupport -Force
+# Keep the JPG original in source; ship only the PNG used by the support popup.
+Get-ChildItem -LiteralPath $supportAssetsPath -File | Where-Object { $_.Name -ne '微信赞助码.jpg' } | Copy-Item -Destination $packageSupport -Force
 Get-ChildItem -LiteralPath $runtimeNoticesPath -File | Copy-Item -Destination $packageRuntimeNotices -Force
 if (-not (Test-Path -LiteralPath (Join-Path $packageRoot 'LICENSE') -PathType Leaf) -or
     -not (Test-Path -LiteralPath (Join-Path $packageRoot 'THIRD_PARTY_NOTICES.md') -PathType Leaf)) {

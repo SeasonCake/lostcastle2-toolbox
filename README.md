@@ -23,6 +23,8 @@ Current stable release: [v1.7.8](https://github.com/SeasonCake/lostcastle2-toolb
 
 Version 1.7.8 includes the r5 recovery changes and fixes public-core configuration generation during initial runtime setup. One actual solo session passed event-continuity, recorded UI-heartbeat, archive, and settlement-propagation checks; multiplayer and all MOD combinations are not covered by that result. All 1.7.7 candidates remain internal diagnostic history. The separately shared community package retains its original bytes. See the [release notes](docs/LC2_1.7.8_RELEASE_NOTES.zh-CN.md) and [recovery history](docs/LC2_1.7.7_RECOVERY.zh-CN.md) for the scope and remaining limits.
 
+The source and local community package are now at 1.8.0: the catalog recognizes 72 community MODs, including two new black-hole weapon entries and Loot Weight Patch 2.8.0. The interface uses a lighter teal palette and refined card spacing. The matching public-core release is being prepared; see the [1.8.0 notes](docs/LC2_1.8.0_RELEASE_NOTES.zh-CN.md) for its current stage. Damage taken, healing, and mana counter changes remain deferred.
+
 The GitHub Release provides a Windows x64 `public-core` package. It contains the toolbox, the official BepInEx artifact, the project-owned Bridge, and public MOD catalog metadata, but excludes the third-party Soul Stone Trainer, Gold Editor, and community MOD binary/resource payloads. Users can provide packages they obtained independently and let the toolbox verify them against the catalog. The separately distributed Chinese community bundle is not byte-identical to the GitHub asset.
 
 ## Project status
@@ -35,7 +37,7 @@ The GitHub Release provides a Windows x64 `public-core` package. It contains the
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
 | Main toolbox and external combat HUD | Toolbox 1.7.6 / Bridge 1.7.4 labels the compact HUD **realtime** and keeps skip diagnostics off that surface. The detailed page explains **realtime estimate / settlement may correct**. DPS prefers complete live cumulative deltas and falls back to hit events. A process-first mid-run join may restore damage and boss damage from a complete nonzero live vector without creating a DPS spike, while in-run taken damage keeps the validated hit-event path. A one-player settlement UI record may finalize damage, boss damage, and taken damage only after the identity gate accepts it; the trusted UI boundary still ends an estimated session when that record is unavailable |
-| MOD management | v1.7.6 catalogs two existing tools plus 60 curated community MODs. The local community bundle uses 61 minimal payload files; GitHub public-core ships metadata only and requires user-supplied original packages. Hash-bound superseded payloads are removed during an upgrade while modified or unknown files are preserved |
+| MOD management | 1.8.0 catalogs two existing tools plus 72 community MODs. The local community bundle uses 78 functional payload files; GitHub public-core ships metadata only and requires user-supplied original packages. Hash-bound superseded payloads are removed during an upgrade while modified or unknown files are preserved |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
