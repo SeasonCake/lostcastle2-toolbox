@@ -19,11 +19,11 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 
 ## Download
 
-Current stable release: [v1.7.8](https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.7.8). See the [v1.7.8 release notes](docs/LC2_1.7.8_RELEASE_NOTES.zh-CN.md) for the exact changes, verification, and known limits.
+Current stable release: [v1.8.0](https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.8.0). See the [v1.8.0 release notes](docs/LC2_1.8.0_RELEASE_NOTES.zh-CN.md) for changes, verification, and known limits.
 
-Version 1.7.8 includes the r5 recovery changes and fixes public-core configuration generation during initial runtime setup. One actual solo session passed event-continuity, recorded UI-heartbeat, archive, and settlement-propagation checks; multiplayer and all MOD combinations are not covered by that result. All 1.7.7 candidates remain internal diagnostic history. The separately shared community package retains its original bytes. See the [release notes](docs/LC2_1.7.8_RELEASE_NOTES.zh-CN.md) and [recovery history](docs/LC2_1.7.7_RECOVERY.zh-CN.md) for the scope and remaining limits.
+Version 1.8.0 recognizes 72 community MODs, including two new black-hole weapon entries and Loot Weight Patch 2.8.0. It adds a lighter teal interface, refined card spacing, and clearer support links, while retaining the recovery and diagnostic-export improvements from 1.7.8. Damage taken, healing, and mana counter changes remain deferred. New MOD gameplay and all multiplayer combinations have not been fully tested.
 
-The source and local community package are now at 1.8.0: the catalog recognizes 72 community MODs, including two new black-hole weapon entries and Loot Weight Patch 2.8.0. The interface uses a lighter teal palette and refined card spacing. The matching public-core release is being prepared; see the [1.8.0 notes](docs/LC2_1.8.0_RELEASE_NOTES.zh-CN.md) for its current stage. Damage taken, healing, and mana counter changes remain deferred.
+First game launch requires online retrieval or generation of Unity compatibility files; the actual public-core first-game launch and network path were not revalidated for this release.
 
 The GitHub Release provides a Windows x64 `public-core` package. It contains the toolbox, the official BepInEx artifact, the project-owned Bridge, and public MOD catalog metadata, but excludes the third-party Soul Stone Trainer, Gold Editor, and community MOD binary/resource payloads. Users can provide packages they obtained independently and let the toolbox verify them against the catalog. The separately distributed Chinese community bundle is not byte-identical to the GitHub asset.
 
