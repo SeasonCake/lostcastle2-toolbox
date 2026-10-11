@@ -16,7 +16,7 @@ The repository currently contains:
 
 The application now starts in a calculator-style main toolbox window. It manages the keyboard overlay, macros, and a compact combat HUD; full combat details live in the main window. The v2 event contract keeps game observation, aggregation, and presentation separate so new items normally require a source-registry entry instead of new UI logic.
 
-On a clean game installation, the first toolbox game launch offers an explicit one-click setup for the pinned BepInEx runtime and the read-only combat Bridge. No community MOD is enabled automatically, the BepInEx console is disabled by default, and a different existing BepInEx core is never overwritten silently.
+On a clean game installation, the first toolbox game launch offers an explicit one-click setup for the pinned BepInEx runtime and the read-only combat Bridge. No community MOD is enabled automatically and the BepInEx console is disabled by default. When an existing BepInEx core differs, version 1.9.1 automatically backs it up and replaces it with the bundled runtime, preserving plugins and configuration and rolling back failed writes. DLL replacement requires the game to be fully stopped.
 
 ## Download
 

@@ -9,7 +9,7 @@ import keyview
 from toolbox.app_shell import CombatHudWindow, ToolboxShell, responsive_pair
 from toolbox.combat_aggregator import CombatAggregator
 from toolbox.game_features import DemoGameFeatureService, FeatureSnapshot
-from toolbox.team_mini_ui import TeamMiniWindow
+from toolbox.team_mini_ui import TeamMiniWindow, vital_fraction
 
 
 class TeamMiniTests(unittest.TestCase):
@@ -53,12 +53,13 @@ class TeamMiniTests(unittest.TestCase):
         self.root.update()
         self.mini.previous_member.invoke()
         self.assertIn('金币 0', self.mini.resources.cget('text'))
+        self.mini._set_view('inscriptions')
         item = self.mini.inventory.get_children('inscription-0')[0]
         self.mini.inventory.selection_set(item)
         self.mini._select_item()
         self.assertIn('攻击力提升 / 生命上限提升', self.mini.item_detail.cget('text'))
         self.mini.next_member.invoke()
-        self.assertIn('金币 未同步', self.mini.resources.cget('text'))
+        self.assertEqual('资源暂未同步', self.mini.resources.cget('text'))
         self.assertNotIn('金币 0', self.mini.resources.cget('text'))
 
     def test_refresh_keeps_tree_context_then_discards_stale_data_and_recovers(self):
@@ -66,6 +67,7 @@ class TeamMiniTests(unittest.TestCase):
         self.mini.toggle()
         self.root.update()
         self.mini.previous_member.invoke()
+        self.mini._set_view('bag')
         self.mini.inventory.item('bag', open=False)
         self.mini.refresh()
         self.assertFalse(self.mini.inventory.item('bag', 'open'))
@@ -74,15 +76,129 @@ class TeamMiniTests(unittest.TestCase):
         self.mini.refresh()
         self.assertFalse(self.mini.inventory.get_children())
         self.assertEqual(self.mini.members.cget('text'), '等待队伍数据')
-        self.assertNotIn('256', self.mini.vitals.cget('text'))
+        self.assertNotIn('256', self.mini.hp_meter.value.cget('text'))
         self.service.snapshot = snapshot
         self.mini.refresh()
         self.assertTrue(self.mini.inventory.get_children())
-        self.assertIn('95', self.mini.vitals.cget('text'))
+        self.assertIn('95', self.mini.hp_meter.value.cget('text'))
 
     def test_hud_starts_automatically_unless_explicitly_hidden_for_preview(self):
         self.assertTrue(keyview.parse_args([]).show_combat_hud)
         self.assertFalse(keyview.parse_args(['--hide-combat-hud-on-start']).show_combat_hud)
+
+    def test_vital_bars_keep_unknown_zero_and_out_of_range_values_distinct(self):
+        self.enable()
+        self.mini.toggle()
+        self.root.update()
+        self.assertAlmostEqual(self.mini.hp_meter.fraction, .475)
+        self.assertEqual(self.mini.mp_meter.fraction, 0)
+        self.assertEqual(self.mini.mp_meter.value.cget('text'), '0 / 80')
+        self.mini.hp_meter.set_values(None, 200)
+        self.assertIsNone(self.mini.hp_meter.fraction)
+        self.assertEqual(self.mini.hp_meter.value.cget('text'), '未同步')
+        self.mini.hp_meter.set_values(0, 200)
+        self.assertEqual(self.mini.hp_meter.fraction, 0)
+        self.assertEqual(self.mini.hp_meter.value.cget('text'), '0 / 200')
+        self.mini.hp_meter.set_values(300, 200)
+        self.assertEqual(self.mini.hp_meter.fraction, 1)
+        self.assertEqual(self.mini.hp_meter.value.cget('text'), '300 / 200')
+        for value, maximum in ((1, 0), (True, 200), (1, float('nan'))):
+            self.assertIsNone(vital_fraction(value, maximum))
+
+    def test_long_member_name_has_full_hover_detail_and_does_not_cover_controls(self):
+        self.enable()
+        self.mini.toggle()
+        self.root.update()
+        full = '这是一位名字特别长的冒险者' * 3
+        self.mini._member_full_name = full
+        self.mini._fit_member_name()
+        self.root.update()
+        self.assertTrue(self.mini.members.cget('text').endswith('…'))
+        self.mini.members.event_generate('<Enter>')
+        self.root.update()
+        self.assertEqual(self.mini.item_detail.cget('text'), full)
+        self.assertLessEqual(self.mini.item_detail.winfo_rooty()+self.mini.item_detail.winfo_height(), self.mini.window.winfo_rooty()+self.mini.window.winfo_height())
+        self.mini.members.event_generate('<Leave>')
+        self.root.update()
+        self.assertEqual(self.mini.item_detail.cget('text'), '拖动标题或空白处移动小窗')
+
+    def test_views_show_one_information_group_and_keep_selected_view_on_refresh(self):
+        self.enable()
+        self.mini.toggle()
+        self.root.update()
+        self.assertEqual(self.mini.active_view, 'status')
+        self.assertTrue(self.mini.status_view.winfo_ismapped())
+        self.assertFalse(self.mini.inventory_view.winfo_ismapped())
+        self.mini.view_buttons['bag'].invoke()
+        self.root.update()
+        self.assertFalse(self.mini.status_view.winfo_ismapped())
+        self.assertEqual(self.mini.inventory.get_children(), ('bag',))
+        self.mini.view_buttons['inscriptions'].invoke()
+        self.mini.previous_member.invoke()
+        self.mini.refresh()
+        self.root.update()
+        self.assertEqual(self.mini.active_view, 'inscriptions')
+        self.assertNotIn('bag', self.mini.inventory.get_children())
+        self.assertIn('inscription-0', self.mini.inventory.get_children())
+        self.mini.toggle()
+        self.mini.toggle()
+        self.assertEqual(self.mini.active_view, 'inscriptions')
+
+    def test_status_fits_large_resources_without_clipping_or_refresh_growth(self):
+        self.enable()
+        snapshot = self.service.snapshot(42)
+        player = dict(snapshot.team[0], resources={
+            'gold': 9705008, 'crystal': 99999, 'iron': 1234, 'coins': 0})
+        self.service.snapshot = lambda _pid: FeatureSnapshot(
+            snapshot.state, snapshot.detail, (player,), snapshot.loadout, snapshot.captured_at)
+        self.mini.toggle()
+        self.root.update()
+        self.assertIn('9,705,008', self.mini.resources.cget('text'))
+        self.assertIn('硬币 0', self.mini.resources.cget('text'))
+        resources = self.mini.resources
+        bottom = resources.winfo_rooty() + resources.winfo_reqheight()
+        ancestor = resources.master
+        while ancestor is not self.mini.window:
+            self.assertLessEqual(bottom, ancestor.winfo_rooty()+ancestor.winfo_height(), str(ancestor))
+            ancestor = ancestor.master
+        self.assertLess(bottom, self.mini.item_detail.winfo_rooty())
+        self.assertLessEqual(self.mini.window.winfo_height(), round(420*self.mini._dpi/96))
+        height = self.mini.window.winfo_height()
+        for _ in range(5):
+            self.mini.refresh()
+            self.root.update()
+        self.mini._set_view('bag')
+        self.root.update()
+        self.mini._set_view('status')
+        self.root.update()
+        self.assertEqual(self.mini.window.winfo_height(), height)
+        # This matches the live HUD path: the main toolbox is minimized,
+        # while the unowned native overlay remains available.
+        self.root.deiconify()
+        self.root.update()
+        self.root.iconify()
+        self.root.update()
+        self.mini.window.geometry(f'{self.mini.window.winfo_width()}x{round(320*self.mini._dpi/96)}')
+        self.mini.refresh()
+        self.root.update()
+        self.assertEqual(self.root.state(), 'iconic')
+        self.assertLessEqual(resources.winfo_rooty()+resources.winfo_reqheight(),
+                             resources.master.master.winfo_rooty()+resources.master.master.winfo_height())
+
+    def test_dragging_resource_surface_moves_only_mini(self):
+        self.enable()
+        self.mini.toggle()
+        self.root.update()
+        main_position = (self.root.winfo_x(), self.root.winfo_y())
+        start = (self.mini.window.winfo_x(), self.mini.window.winfo_y())
+        self.assertTrue(self.mini.resources.bind('<B1-Motion>'))
+        self.assertFalse(self.mini.view_buttons['bag'].bind('<B1-Motion>'))
+        self.assertFalse(self.mini.inventory.bind('<B1-Motion>'))
+        self.mini._begin_drag(SimpleNamespace(x_root=50, y_root=50))
+        self.mini._drag(SimpleNamespace(x_root=90, y_root=70))
+        self.root.update()
+        self.assertEqual((self.mini.window.winfo_x(), self.mini.window.winfo_y()), (start[0]+40, start[1]+20))
+        self.assertEqual((self.root.winfo_x(), self.root.winfo_y()), main_position)
 
     def test_compact_translucent_mini_does_not_map_or_activate_its_main_owner(self):
         # The toolbox has displayed its main window on startup before the
@@ -107,7 +223,7 @@ class TeamMiniTests(unittest.TestCase):
         self.assertEqual(self.root.state(), 'withdrawn')
         self.assertAlmostEqual(float(self.mini.window.attributes('-alpha')), .86, places=2)
         self.assertLessEqual(self.mini.window.winfo_width(), round(300*self.mini._dpi/96))
-        self.assertLessEqual(self.mini.window.winfo_height(), round(320*self.mini._dpi/96))
+        self.assertLessEqual(self.mini.window.winfo_height(), round(420*self.mini._dpi/96))
         hwnd = int(keyview.user32.GetAncestor(self.mini.window.winfo_id(), 2))
         self.assertTrue(keyview.user32.GetWindowLongW(hwnd, -20) & 0x08000000)
         self.mini.hide()
@@ -131,7 +247,7 @@ class TeamMiniTests(unittest.TestCase):
         self.enable()
         self.mini.toggle()
         self.root.update()
-        self.assertIn('95', self.mini.vitals.cget('text'))
+        self.assertIn('95', self.mini.hp_meter.value.cget('text'))
         original = self.service.snapshot
         def changed_snapshot(pid):
             snapshot = original(pid)
@@ -145,7 +261,7 @@ class TeamMiniTests(unittest.TestCase):
         shell.feature_pages = None
         shell.team_mini = self.mini
         ToolboxShell.refresh(shell)
-        self.assertIn('67', self.mini.vitals.cget('text'))
+        self.assertIn('67', self.mini.hp_meter.value.cget('text'))
 
     def test_hud_team_and_toolbox_buttons_control_different_windows(self):
         self.root.deiconify()

@@ -857,6 +857,8 @@ class RoundedPanel(tk.Canvas):
         self._radius = radius
         self._inset = max(6, radius // 2)
         self._auto_height = height is None
+        self._resize_job: str | None = None
+        self._destroying = False
         self.content = tk.Frame(
             self,
             bg=fill,
@@ -875,11 +877,15 @@ class RoundedPanel(tk.Canvas):
             self.content.bind("<Configure>", self._resize_to_content)
 
     def _resize_to_content(self, _event: tk.Event[Any] | None = None) -> None:
+        if self._destroying:
+            return
         target = max(2, self.content.winfo_reqheight() + self._inset * 2)
         if int(float(self.cget("height"))) != target:
             self.configure(height=target)
 
     def _redraw(self, event: tk.Event[Any]) -> None:
+        if self._destroying:
+            return
         width = max(2, int(event.width))
         height = max(2, int(event.height))
         radius = min(self._radius, width // 2, height // 2)
@@ -933,8 +939,19 @@ class RoundedPanel(tk.Canvas):
         if not self._auto_height:
             dimensions["height"] = max(1, height - self._inset * 2)
         self.itemconfigure(self._content_window, **dimensions)
-        if self._auto_height:
-            self.after_idle(self._resize_to_content)
+        if self._auto_height and self._resize_job is None:
+            self._resize_job = self.after_idle(self._finish_content_resize)
+
+    def _finish_content_resize(self) -> None:
+        self._resize_job = None
+        self._resize_to_content()
+
+    def destroy(self) -> None:
+        self._destroying = True
+        if self._resize_job is not None:
+            self.after_cancel(self._resize_job)
+            self._resize_job = None
+        super().destroy()
 
 
 def responsive_pair(row: tk.Frame, copy: tk.Frame, controls: tk.Frame, *, wrap_controls: bool = False) -> None:

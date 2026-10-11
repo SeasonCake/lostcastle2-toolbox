@@ -300,9 +300,9 @@ if ($LASTEXITCODE -ne 0) {
 
 $packageParent = Join-Path $buildOutputRoot 'package'
 $packageName = if ($BuildProfile -eq 'Diagnostic') {
-    "失落城堡2工具箱1.9.0-诊断候选-r$CandidateRevision"
+    "失落城堡2工具箱1.9.1-诊断候选-r$CandidateRevision"
 } else {
-    '失落城堡2工具箱1.9.0-实时数值监测+一键MOD安装'
+    '失落城堡2工具箱1.9.1-实时数值监测+一键MOD安装'
 }
 $packageRoot = Join-Path $packageParent $packageName
 if (Test-Path -LiteralPath $packageRoot) {
@@ -327,11 +327,11 @@ foreach ($directory in @($packageRoot, $packageConfig, $packageModules, $package
 $runtimeRoot = Join-Path $buildOutputRoot 'dist\失落城堡2工具箱'
 Get-ChildItem -LiteralPath $runtimeRoot -Force | Copy-Item -Destination $packageRoot -Recurse -Force
 Copy-Item -LiteralPath '.\package_assets\使用说明.txt' -Destination $packageRoot -Force
-Copy-Item -LiteralPath '.\package_assets\1.9.0更新说明.txt' -Destination (Join-Path $packageRoot '更新说明.txt')
-Copy-Item -LiteralPath '.\package_assets\1.9.0群公告.txt' -Destination (Join-Path $packageRoot '群公告.txt')
+Copy-Item -LiteralPath '.\package_assets\1.9.1更新说明.txt' -Destination (Join-Path $packageRoot '更新说明.txt')
+Copy-Item -LiteralPath '.\package_assets\1.9.1群公告.txt' -Destination (Join-Path $packageRoot '群公告.txt')
 if ($diagnosticsExpected) {
     @"
-失落城堡2工具箱 1.9.0-r$CandidateRevision · 诊断内测版
+失落城堡2工具箱 1.9.1-r$CandidateRevision · 诊断内测版
 
 本包用于恢复验证，尚未作为正式分享版发布。
 对局事件记录默认开启，可在战斗统计页关闭；支持诊断另保留有界异常样本与消费状态。

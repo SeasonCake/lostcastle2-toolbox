@@ -65,7 +65,7 @@ from toolbox.windows_windowing import (
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.9.1"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -3338,6 +3338,109 @@ def self_test() -> int:
     return 0
 
 
+def ensure_runtime_for_action(
+    root: tk.Misc, runtime_setup: RuntimeSetupManager, support_exporter: SupportDiagnostics
+) -> bool:
+    try:
+        status = runtime_setup.status()
+    except (RuntimeSetupError, OSError) as error:
+        messagebox.showerror(APP_NAME, f"暂时无法核对运行环境。\n\n{error}", parent=root)
+        return False
+    support_exporter.record_event("runtime_status", state=status.state, detail=status.detail)
+    if status.ready:
+        return True
+    if status.state == "game_not_configured":
+        messagebox.showerror(
+            APP_NAME,
+            "没有找到 LostCastle2.exe，请先在设置中定位游戏程序。",
+            parent=root,
+        )
+        return False
+    replace_existing = runtime_setup.needs_framework_update()
+    component_update = status.state in {"bridge_update", "features_update", "needs_configuration"}
+    setup_title = "更新运行环境" if replace_existing else "更新工具箱组件" if component_update else "首次初始化"
+    setup_message = (
+        "将更新工具箱的战斗与配装组件，保留现有 MOD 和配置。\n\n"
+        "配装助手默认可查看，更换装备仍需手动确认；队伍状态默认关闭。\n\n"
+        "请先完全关闭游戏。是否现在更新？"
+    ) if component_update else (
+        "战斗 HUD 和 DLL MOD 需要先初始化游戏运行环境。\n\n"
+        "盒子会安装配套 BepInEx、战斗 HUD Bridge 和工具箱功能组件。"
+        "配装助手默认可查看，更换装备仍需手动确认；"
+        "不会自动安装或启用任何社区 MOD，也会默认关闭调试控制台。\n\n"
+        "是否现在一键初始化？"
+    )
+    if not replace_existing and not messagebox.askyesno(
+        setup_title,
+        setup_message,
+        parent=root,
+    ):
+        support_exporter.record_event("runtime_initialization_cancelled")
+        return False
+    try:
+        support_exporter.record_event(
+            "runtime_initialization_begin", automatic_framework_update=replace_existing
+        )
+        setup_results: queue.Queue[Exception | None] = queue.Queue()
+        progress = tk.Toplevel(root)
+        progress.title(setup_title)
+        progress.transient(root)
+        progress.resizable(False, False)
+        progress.protocol("WM_DELETE_WINDOW", lambda: None)
+        tk.Label(progress, text="正在更新，请稍候…", font=("Microsoft YaHei UI", 12, "bold"), padx=24, pady=14).pack()
+        tk.Label(progress, text="正在备份与核对文件，请保持游戏关闭。", font=("Microsoft YaHei UI", 9), padx=24, pady=8).pack()
+        ttk.Progressbar(progress, mode="indeterminate", length=300).pack(padx=24, pady=(4, 18))
+        progress.winfo_children()[-1].start(12)
+        progress.grab_set()
+        finished = tk.BooleanVar(root, value=False)
+        def install_runtime_worker() -> None:
+            try:
+                runtime_setup.install(replace_existing=replace_existing)
+            except Exception as error:
+                setup_results.put(error)
+            else:
+                setup_results.put(None)
+        def poll_runtime_result() -> None:
+            if not setup_results.empty():
+                finished.set(True)
+            else:
+                root.after(100, poll_runtime_result)
+        threading.Thread(target=install_runtime_worker, name="LC2RuntimeUpdate", daemon=True).start()
+        root.after(100, poll_runtime_result)
+        root.wait_variable(finished)
+        progress.destroy()
+        setup_error = setup_results.get_nowait()
+        if setup_error is not None:
+            raise setup_error
+    except RuntimeSetupGameRunning as error:
+        support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
+        messagebox.showerror(APP_NAME, str(error), parent=root)
+        return False
+    except RuntimeSetupConflict as error:
+        support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
+        messagebox.showerror(
+            APP_NAME,
+            f"运行环境暂时无法更新。\n\n{error}",
+            parent=root,
+        )
+        return False
+    except (RuntimeSetupError, OSError) as error:
+        support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
+        messagebox.showerror(
+            APP_NAME,
+            f"初始化失败，游戏尚未启动。\n\n{error}",
+            parent=root,
+        )
+        return False
+    support_exporter.record_event("runtime_initialization_complete")
+    messagebox.showinfo(
+        "初始化完成",
+        "HUD / MOD 运行环境已就绪。首次启动游戏会生成兼容文件，可能比平时稍慢。",
+        parent=root,
+    )
+    return True
+
+
 def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     if args.self_test or args.export_diagnostics:
@@ -3430,108 +3533,7 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
     )
 
     def ensure_game_runtime() -> bool:
-        try:
-            status = runtime_setup.status()
-        except (RuntimeSetupError, OSError) as error:
-            messagebox.showerror(APP_NAME, f"暂时无法核对运行环境。\n\n{error}", parent=root)
-            return False
-        support_exporter.record_event("runtime_status", state=status.state, detail=status.detail)
-        if status.ready:
-            return True
-        if status.state == "game_not_configured":
-            messagebox.showerror(
-                APP_NAME,
-                "没有找到 LostCastle2.exe，请先在设置中定位游戏程序。",
-                parent=root,
-            )
-            return False
-        game_exe = runtime_setup._game_exe()
-        replace_existing = runtime_setup.needs_framework_update()
-        component_update = status.state in {"bridge_update", "features_update", "needs_configuration"}
-        setup_title = "更新运行环境" if replace_existing else "更新工具箱组件" if component_update else "首次初始化"
-        setup_message = (
-            "将已有 BepInEx 更新为工具箱配套版本。\n\n"
-            "会备份原运行库，保留你安装的 MOD、补丁和配置；"
-            "旧兼容缓存会在下次启动时重新生成。更新失败会恢复原文件。\n\n"
-            "请先完全关闭游戏。是否现在更新？"
-        ) if replace_existing else (
-            "将更新工具箱的战斗与配装组件，保留现有 MOD 和配置。\n\n"
-            "配装助手默认可查看，更换装备仍需手动确认；队伍状态默认关闭。\n\n"
-            "请先完全关闭游戏。是否现在更新？"
-        ) if component_update else (
-            "战斗 HUD 和 DLL MOD 需要先初始化游戏运行环境。\n\n"
-            "盒子会安装配套 BepInEx、战斗 HUD Bridge 和工具箱功能组件。"
-            "配装助手默认可查看，更换装备仍需手动确认；"
-            "不会自动安装或启用任何社区 MOD，也会默认关闭调试控制台。\n\n"
-            "是否现在一键初始化？"
-        )
-        if not messagebox.askyesno(
-            setup_title,
-            setup_message,
-            parent=root,
-        ):
-            support_exporter.record_event("runtime_initialization_cancelled")
-            return False
-        try:
-            support_exporter.record_event("runtime_initialization_begin")
-            setup_results: queue.Queue[Exception | None] = queue.Queue()
-            progress = tk.Toplevel(root)
-            progress.title(setup_title)
-            progress.transient(root)
-            progress.resizable(False, False)
-            progress.protocol("WM_DELETE_WINDOW", lambda: None)
-            tk.Label(progress, text="正在更新，请稍候…", font=("Microsoft YaHei UI", 12, "bold"), padx=24, pady=14).pack()
-            tk.Label(progress, text="正在备份与核对文件，请保持游戏关闭。", font=("Microsoft YaHei UI", 9), padx=24, pady=8).pack()
-            ttk.Progressbar(progress, mode="indeterminate", length=300).pack(padx=24, pady=(4, 18))
-            progress.winfo_children()[-1].start(12)
-            progress.grab_set()
-            finished = tk.BooleanVar(root, value=False)
-            def install_runtime_worker() -> None:
-                try:
-                    runtime_setup.install(replace_existing=replace_existing)
-                except Exception as error:
-                    setup_results.put(error)
-                else:
-                    setup_results.put(None)
-            def poll_runtime_result() -> None:
-                if not setup_results.empty():
-                    finished.set(True)
-                else:
-                    root.after(100, poll_runtime_result)
-            threading.Thread(target=install_runtime_worker, name="LC2RuntimeUpdate", daemon=True).start()
-            root.after(100, poll_runtime_result)
-            root.wait_variable(finished)
-            progress.destroy()
-            setup_error = setup_results.get_nowait()
-            if setup_error is not None:
-                raise setup_error
-        except RuntimeSetupGameRunning as error:
-            support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
-            messagebox.showerror(APP_NAME, str(error), parent=root)
-            return False
-        except RuntimeSetupConflict as error:
-            support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
-            messagebox.showerror(
-                APP_NAME,
-                f"运行环境暂时无法更新。\n\n{error}",
-                parent=root,
-            )
-            return False
-        except (RuntimeSetupError, OSError) as error:
-            support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
-            messagebox.showerror(
-                APP_NAME,
-                f"初始化失败，游戏尚未启动。\n\n{error}",
-                parent=root,
-            )
-            return False
-        support_exporter.record_event("runtime_initialization_complete")
-        messagebox.showinfo(
-            "初始化完成",
-            "HUD / MOD 运行环境已就绪。首次启动游戏会生成兼容文件，可能比平时稍慢。",
-            parent=root,
-        )
-        return True
+        return ensure_runtime_for_action(root, runtime_setup, support_exporter)
 
     keyboard_app.before_game_launch = ensure_game_runtime
     registry = SourceRegistry.from_file(
@@ -3722,7 +3724,8 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
             labels: dict[str, tk.Misc]
             if args.qa_ui_window == "team-mini":
                 mini = shell.team_mini
-                labels = {key: getattr(mini, key) for key in ("status", "members", "vitals", "resources", "inventory", "item_detail", "enable_button", "lock_button")}
+                labels = {key: getattr(mini, key) for key in ("status", "members", "member_slot", "resources", "inventory", "item_detail", "enable_button", "lock_button", "empty_title", "empty_detail")}
+                labels.update(hp_value=mini.hp_meter.value, mp_value=mini.mp_meter.value)
             elif args.qa_ui_window == "hud":
                 labels = dict(shell.hud.labels)
                 for index, row in enumerate(shell.hud.teammate_labels, start=1):

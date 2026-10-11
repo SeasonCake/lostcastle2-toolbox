@@ -25,7 +25,7 @@ if (-not [string]::IsNullOrWhiteSpace($OutputRoot)) {
     }
 }
 
-$packageName = '失落城堡2工具箱1.9.0-public-core'
+$packageName = '失落城堡2工具箱1.9.1-public-core'
 $appName = '失落城堡2工具箱'
 $publicBuildParent = Join-Path $buildOutputRoot 'build'
 $publicBuildRoot = Join-Path $publicBuildParent 'public-core'
@@ -400,7 +400,7 @@ function Assert-PublicPackage {
     $packageExe = Join-Path $PackageRoot "$appName.exe"
     Assert-LeafFile $packageExe 'public-core executable'
     $version = (Get-Item -LiteralPath $packageExe).VersionInfo.FileVersion.Trim()
-    Assert-Condition ($version -in @('1.9.0', '1.9.0.0')) "Packaged FileVersion is not 1.9.0: $version"
+    Assert-Condition ($version -in @('1.9.1', '1.9.1.0')) "Packaged FileVersion is not 1.9.1: $version"
 
     $internalRoot = Join-Path $PackageRoot '_internal'
     Assert-Condition (Test-Path -LiteralPath $internalRoot -PathType Container) 'Packaged PyInstaller _internal directory is missing.'
@@ -582,7 +582,7 @@ foreach ($directory in @($publicPackageRoot, $packageConfig, $packageModules, $p
 
 Get-ChildItem -LiteralPath $runtimeRoot -Force | Copy-Item -Destination $publicPackageRoot -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\public-core.README.txt') -Destination (Join-Path $publicPackageRoot '使用说明.txt')
-Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\1.9.0更新说明.txt') -Destination (Join-Path $publicPackageRoot '更新说明.txt')
+Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\1.9.1更新说明.txt') -Destination (Join-Path $publicPackageRoot '更新说明.txt')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\MOD自动添加说明.txt') -Destination $publicPackageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $publicPackageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot 'PUBLIC_CORE_THIRD_PARTY_NOTICES.md') -Destination (Join-Path $publicPackageRoot 'THIRD_PARTY_NOTICES.md')
