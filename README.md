@@ -20,15 +20,15 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 
 ## Download
 
-Current stable release: [v1.8.0](https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.8.0). See the [v1.8.0 release notes](docs/LC2_1.8.0_RELEASE_NOTES.zh-CN.md) for changes, verification, and known limits.
+Current stable release: [v1.9.0](https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.9.0). See the [v1.9.0 release notes](docs/LC2_1.9.0_RELEASE_NOTES.zh-CN.md) for changes, verification, and known limits.
 
-Source preparation for 1.9.0 adds an 84-entry community catalog, three primary pages, larger typography and a warm light theme, plus backed-up updates for an existing BepInEx installation. The [1.9.0 notes](docs/LC2_1.9.0_RELEASE_NOTES.zh-CN.md) distinguish verification from release status.
+Version 1.9.0 catalogs 84 community MODs (12 additions and 8 upgrades), adds team status, loadout and LC Enhancement Plan pages, and provides a translucent team mini window directly from the HUD. It includes a brighter warm theme, display-aware fonts and MOD columns, hover support links, background MOD status scanning, and backed-up updates for an existing BepInEx installation.
 
-Version 1.8.0 recognizes 72 community MODs, including two new black-hole weapon entries and Loot Weight Patch 2.8.0. It adds a lighter teal interface, refined card spacing, and clearer support links, while retaining the recovery and diagnostic-export improvements from 1.7.8. Damage taken, healing, and mana counter changes remain deferred. New MOD gameplay and all multiplayer combinations have not been fully tested.
+Damage taken, healing, and mana counter changes remain deferred. New MOD gameplay, all loadout combinations and all multiplayer configurations have not been fully tested.
 
 First game launch requires online retrieval or generation of Unity compatibility files; the actual public-core first-game launch and network path were not revalidated for this release.
 
-The GitHub Release provides a Windows x64 `public-core` package. It contains the toolbox, the official BepInEx artifact, the project-owned Bridge, and public MOD catalog metadata, but excludes the third-party Soul Stone Trainer, Gold Editor, and community MOD binary/resource payloads. Users can provide packages they obtained independently and let the toolbox verify them against the catalog. The separately distributed Chinese community bundle is not byte-identical to the GitHub asset.
+The GitHub Release provides a Windows x64 `public-core` package. It contains the toolbox, the official BepInEx artifact, the project-owned Bridge and team/loadout component, and public MOD catalog metadata, but excludes the third-party Soul Stone Trainer, Gold Editor, and community MOD binary/resource payloads. Users can provide packages they obtained independently and let the toolbox verify them against the catalog. The separately distributed Chinese community bundle is not byte-identical to the GitHub asset.
 
 ## Project status
 
@@ -40,7 +40,7 @@ The GitHub Release provides a Windows x64 `public-core` package. It contains the
 | Combat event v2 and replay aggregation | Implemented and tested |
 | Mana and shield observation bridge | Mana spend/recovery runtime-validated; shield samples still pending |
 | Main toolbox and external combat HUD | Toolbox 1.7.6 / Bridge 1.7.4 labels the compact HUD **realtime** and keeps skip diagnostics off that surface. The detailed page explains **realtime estimate / settlement may correct**. DPS prefers complete live cumulative deltas and falls back to hit events. A process-first mid-run join may restore damage and boss damage from a complete nonzero live vector without creating a DPS spike, while in-run taken damage keeps the validated hit-event path. A one-player settlement UI record may finalize damage, boss damage, and taken damage only after the identity gate accepts it; the trusted UI boundary still ends an estimated session when that record is unavailable |
-| MOD management | 1.8.0 catalogs two existing tools plus 72 community MODs. The local community bundle uses 78 functional payload files; GitHub public-core ships metadata only and requires user-supplied original packages. Hash-bound superseded payloads are removed during an upgrade while modified or unknown files are preserved |
+| MOD management | 1.9.0 catalogs two existing tools plus 84 community MODs. The local community bundle uses 90 functional payload files; GitHub public-core ships metadata only and requires user-supplied original packages. Hash-bound superseded payloads are removed during an upgrade while modified or unknown files are preserved |
 
 Research results are scoped to the game build recorded in the Chinese plan. A game update can invalidate hook compatibility and must be revalidated.
 
@@ -92,7 +92,7 @@ The temporary BepInEx probe has separate instructions in [`game_plugins/LC2Damag
 
 The current 1.9.0 source catalog contains the two original tools and 84 curated community MOD entries: 12 additions and 8 upgrades, with 90 functional payload files totaling 5,162,445 bytes. Functional categories, search and installation filters share a background status scan. Generated config, cache, interop, Doorstop, source-package contact details and duplicate core files are excluded. Original authors and exact identities remain in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and the catalogs.
 
-The bottom-left footer links to GitHub and the maintainer's [Bilibili space](https://space.bilibili.com/88048665?), followed by a `投喂` entry that shows the WeChat code by default and opens the local WeChat, Alipay, and explanation folder for friends who enjoy *Lost Castle 2* and want to support the maintainer or nudge an update.
+The home page, MOD page and bottom-left `支持我们` entries display the WeChat code on hover; clicking opens the local WeChat, Alipay and explanation folder. The footer also links to GitHub and the maintainer's [Bilibili space](https://space.bilibili.com/88048665?). Support is voluntary.
 
 ## Safety and scope
 
