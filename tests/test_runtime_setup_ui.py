@@ -85,12 +85,14 @@ class RuntimeSetupUiTests(unittest.TestCase):
         failed = False
         def fail_once(path,content):
             nonlocal failed
-            if path == self.il2cpp and not failed:
+            if path.resolve() == self.il2cpp.resolve() and not failed:
                 failed = True
                 raise OSError('isolated write failure')
             writer(path,content)
         with patch.object(self.manager,'_write_atomic',side_effect=fail_once):
-            self.assertFalse(self.run_action())
+            outcome = self.run_action()
+        self.assertTrue(failed, 'The runtime write failure must actually be injected')
+        self.assertFalse(outcome)
         self.ask.assert_not_called()
         self.info.assert_not_called()
         self.error.assert_called_once()
