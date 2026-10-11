@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch]$ValidateOnly,
     [string]$OutputRoot = ''
@@ -25,7 +25,7 @@ if (-not [string]::IsNullOrWhiteSpace($OutputRoot)) {
     }
 }
 
-$packageName = '失落城堡2工具箱1.8.0-public-core'
+$packageName = '失落城堡2工具箱1.9.0-public-core'
 $appName = '失落城堡2工具箱'
 $publicBuildParent = Join-Path $buildOutputRoot 'build'
 $publicBuildRoot = Join-Path $publicBuildParent 'public-core'
@@ -45,8 +45,8 @@ $supportAssetsSource = Join-Path $projectRoot 'package_assets\赞助与投喂'
 $publicRuntimeNoticesSource = Join-Path $projectRoot 'package_assets\运行环境\public-core'
 
 $expectedPublicModCatalogSha256 = '879388326B33DCCE722DCC4E4FD76802DC5628787713ED51D6EAA0999E12BE0C'
-$expectedPublicCommunityCatalogSha256 = 'D19C6B036AAFD6264172DEC7C6D178B42D6D8E0A1C000679E214044553E7B396'
-$expectedPublicRuntimeManifestSha256 = '9CF1E7066EBDA04616C1EC7476AF582B0E230460EE2F2FD98D304ED0030115CC'
+$expectedPublicCommunityCatalogSha256 = '36DC56A0FAC39188944D35AEB1AC0414C94D92BE762B519DFD6C1E9828B88E82'
+$expectedPublicRuntimeManifestSha256 = '8D9A34299FCE9A4010F26AC42C48A86197CCA6807F45DA5F5D14A69560C740FB'
 $expectedOfficialRuntimeSha256 = '2A7CBF74D26ABE4765C3E662DB1721B923BAC39849EBFEF2CA5DC7DE7E2D9B7F'
 $expectedOfficialRuntimeSize = 34335572L
 $expectedOfficialRuntimeMemberCount = 228
@@ -55,6 +55,8 @@ $expectedOfficialRuntimeUrl = 'https://builds.bepinex.dev/projects/bepinex_be/78
 $expectedOfficialRuntimeFilename = 'BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.785+6abdba4.zip'
 $expectedBridgeSha256 = '190B8B4A8C661C73A32ADF15DF56487E57473E591BFA25520D172A7E188E7DED'
 $expectedBridgeSize = 102400L
+$expectedFeaturesSha256 = '201F270836632D3AD0481CFCF62B5D2FF471BBA70C3D7736AAAFE786BE909473'
+$expectedFeaturesSize = 44032L
 $expectedSevenZipExeSha256 = '4CD7D776C686427226A151789D2D61F0B2ED2C392148CC4E69C0238362FAFECF'
 $expectedSevenZipDllSha256 = '5BD20FB38499D95C39594F41D4781B6181B3304B7F1F4D06B0182F514E7EAA74'
 $legacyPreparedRuntimeSha256 = '0B617BC439F53E39680444F1EFD84C2B31A96D144D3267EE06EBEA05B59738A8'
@@ -221,6 +223,11 @@ function Assert-PublicRuntime {
     Assert-Condition ([long]$manifest.bridge.size_bytes -eq $expectedBridgeSize) 'Public Bridge manifest size mismatch.'
     Assert-Condition ([string]$manifest.bridge.sha256 -ceq $expectedBridgeSha256) 'Public Bridge manifest SHA-256 mismatch.'
     Assert-Condition ($manifest.bridge.diagnostics_enabled -eq $false) 'Public Bridge diagnostics must be disabled.'
+    Assert-Condition ([string]$manifest.features.filename -ceq 'LC2ToolboxFeatures.dll') 'Public feature component filename mismatch.'
+    Assert-Condition ([string]$manifest.features.target -ceq 'BepInEx/plugins/LC2ToolboxFeatures/LC2ToolboxFeatures.dll') 'Public feature component target mismatch.'
+    Assert-Condition ([long]$manifest.features.size_bytes -eq $expectedFeaturesSize) 'Public feature component size mismatch.'
+    Assert-Condition ([string]$manifest.features.sha256 -ceq $expectedFeaturesSha256) 'Public feature component hash mismatch.'
+    Assert-Condition ($manifest.features.team_enabled_default -eq $false -and $manifest.features.loadout_viewing_default -eq $true) 'Public feature defaults differ from the selected product behavior.'
 
     $expectedRequired = @(
         '.doorstop_version',
@@ -252,13 +259,14 @@ function Assert-PublicRuntime {
 
     Assert-Condition (Test-Path -LiteralPath $publicRuntimeSource -PathType Container) 'Missing public runtime source directory.'
     $sourceFiles = @(Get-ChildItem -LiteralPath $publicRuntimeSource -File -Recurse -Force)
-    $expectedSourceNames = @('bepinex-runtime.zip', 'LC2CombatBridge.dll') | Sort-Object
+    $expectedSourceNames = @('bepinex-runtime.zip', 'LC2CombatBridge.dll', 'LC2ToolboxFeatures.dll') | Sort-Object
     $actualSourceNames = @($sourceFiles | ForEach-Object { $_.FullName.Substring($publicRuntimeSource.Length).TrimStart('\', '/').Replace('\', '/') } | Sort-Object)
-    Assert-Condition (@(Compare-Object -ReferenceObject $expectedSourceNames -DifferenceObject $actualSourceNames).Count -eq 0) 'Public runtime source must contain exactly the official ZIP and LC2 Combat Bridge.'
+    Assert-Condition (@(Compare-Object -ReferenceObject $expectedSourceNames -DifferenceObject $actualSourceNames).Count -eq 0) 'Public runtime source must contain exactly the official ZIP and project-owned components.'
     $runtimeArchivePath = Join-Path $publicRuntimeSource 'bepinex-runtime.zip'
     $bridgePath = Join-Path $publicRuntimeSource 'LC2CombatBridge.dll'
     Assert-FileIdentity $runtimeArchivePath $expectedOfficialRuntimeSize $expectedOfficialRuntimeSha256 'official BepInEx archive'
     Assert-FileIdentity $bridgePath $expectedBridgeSize $expectedBridgeSha256 'LC2 Combat Bridge'
+    Assert-FileIdentity (Join-Path $publicRuntimeSource 'LC2ToolboxFeatures.dll') $expectedFeaturesSize $expectedFeaturesSha256 'LC2 Toolbox feature component'
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [System.IO.Compression.ZipFile]::OpenRead($runtimeArchivePath)
@@ -392,7 +400,7 @@ function Assert-PublicPackage {
     $packageExe = Join-Path $PackageRoot "$appName.exe"
     Assert-LeafFile $packageExe 'public-core executable'
     $version = (Get-Item -LiteralPath $packageExe).VersionInfo.FileVersion.Trim()
-    Assert-Condition ($version -in @('1.8.0', '1.8.0.0')) "Packaged FileVersion is not 1.8.0: $version"
+    Assert-Condition ($version -in @('1.9.0', '1.9.0.0')) "Packaged FileVersion is not 1.9.0: $version"
 
     $internalRoot = Join-Path $PackageRoot '_internal'
     Assert-Condition (Test-Path -LiteralPath $internalRoot -PathType Container) 'Packaged PyInstaller _internal directory is missing.'
@@ -409,7 +417,8 @@ function Assert-PublicPackage {
     $packagedRuntimeRoot = Join-Path $internalRoot 'third_party\lc2_runtime'
     Assert-FileIdentity (Join-Path $packagedRuntimeRoot 'bepinex-runtime.zip') $expectedOfficialRuntimeSize $expectedOfficialRuntimeSha256 'packaged official BepInEx archive'
     Assert-FileIdentity (Join-Path $packagedRuntimeRoot 'LC2CombatBridge.dll') $expectedBridgeSize $expectedBridgeSha256 'packaged LC2 Combat Bridge'
-    Assert-Condition (@(Get-ChildItem -LiteralPath $packagedRuntimeRoot -File -Recurse -Force).Count -eq 2) 'Packaged runtime bundle contains unexpected files.'
+    Assert-FileIdentity (Join-Path $packagedRuntimeRoot 'LC2ToolboxFeatures.dll') $expectedFeaturesSize $expectedFeaturesSha256 'packaged toolbox feature component'
+    Assert-Condition (@(Get-ChildItem -LiteralPath $packagedRuntimeRoot -File -Recurse -Force).Count -eq 3) 'Packaged runtime bundle contains unexpected files.'
 
     $packagedSevenZipRoot = Join-Path $internalRoot 'third_party\7zip'
     Assert-FileIdentity (Join-Path $packagedSevenZipRoot '7z.exe') 575488L $expectedSevenZipExeSha256 'packaged 7-Zip executable'
@@ -485,7 +494,7 @@ function Assert-PublicPackage {
 
 # Preflight is read-only and fail-closed. It never consults the local/private payload roots.
 $publicModCatalog = Assert-PublicCatalog $publicModCatalogPath (Join-Path $projectRoot 'assets\mod_catalog.json') $expectedPublicModCatalogSha256 2 'public MOD catalog'
-$publicCommunityCatalog = Assert-PublicCatalog $publicCommunityCatalogPath (Join-Path $projectRoot 'assets\community_mod_catalog.json') $expectedPublicCommunityCatalogSha256 72 'public community MOD catalog'
+$publicCommunityCatalog = Assert-PublicCatalog $publicCommunityCatalogPath (Join-Path $projectRoot 'assets\community_mod_catalog.json') $expectedPublicCommunityCatalogSha256 84 'public community MOD catalog'
 $publicRuntimeManifest = Assert-PublicRuntime $publicRuntimeManifestPath
 Assert-LeafFile $publicProfilePath 'distribution build profile'
 Assert-SevenZipAndPackageAssets
@@ -573,6 +582,7 @@ foreach ($directory in @($publicPackageRoot, $packageConfig, $packageModules, $p
 
 Get-ChildItem -LiteralPath $runtimeRoot -Force | Copy-Item -Destination $publicPackageRoot -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\public-core.README.txt') -Destination (Join-Path $publicPackageRoot '使用说明.txt')
+Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\1.9.0更新说明.txt') -Destination (Join-Path $publicPackageRoot '更新说明.txt')
 Copy-Item -LiteralPath (Join-Path $projectRoot 'package_assets\MOD自动添加说明.txt') -Destination $publicPackageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE') -Destination $publicPackageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot 'PUBLIC_CORE_THIRD_PARTY_NOTICES.md') -Destination (Join-Path $publicPackageRoot 'THIRD_PARTY_NOTICES.md')

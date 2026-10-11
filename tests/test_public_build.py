@@ -24,10 +24,10 @@ PUBLIC_MOD_CATALOG_SHA256 = (
     "879388326B33DCCE722DCC4E4FD76802DC5628787713ED51D6EAA0999E12BE0C"
 )
 PUBLIC_COMMUNITY_CATALOG_SHA256 = (
-    "D19C6B036AAFD6264172DEC7C6D178B42D6D8E0A1C000679E214044553E7B396"
+    "36DC56A0FAC39188944D35AEB1AC0414C94D92BE762B519DFD6C1E9828B88E82"
 )
 PUBLIC_RUNTIME_MANIFEST_SHA256 = (
-    "9CF1E7066EBDA04616C1EC7476AF582B0E230460EE2F2FD98D304ED0030115CC"
+    "8D9A34299FCE9A4010F26AC42C48A86197CCA6807F45DA5F5D14A69560C740FB"
 )
 OFFICIAL_RUNTIME_SHA256 = (
     "2A7CBF74D26ABE4765C3E662DB1721B923BAC39849EBFEF2CA5DC7DE7E2D9B7F"
@@ -67,7 +67,7 @@ class PublicBuildTests(unittest.TestCase):
 
     def test_public_build_uses_isolated_roots_and_an_explicit_allowlist(self) -> None:
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("失落城堡2工具箱1.8.0-public-core", script)
+        self.assertIn("失落城堡2工具箱1.9.0-public-core", script)
         self.assertIn("$publicBuildParent = Join-Path $buildOutputRoot 'build'", script)
         self.assertIn(
             "$publicBuildRoot = Join-Path $publicBuildParent 'public-core'", script
@@ -130,7 +130,7 @@ class PublicBuildTests(unittest.TestCase):
 
         catalogs = (
             (PUBLIC_MOD_CATALOG, 2),
-            (PUBLIC_COMMUNITY_CATALOG, 72),
+            (PUBLIC_COMMUNITY_CATALOG, 84),
         )
         for path, expected_count in catalogs:
             payload = json.loads(path.read_text(encoding="utf-8"))

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import queue
 import threading
+import time
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
@@ -19,6 +20,7 @@ from .mod_manager import (
     ModConflictError,
     ModDescriptor,
     ModGamePathRequired,
+    ModGameRunning,
     ModIntegrityError,
     ModManager,
     ModManagerError,
@@ -26,21 +28,12 @@ from .mod_manager import (
 from .mod_inspector import ModDraft, ModInspectionError, ModPackageInspector
 from .user_mod_registry import UserModRegistry, UserModRegistryError, draft_fingerprint
 from .support_diagnostics import SupportDiagnostics, SupportExport
-from .windows_windowing import clamp_to_nearest_work_area, place_tk_window
+from .game_features import GameFeatureService
+from .mod_categories import MOD_CATEGORIES, filter_mods, mod_category
+from .windows_windowing import clamp_to_nearest_work_area, nearest_monitor_work_area, place_tk_window, prepare_tk_overlay, show_tk_window_no_activate, tk_window_is_visible, window_dpi
+from .ui_theme import BG, SURFACE, SIDEBAR, BORDER, TEXT, MUTED, ACCENT, ACCENT_HOVER, ACCENT_TEXT, SELECTION, GREEN, RED, BLUE, GOLD
 
 
-BG = "#F2F5F5"
-SURFACE = "#FFFFFF"
-SIDEBAR = "#E5EDEE"
-BORDER = "#D3DFDF"
-TEXT = "#263A3D"
-MUTED = "#607477"
-ACCENT = "#286E70"
-ACCENT_HOVER = "#205A5C"
-GREEN = "#397B64"
-RED = "#C34B37"
-BLUE = "#3F739A"
-GOLD = "#B4790D"
 HUD_TRANSPARENT = "#010203"
 TOOLBOX_AUTHOR = "加菲_barista"
 TOOLBOX_REPOSITORY_URL = "https://github.com/SeasonCake/lostcastle2-toolbox"
@@ -101,14 +94,15 @@ def combat_hud_initial_position(
     )
 
 
-def mod_tree_column_widths(available_width: int) -> dict[str, int]:
+def mod_tree_column_widths(available_width: int, *, text_scale: float = 1.0) -> dict[str, int]:
     """Allocate readable MOD columns without letting author/version run together."""
 
-    total = max(420, int(available_width))
-    version = 76
-    status = 82
-    author = min(220, max(136, round(total * 0.24)))
-    name = max(126, total - version - author - status)
+    scale = max(1.0, float(text_scale))
+    total = max(round(420 * scale), int(available_width))
+    version = round(76 * scale)
+    status = round(82 * scale)
+    author = min(round(220 * scale), max(round(136 * scale), round(total * 0.24)))
+    name = max(round(126 * scale), total - version - author - status)
     return {
         "name": name,
         "version": version,
@@ -447,6 +441,7 @@ def combat_hud_size(
     ui_scale: float = 1.0,
     *,
     player_count: int = 1,
+    controls_row: bool = False,
 ) -> tuple[int, int]:
     """Keep the compact HUD readable when Windows uses high-DPI fonts."""
 
@@ -466,6 +461,8 @@ def combat_hud_size(
         height = 474 + round(40 * mid_dpi) + round(140 * high_dpi)
     else:
         height = 474 + round(84 * high_dpi)
+    if controls_row:
+        height += round(22*max(1.0, float(tk_scaling)/1.5))
     return (
         round((350 + 40 * high_dpi) * scale)
         + teammate_columns * teammate_column_width,
@@ -506,6 +503,15 @@ def main_window_min_size(tk_scaling: float) -> tuple[int, int]:
         780 + round(840 * high_dpi),
         700 + round(40 * mid_dpi) + round(260 * high_dpi),
     )
+
+
+def main_font_size(size: int, scale: float = 1.0) -> int:
+    preferred = 10 if size <= 8 else 12 if size <= 12 else size
+    return max(12, round(preferred * scale))
+
+
+def main_pixel_font_size(size: int, scale: float, dpi: int) -> int:
+    return -max(12, round(main_font_size(size, scale) * max(72, min(384, dpi)) / 72))
 
 
 def main_metric_card_height(tk_scaling: float) -> int:
@@ -573,6 +579,7 @@ def _set_metric_label(
     base_size: int,
     characters_at_base: int,
     minimum_size: int = 10,
+    pixel_sizes: bool = False,
 ) -> None:
     available_width = int(label.winfo_width()) - 6
     if available_width > 20:
@@ -583,12 +590,12 @@ def _set_metric_label(
         measured_font = tkfont.Font(
             root=label,
             family="Segoe UI",
-            size=size,
+            size=-size if pixel_sizes else size,
             weight="bold",
         )
         while size > minimum_size and measured_font.measure(text) > available_width:
             size -= 1
-            measured_font.configure(size=size)
+            measured_font.configure(size=-size if pixel_sizes else size)
     else:
         # The first refresh can happen before geometry propagation. Keep a
         # deterministic length-based fallback until a real width is available.
@@ -598,7 +605,7 @@ def _set_metric_label(
             characters_at_base=characters_at_base,
             minimum_size=minimum_size,
         )
-    label.configure(text=text, font=("Segoe UI", size, "bold"))
+    label.configure(text=text, font=("Segoe UI", -size if pixel_sizes else size, "bold"))
 
 
 def _set_fitting_text(
@@ -930,6 +937,105 @@ class RoundedPanel(tk.Canvas):
             self.after_idle(self._resize_to_content)
 
 
+def responsive_pair(row: tk.Frame, copy: tk.Frame, controls: tk.Frame, *, wrap_controls: bool = False) -> None:
+    """Keep descriptions readable by moving actions below them when space runs out."""
+    state: dict[str, Any] = {}
+    copy.pack_forget()
+    controls.pack_forget()
+
+    def layout(_event: Any = None) -> None:
+        width = max(1, row.winfo_width())
+        buttons = controls.winfo_children() if wrap_controls else []
+        controls_width = controls.winfo_reqwidth()
+        if buttons:
+            columns = max(1, min(len(buttons), width // max(1, max(button.winfo_reqwidth() for button in buttons)+5)))
+            controls_width = max(sum(button.winfo_reqwidth()+5 for button in buttons[start:start+columns])-5 for start in range(0, len(buttons), columns))
+            if state.get("columns") != columns:
+                state["columns"] = columns
+                for button in buttons:
+                    button.pack_forget()
+                for index, button in enumerate(buttons):
+                    button.grid(row=index//columns, column=index%columns, padx=(0 if index%columns == 0 else 5, 0), pady=(0 if index < columns else 5, 0), sticky="ew")
+        stacked = copy.winfo_reqwidth()+controls_width+18 > width
+        if state.get("stacked") == stacked:
+            return
+        state["stacked"] = stacked
+        row.columnconfigure(0, weight=1)
+        row.columnconfigure(1, weight=0)
+        copy.grid(row=0, column=0, columnspan=2 if stacked else 1, sticky="ew")
+        controls.grid(row=1 if stacked else 0, column=0 if stacked else 1, columnspan=2 if stacked else 1, sticky="e", pady=(8, 0) if stacked else 0)
+
+    for widget in (row, copy, controls):
+        widget.bind("<Configure>", layout, add="+")
+    row.after_idle(layout)
+
+
+class ScrollablePage(tk.Frame):
+    """Keep readable type and reachable controls when a page exceeds its viewport."""
+
+    def __init__(self, parent: tk.Misc, *, bg: str = BG) -> None:
+        super().__init__(parent, bg=bg)
+        self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.content = tk.Frame(self.canvas, bg=bg)
+        self._window = self.canvas.create_window(0, 0, anchor="nw", window=self.content)
+        self._dimensions = (0, 0)
+        self._overflow = False
+        self.canvas.bind("<Configure>", self._sync)
+        self.content.bind("<Configure>", self._sync)
+        self.content.bind("<Unmap>", self._sync)
+        self.content.bind("<Map>", self._sync)
+        self.winfo_toplevel().bind("<MouseWheel>", self._wheel, add="+")
+
+    def _sync(self, _event: Any = None) -> None:
+        width, viewport = self.canvas.winfo_width(), self.canvas.winfo_height()
+        height = max(viewport, self.content.winfo_reqheight())
+        dimensions = (width, height)
+        if dimensions != self._dimensions:
+            self._dimensions = dimensions
+            # Let Tk track requested content height. Pinning the window height
+            # leaves stale blank space after wrapping/fonts change the request.
+            self.canvas.itemconfigure(self._window, width=width)
+            self.canvas.configure(scrollregion=(0, 0, width, height))
+        overflow = height > viewport + 1
+        if overflow != self._overflow:
+            self._overflow = overflow
+            if overflow:
+                self.scrollbar.pack(side="right", fill="y")
+            else:
+                self.scrollbar.pack_forget()
+                self.canvas.yview_moveto(0)
+
+    def _wheel(self, event: Any) -> str | None:
+        if not self._overflow or not self.winfo_ismapped():
+            return None
+        widget = event.widget
+        if isinstance(widget, (tk.Listbox, tk.Text, ttk.Treeview, ttk.Combobox, tk.Spinbox)):
+            return None
+        while widget is not None and widget is not self:
+            widget = getattr(widget, "master", None)
+        if widget is self:
+            self.canvas.yview_scroll(-int(event.delta / 120), "units")
+            return "break"
+        return None
+
+    def reveal(self, widget: tk.Misc) -> None:
+        """Keep focused navigation reachable when larger text requires scrolling."""
+        self.update_idletasks()
+        if not self._overflow:
+            return
+        height = self._dimensions[1]
+        viewport = self.canvas.winfo_height()
+        top = widget.winfo_rooty() - self.content.winfo_rooty()
+        start = self.canvas.yview()[0] * height
+        if top < start:
+            self.canvas.yview_moveto(max(0, top-8) / height)
+        elif top + widget.winfo_height() > start + viewport:
+            self.canvas.yview_moveto((top + widget.winfo_height() - viewport + 8) / height)
+
+
 class CombatHudWindow:
     """Compact B-style readout; all values come from the shared aggregator."""
 
@@ -939,8 +1045,14 @@ class CombatHudWindow:
         aggregator: CombatAggregator,
         *,
         ui_scale: float = 1.0,
+        toggle_team_mini: Callable[[], None] | None = None,
+        show_toolbox: Callable[[], None] | None = None,
     ) -> None:
         self.owner = owner
+        self.toggle_team_mini = toggle_team_mini
+        self.show_toolbox = show_toolbox
+        self.team_mini_button: tk.Button | None = None
+        self._team_mini_visible = False
         self.aggregator = aggregator
         self.window: tk.Toplevel | None = None
         self.labels: dict[str, tk.Label] = {}
@@ -982,7 +1094,7 @@ class CombatHudWindow:
         if self.window is not None:
             try:
                 position = (self.window.winfo_x(), self.window.winfo_y())
-                was_visible = self.window.state() != "withdrawn"
+                was_visible = tk_window_is_visible(self.window)
             except tk.TclError:
                 position = None
             self.close()
@@ -994,6 +1106,7 @@ class CombatHudWindow:
                     self._tk_scaling,
                     self.ui_scale,
                     player_count=self._last_player_count,
+                    controls_row=True,
                 )
                 x, y = clamp_to_nearest_work_area(
                     position[0],
@@ -1008,17 +1121,16 @@ class CombatHudWindow:
     def show(self) -> None:
         if self.window is not None:
             try:
-                self.window.deiconify()
-                self.window.lift()
+                show_tk_window_no_activate(self.window)
                 return
             except tk.TclError:
                 self.window = None
         window = tk.Toplevel(self.owner)
+        window.withdraw()
         self.window = window
         self._tk_scaling = float(window.tk.call("tk", "scaling"))
         window.title("LC2 战斗 HUD")
         window.configure(bg=HUD_TRANSPARENT)
-        window.geometry(self._initial_geometry(window))
         window.minsize(self._px(330), self._px(380))
         window.overrideredirect(True)
         window.attributes("-topmost", True)
@@ -1027,6 +1139,7 @@ class CombatHudWindow:
             window.attributes("-transparentcolor", HUD_TRANSPARENT)
         except tk.TclError:
             pass
+        window.geometry(self._initial_geometry(window))
 
         self.panels.clear()
         self.teammate_columns.clear()
@@ -1041,6 +1154,7 @@ class CombatHudWindow:
             self._tk_scaling,
             self.ui_scale,
             player_count=1,
+            controls_row=True,
         )
         left_host = tk.Frame(
             layout,
@@ -1053,8 +1167,8 @@ class CombatHudWindow:
 
         outer = RoundedPanel(
             left_host,
-            fill="#FFFFFF",
-            outline="#E9DED0",
+            fill=SURFACE,
+            outline=BORDER,
             radius=self._px(18),
             height=self._px(400),
             content_padx=0,
@@ -1062,12 +1176,12 @@ class CombatHudWindow:
         )
         outer.pack(fill="both", expand=True)
         surface = outer.content
-        header = tk.Frame(surface, bg="#FFFFFF", padx=self._px(10), pady=self._px(7))
+        header = tk.Frame(surface, bg=SURFACE, padx=self._px(10), pady=self._px(7))
         header.pack(fill="x")
         title_label = tk.Label(
             header,
             text="LC2 战斗",
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=TEXT,
             font=self._font("Microsoft YaHei UI", 11, "bold"),
         )
@@ -1075,18 +1189,20 @@ class CombatHudWindow:
         self.labels["hud_status"] = tk.Label(
             header,
             text="● 等待数据",
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=MUTED,
             font=self._font("Microsoft YaHei UI", 9),
         )
+        control_bar = tk.Frame(surface, bg=SURFACE, padx=self._px(10))
+        control_bar.pack(fill="x", pady=(0, self._px(4)))
         self.labels["hud_status"].pack(side="left", padx=(self._px(10), 0))
         tk.Button(
-            header,
+            control_bar,
             text="隐藏",
             command=window.withdraw,
-            bg="#E5EDED",
+            bg=SIDEBAR,
             fg=MUTED,
-            activebackground="#E4D8C7",
+            activebackground=BORDER,
             relief="flat",
             bd=0,
             padx=self._px(9),
@@ -1094,11 +1210,26 @@ class CombatHudWindow:
             cursor="hand2",
             font=self._font("Microsoft YaHei UI", 9),
         ).pack(side="right")
+        if self.toggle_team_mini is not None:
+            self.team_mini_button = tk.Button(
+                control_bar, text="队伍", command=self.toggle_team_mini,
+                bg=SELECTION if self._team_mini_visible else SIDEBAR, fg=TEXT,
+                activebackground=SELECTION, relief="flat", bd=0,
+                padx=self._px(7), pady=self._px(3), cursor="hand2",
+                font=self._font("Microsoft YaHei UI", 9),
+            )
+            self.team_mini_button.pack(side="right", padx=(0, self._px(4)))
+        if self.show_toolbox is not None:
+            tk.Button(control_bar, text="盒子", command=self.show_toolbox,
+                bg=SIDEBAR, fg=TEXT, activebackground=SELECTION,
+                relief="flat", bd=0, padx=self._px(7), pady=self._px(3),
+                cursor="hand2", font=self._font("Microsoft YaHei UI", 9),
+            ).pack(side="right", padx=(0, self._px(4)))
         for widget in (header, title_label, self.labels["hud_status"]):
             widget.bind("<ButtonPress-1>", self._begin_drag)
             widget.bind("<B1-Motion>", self._drag_window)
 
-        body = tk.Frame(surface, bg="#FFFFFF", padx=self._px(5), pady=self._px(5))
+        body = tk.Frame(surface, bg=SURFACE, padx=self._px(5), pady=self._px(5))
         body.pack(fill="both", expand=True)
         self._build_damage_group(body)
         self._build_resource_group(body)
@@ -1108,7 +1239,17 @@ class CombatHudWindow:
         # Commit the single-player geometry before a demo/live party snapshot
         # expands only the transparent window surface to the right.
         window.update_idletasks()
+        prepare_tk_overlay(window)
+        show_tk_window_no_activate(window)
         self.refresh()
+
+    def set_team_mini_visible(self, visible: bool) -> None:
+        self._team_mini_visible = visible
+        if self.team_mini_button is not None:
+            try:
+                self.team_mini_button.configure(bg=SELECTION if visible else SIDEBAR)
+            except tk.TclError:
+                pass
 
     def _begin_drag(self, event: tk.Event[Any]) -> None:
         if self.window is None:
@@ -1138,8 +1279,8 @@ class CombatHudWindow:
     ) -> tk.Frame:
         panel = RoundedPanel(
             parent,
-            fill="#FCFAF6",
-            outline="#EFE5D8",
+            fill=BG,
+            outline=BORDER,
             radius=14,
             height=self._px(
                 hud_panel_height(
@@ -1163,7 +1304,7 @@ class CombatHudWindow:
         )
         self.boss_share_bar = tk.Canvas(
             cell,
-            bg="#FCFAF6",
+            bg=BG,
             height=self._px(8),
             highlightthickness=0,
             bd=0,
@@ -1172,16 +1313,16 @@ class CombatHudWindow:
         # then use only the space that truly remains at every DPI.
         self.boss_share_bar.pack(side="bottom", fill="x", pady=(self._px(8), 0))
         self.boss_share_bar.bind("<Configure>", self._draw_boss_share)
-        columns = tk.Frame(cell, bg="#FCFAF6")
+        columns = tk.Frame(cell, bg=BG)
         columns.pack(fill="both", expand=True)
         columns.grid_columnconfigure(0, weight=1, uniform="damage")
         columns.grid_columnconfigure(1, weight=1, uniform="damage")
-        total = tk.Frame(columns, bg="#FCFAF6")
+        total = tk.Frame(columns, bg=BG)
         total.grid(row=0, column=0, sticky="nsew", padx=(0, self._px(6)))
         self.labels["damage_scope"] = tk.Label(
             total,
             text="总伤害",
-            bg="#FCFAF6",
+            bg=BG,
             fg=MUTED,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 9),
@@ -1190,18 +1331,18 @@ class CombatHudWindow:
         self.labels["damage"] = tk.Label(
             total,
             text="—",
-            bg="#FCFAF6",
+            bg=BG,
             fg=GOLD,
             anchor="w",
             font=self._font("Segoe UI", 19, "bold"),
         )
         self.labels["damage"].pack(fill="x", pady=(self._px(1), self._px(5)))
-        boss = tk.Frame(columns, bg="#FCFAF6", padx=self._px(8))
+        boss = tk.Frame(columns, bg=BG, padx=self._px(8))
         boss.grid(row=0, column=1, sticky="nsew", padx=(self._px(6), 0))
         tk.Label(
             boss,
             text="BOSS 伤害",
-            bg="#FCFAF6",
+            bg=BG,
             fg=RED,
             anchor="e",
             font=self._font("Microsoft YaHei UI", 9, "bold"),
@@ -1209,7 +1350,7 @@ class CombatHudWindow:
         self.labels["boss"] = tk.Label(
             boss,
             text="—",
-            bg="#FCFAF6",
+            bg=BG,
             fg=RED,
             anchor="e",
             font=self._font("Segoe UI", 16, "bold"),
@@ -1252,8 +1393,8 @@ class CombatHudWindow:
             column = self.teammate_columns[index // HUD_TEAMMATES_PER_COLUMN]
             panel = RoundedPanel(
                 column,
-                fill="#FCFAF6",
-                outline="#E9DED0",
+                fill=BG,
+                outline=BORDER,
                 radius=self._px(14),
                 height=card_height,
                 content_padx=self._px(10),
@@ -1263,7 +1404,7 @@ class CombatHudWindow:
             name = tk.Label(
                 cell,
                 text=f"队友 {index + 1}",
-                bg="#FCFAF6",
+                bg=BG,
                 fg=TEXT,
                 anchor="w",
                 font=self._font("Microsoft YaHei UI", 10, "bold"),
@@ -1272,7 +1413,7 @@ class CombatHudWindow:
             damage = tk.Label(
                 cell,
                 text="0",
-                bg="#FCFAF6",
+                bg=BG,
                 fg=GOLD,
                 anchor="w",
                 font=self._font("Segoe UI", 14, "bold"),
@@ -1281,7 +1422,7 @@ class CombatHudWindow:
             share = tk.Label(
                 cell,
                 text="队伍占比 0%",
-                bg="#FCFAF6",
+                bg=BG,
                 fg=MUTED,
                 anchor="w",
                 font=self._font("Microsoft YaHei UI", 8),
@@ -1289,7 +1430,7 @@ class CombatHudWindow:
             share.pack(fill="x")
             bar = tk.Canvas(
                 cell,
-                bg="#FCFAF6",
+                bg=BG,
                 height=self._px(8),
                 highlightthickness=0,
                 bd=0,
@@ -1302,7 +1443,7 @@ class CombatHudWindow:
             boss = tk.Label(
                 cell,
                 text="Boss 0",
-                bg="#FCFAF6",
+                bg=BG,
                 fg=RED,
                 anchor="w",
                 font=self._font("Microsoft YaHei UI", 9),
@@ -1359,7 +1500,7 @@ class CombatHudWindow:
             y,
             right,
             y,
-            fill="#E4D8C7",
+            fill=BORDER,
             width=self._px(6),
             capstyle=tk.ROUND,
         )
@@ -1376,11 +1517,11 @@ class CombatHudWindow:
 
     def _build_resource_group(self, parent: tk.Frame) -> None:
         cell = self._hud_panel(parent, height=152, panel_key="resource")
-        columns = tk.Frame(cell, bg="#FCFAF6")
+        columns = tk.Frame(cell, bg=BG)
         columns.pack(fill="both", expand=True)
         for column in range(3):
             columns.grid_columnconfigure(column, weight=1 if column != 1 else 0)
-        hp = tk.Frame(columns, bg="#FCFAF6")
+        hp = tk.Frame(columns, bg=BG)
         hp.grid(row=0, column=0, sticky="nsew", padx=(0, self._px(8)))
         tk.Frame(hp, bg=RED, height=self._px(2)).pack(
             fill="x", pady=(0, self._px(5))
@@ -1388,7 +1529,7 @@ class CombatHudWindow:
         tk.Label(
             hp,
             text=TAKEN_DAMAGE_LABEL,
-            bg="#FCFAF6",
+            bg=BG,
             fg=MUTED,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 9),
@@ -1396,7 +1537,7 @@ class CombatHudWindow:
         self.labels["hp_loss"] = tk.Label(
             hp,
             text="—",
-            bg="#FCFAF6",
+            bg=BG,
             fg=RED,
             anchor="w",
             font=self._font("Segoe UI", 17, "bold"),
@@ -1405,16 +1546,16 @@ class CombatHudWindow:
         self.labels["healing"] = tk.Label(
             hp,
             text="回复 +0",
-            bg="#FCFAF6",
+            bg=BG,
             fg=GREEN,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 9),
         )
         self.labels["healing"].pack(fill="x")
-        tk.Frame(columns, bg="#E9DED0", width=self._px(1)).grid(
+        tk.Frame(columns, bg=BORDER, width=self._px(1)).grid(
             row=0, column=1, sticky="ns"
         )
-        mp = tk.Frame(columns, bg="#FCFAF6")
+        mp = tk.Frame(columns, bg=BG)
         mp.grid(row=0, column=2, sticky="nsew", padx=(self._px(8), 0))
         tk.Frame(mp, bg=BLUE, height=self._px(2)).pack(
             fill="x", pady=(0, self._px(5))
@@ -1422,7 +1563,7 @@ class CombatHudWindow:
         tk.Label(
             mp,
             text="法力消耗",
-            bg="#FCFAF6",
+            bg=BG,
             fg=MUTED,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 9),
@@ -1430,7 +1571,7 @@ class CombatHudWindow:
         self.labels["mp_spent"] = tk.Label(
             mp,
             text="—",
-            bg="#FCFAF6",
+            bg=BG,
             fg=BLUE,
             anchor="w",
             font=self._font("Segoe UI", 17, "bold"),
@@ -1439,7 +1580,7 @@ class CombatHudWindow:
         self.labels["mp_gained"] = tk.Label(
             mp,
             text="恢复 +0",
-            bg="#FCFAF6",
+            bg=BG,
             fg=BLUE,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 9),
@@ -1456,17 +1597,17 @@ class CombatHudWindow:
         tk.Frame(cell, bg=GREEN, height=self._px(2)).pack(
             fill="x", pady=(0, self._px(4))
         )
-        row = tk.Frame(cell, bg="#FCFAF6")
+        row = tk.Frame(cell, bg=BG)
         row.pack(fill="both", expand=True)
         row.grid_columnconfigure(0, weight=1)
         row.grid_columnconfigure(1, weight=0, minsize=self._px(150))
         row.grid_rowconfigure(0, weight=1)
-        copy = tk.Frame(row, bg="#FCFAF6")
+        copy = tk.Frame(row, bg=BG)
         copy.grid(row=0, column=0, sticky="nsew")
         tk.Label(
             copy,
             text="近 10 秒平均秒伤",
-            bg="#FCFAF6",
+            bg=BG,
             fg=MUTED,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 9),
@@ -1474,7 +1615,7 @@ class CombatHudWindow:
         self.labels["dps"] = tk.Label(
             copy,
             text="—",
-            bg="#FCFAF6",
+            bg=BG,
             fg=GREEN,
             anchor="w",
             font=self._font("Segoe UI", 16, "bold"),
@@ -1483,7 +1624,7 @@ class CombatHudWindow:
         self.labels["room"] = tk.Label(
             row,
             text="尚未进入地图",
-            bg="#FCFAF6",
+            bg=BG,
             fg=MUTED,
             anchor="e",
             font=self._font("Microsoft YaHei UI", 9),
@@ -1494,11 +1635,11 @@ class CombatHudWindow:
             sticky="e",
             padx=(self._px(8), 0),
         )
-        self.self_share_host = tk.Frame(cell, bg="#FCFAF6")
+        self.self_share_host = tk.Frame(cell, bg=BG)
         self.labels["self_share"] = tk.Label(
             self.self_share_host,
             text="自己队伍占比 0%",
-            bg="#FCFAF6",
+            bg=BG,
             fg=MUTED,
             anchor="w",
             font=self._font("Microsoft YaHei UI", 8),
@@ -1506,7 +1647,7 @@ class CombatHudWindow:
         self.labels["self_share"].pack(fill="x")
         self.self_share_bar = tk.Canvas(
             self.self_share_host,
-            bg="#FCFAF6",
+            bg=BG,
             height=self._px(7),
             highlightthickness=0,
             bd=0,
@@ -1666,7 +1807,7 @@ class CombatHudWindow:
             y,
             right,
             y,
-            fill="#E4D8C7",
+            fill=BORDER,
             width=line_width,
             capstyle=tk.ROUND,
         )
@@ -1688,6 +1829,7 @@ class CombatHudWindow:
             self._tk_scaling,
             self.ui_scale,
             player_count=self._last_player_count,
+            controls_row=True,
         )
         x, y = clamp_to_nearest_work_area(
             self.window.winfo_x(),
@@ -1716,6 +1858,7 @@ class CombatHudWindow:
             float(window.tk.call("tk", "scaling")),
             self.ui_scale,
             player_count=self._last_player_count,
+            controls_row=True,
         )
         x, y = combat_hud_initial_position(
             window.winfo_screenwidth(),
@@ -1754,6 +1897,8 @@ class ToolboxShell:
         close_command: Callable[[], None],
         app_version: str,
         persist_window_geometry: bool = True,
+        game_features: GameFeatureService | None = None,
+        display_dpi_override: int | None = None,
     ) -> None:
         self.root = root
         self.keyboard = keyboard
@@ -1785,12 +1930,24 @@ class ToolboxShell:
         self.close_command = close_command
         self.app_version = app_version
         self.persist_window_geometry = persist_window_geometry
-        self.main_ui_scale = min(1.15, max(0.9, float(keyboard.toolbox_ui_scale)))
+        self.game_features = game_features
+        self.current_page = "home"
+        self.feature_pages: Any = None
+        self.main_ui_scale = min(1.8, max(0.9, float(keyboard.toolbox_ui_scale)))
+        self._display_dpi_override = display_dpi_override
+        self._monitor_dpi = display_dpi_override or window_dpi(root)
+        self._last_monitor_size: tuple[int, int] | None = None
         self.hud = CombatHudWindow(
             root,
             combat_aggregator,
             ui_scale=keyboard.hud_ui_scale,
+            toggle_team_mini=self._toggle_team_mini,
+            show_toolbox=self._show_toolbox,
         )
+        from .team_mini_ui import TeamMiniWindow
+        self.team_mini = TeamMiniWindow(root, game_features,
+            lambda: getattr(game_features, "demo_pid", keyboard.game_process_id),
+            self._toggle_team_reading, self.hud.set_team_mini_visible)
         self.pages: dict[str, tk.Frame] = {}
         self.nav_buttons: dict[str, tk.Button] = {}
         self.labels: dict[str, tk.Label] = {}
@@ -1800,6 +1957,16 @@ class ToolboxShell:
         self.mod_buttons: dict[str, dict[str, tk.Button]] = {}
         self.mod_tree: ttk.Treeview | None = None
         self.mod_search_var = tk.StringVar(value="")
+        self.mod_category_var = tk.StringVar(value=MOD_CATEGORIES["all"])
+        self.mod_state_var = tk.StringVar(value="全部状态")
+        self._mod_status_cache: dict[str, Any] = {}
+        self._mod_status_cache_time = 0.0
+        self._mod_game_identity: Any = None
+        self._mod_scan_generation = 0
+        self._mod_scan_job: Any = None
+        self._mod_scan_reader: ModManager | None = None
+        self._mod_scan_results: queue.Queue[Any] = queue.Queue()
+        self._mod_scan_error = False
         self.mod_selected_id: str | None = None
         self.mod_detail_labels: dict[str, tk.Label] = {}
         self.mod_action_buttons: dict[str, tk.Button] = {}
@@ -1836,19 +2003,21 @@ class ToolboxShell:
 
         root.title("失落城堡 2 工具箱")
         root.configure(bg=BG)
-        root.geometry(self._initial_geometry(root, *keyboard.toolbox_window_size))
-        root.minsize(*main_window_min_size(float(root.tk.call("tk", "scaling"))))
+        root.geometry(self._initial_geometry(root, *keyboard.toolbox_window_size, dpi=self._monitor_dpi))
+        self._update_main_min_size()
         root.protocol("WM_DELETE_WINDOW", close_command)
         self._configure_tree_style()
         self._build()
         self._capture_main_ui_bases()
         self._apply_main_ui_scale()
+        self._last_monitor_size = (root.winfo_width(), root.winfo_height())
         self.show_page("home")
         self.refresh()
         self._after_id = root.after(500, self._tick)
 
     def _configure_tree_style(self) -> None:
         scale = self.main_ui_scale
+        density = getattr(self, "_monitor_dpi", window_dpi(self.root)) / 96
         style = ttk.Style(self.root)
         try:
             style.theme_use("clam")
@@ -1859,22 +2028,29 @@ class ToolboxShell:
             background=SURFACE,
             fieldbackground=SURFACE,
             foreground=TEXT,
-            rowheight=round(30 * scale),
+            rowheight=round(38 * max(1.0, scale) * density),
             bordercolor=BORDER,
-            font=("Microsoft YaHei UI", max(7, round(9 * scale))),
+            font=self._main_font("Microsoft YaHei UI", 11),
         )
         style.configure(
             "Toolbox.Treeview.Heading",
             background=SIDEBAR,
             foreground=TEXT,
             relief="flat",
-            font=("Microsoft YaHei UI", max(7, round(8 * scale)), "bold"),
+            font=self._main_font("Microsoft YaHei UI", 11, "bold"),
         )
         style.map(
             "Toolbox.Treeview",
-            background=[("selected", "#D9EBE8")],
+            background=[("selected", SELECTION)],
             foreground=[("selected", TEXT)],
         )
+        style.configure("TNotebook", background=BG, borderwidth=0)
+        style.configure("TNotebook.Tab", background=SIDEBAR, foreground=MUTED, padding=(round(12*density), round(7*density)), font=self._main_font("Microsoft YaHei UI", 11))
+        self.root.option_add("*TCombobox*Listbox.font", self._main_font("Microsoft YaHei UI", 12))
+        style.map("TNotebook.Tab", background=[("selected", SELECTION), ("active", SURFACE)], foreground=[("selected", TEXT)])
+        style.configure("TCombobox", background=SIDEBAR, fieldbackground=SURFACE, foreground=TEXT, arrowcolor=TEXT, bordercolor=BORDER)
+        style.map("TCombobox", fieldbackground=[("readonly", SURFACE)], foreground=[("readonly", TEXT)])
+        style.configure("Vertical.TScrollbar", background=SIDEBAR, troughcolor=SURFACE, bordercolor=BORDER, arrowcolor=MUTED)
 
     @staticmethod
     def _walk_widgets(root: tk.Misc) -> Iterable[tk.Misc]:
@@ -1911,16 +2087,17 @@ class ToolboxShell:
 
     def _apply_main_ui_scale(self) -> None:
         scale = self.main_ui_scale
+        density = getattr(self, "_monitor_dpi", window_dpi(self.root)) / 96
         for widget, (family, size, weight, slant) in list(self._main_font_bases.items()):
             try:
                 widget.configure(
-                    font=(family, max(6, round(size * scale)), weight, slant)
+                    font=self._main_font(family, size, weight, slant)
                 )
             except tk.TclError:
                 pass
         for (widget, option), base in list(self._main_padding_bases.items()):
             try:
-                widget.configure(**{option: round(base * scale)})
+                widget.configure(**{option: round(base * scale * density)})
             except tk.TclError:
                 pass
         for panel, base_height in list(self._main_panel_height_bases.items()):
@@ -1928,26 +2105,63 @@ class ToolboxShell:
                 # Compact mode may reduce typography and padding, but fixed data
                 # cards keep their proven baseline height so secondary lines are
                 # never squeezed below their requested font geometry.
-                panel.configure(height=round(base_height * max(1.0, scale)))
+                panel.configure(height=round(base_height * max(1.0, scale) * density))
             except tk.TclError:
                 pass
-        self.sidebar.configure(width=round(150 * scale))
+        self.sidebar.configure(width=round(195 * scale * density))
         self._configure_tree_style()
+        if self.feature_pages is not None:
+            self.feature_pages.set_ui_scale(scale * density)
         self.root.update_idletasks()
+        if hasattr(self, "navigation") and self.current_page in self.nav_buttons:
+            self.navigation.reveal(self.nav_buttons[self.current_page])
+
+    def _main_font(self, family: str, size: int, weight: str = "normal", slant: str = "roman") -> tuple[str, int, str, str]:
+        dpi = getattr(self, "_monitor_dpi", window_dpi(self.root))
+        return family, main_pixel_font_size(size, self.main_ui_scale, dpi), weight, slant
+
+    def _main_work_area(self) -> tuple[int, int, int, int]:
+        return nearest_monitor_work_area(self.root.winfo_x(), self.root.winfo_y(), self.root.winfo_width(), self.root.winfo_height(), fallback_width=self.root.winfo_screenwidth(), fallback_height=self.root.winfo_screenheight())
+
+    def _update_main_min_size(self) -> None:
+        work = self._main_work_area()
+        density = self._monitor_dpi / 96
+        self.root.minsize(min(round(820*density), max(600, work[2]-work[0]-24)), min(round(620*density), max(420, work[3]-work[1]-64)))
+
+    def _refresh_monitor_dpi(self) -> None:
+        if self._display_dpi_override is not None:
+            return
+        dpi = window_dpi(self.root)
+        size = (self.root.winfo_width(), self.root.winfo_height())
+        if dpi == self._monitor_dpi:
+            self._last_monitor_size = size
+            return
+        ratio = dpi / self._monitor_dpi
+        previous = self._last_monitor_size or size
+        self._monitor_dpi = dpi
+        self._update_main_min_size()
+        self._apply_main_ui_scale()
+        if self.root.state() == "normal":
+            work = self._main_work_area()
+            width = min(round(previous[0]*ratio), work[2]-work[0]-24)
+            height = min(round(previous[1]*ratio), work[3]-work[1]-64)
+            x, y = clamp_to_nearest_work_area(self.root.winfo_x(), self.root.winfo_y(), width, height, fallback_width=self.root.winfo_screenwidth(), fallback_height=self.root.winfo_screenheight())
+            place_tk_window(self.root, width, height, x, y)
+        self._last_monitor_size = (self.root.winfo_width(), self.root.winfo_height())
 
     def _build(self) -> None:
-        header = tk.Frame(self.root, bg="#FFFFFF", padx=20, pady=14)
+        header = tk.Frame(self.root, bg=SURFACE, padx=20, pady=14)
         header.pack(fill="x")
         self._main_roots.append(header)
-        title = tk.Frame(header, bg="#FFFFFF")
+        title = tk.Frame(header, bg=SURFACE)
         tk.Label(
             title,
             text="失落城堡 2 工具箱",
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=TEXT,
             font=("Microsoft YaHei UI", 17, "bold"),
         ).pack(anchor="w")
-        header_actions = tk.Frame(header, bg="#FFFFFF")
+        header_actions = tk.Frame(header, bg=SURFACE)
         header_actions.pack(side="right")
         self._button(
             header_actions,
@@ -1964,20 +2178,32 @@ class ToolboxShell:
         self.labels["app_version"] = tk.Label(
             header_actions,
             text=f"v{self.app_version}",
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=MUTED,
             font=("Segoe UI", 8, "bold"),
         )
         self.labels["app_version"].pack(side="right", padx=(0, 12))
         title.pack(side="left", fill="x", expand=True)
+        responsive_pair(header, title, header_actions)
         body = tk.Frame(self.root, bg=BG)
         body.pack(fill="both", expand=True)
         self.sidebar = tk.Frame(body, bg=SIDEBAR, width=150, padx=9, pady=12)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
         self._main_roots.append(self.sidebar)
+        self.labels["sidebar_game"] = tk.Label(
+            self.sidebar, text="● 正在检测游戏", bg=SIDEBAR, fg=MUTED,
+            anchor="w", justify="left", font=("Microsoft YaHei UI", 8),
+        )
+        self.labels["sidebar_game"].pack(side="bottom", fill="x", padx=6, pady=(8, 2))
+        self.labels["sidebar_game"].bind("<Configure>", lambda event: event.widget.configure(wraplength=max(80, event.width-8)))
+        self.navigation = ScrollablePage(self.sidebar, bg=SIDEBAR)
+        self.navigation.pack(fill="both", expand=True)
         for page_id, label in (
             ("home", "概览"),
+            ("team", "队伍状态"),
+            ("enhancement", "LC 增强计划"),
+            ("loadout", "配装助手"),
             ("combat", "战斗统计"),
             ("keyboard", "按键显示"),
             ("macro", "按键宏"),
@@ -1985,35 +2211,24 @@ class ToolboxShell:
             ("settings", "设置"),
         ):
             button = tk.Button(
-                self.sidebar,
+                self.navigation.content,
                 text=label,
                 command=lambda target=page_id: self.show_page(target),
                 bg=SIDEBAR,
                 fg=TEXT,
-                activebackground="#D8E5E5",
+                activebackground=SELECTION,
                 activeforeground=TEXT,
                 relief="flat",
                 bd=0,
                 anchor="w",
                 padx=12,
-                pady=9,
+                pady=6,
                 cursor="hand2",
-                font=("Microsoft YaHei UI", 9),
+                font=("Microsoft YaHei UI", 12),
             )
             button.pack(fill="x", pady=2)
+            button.bind("<FocusIn>", lambda event: self.navigation.reveal(event.widget))
             self.nav_buttons[page_id] = button
-        tk.Frame(self.sidebar, bg=SIDEBAR).pack(fill="both", expand=True)
-        self.labels["sidebar_game"] = tk.Label(
-            self.sidebar,
-            text="● 正在检测游戏",
-            bg=SIDEBAR,
-            fg=MUTED,
-            anchor="w",
-            justify="left",
-            wraplength=126,
-            font=("Microsoft YaHei UI", 8),
-        )
-        self.labels["sidebar_game"].pack(fill="x", padx=6, pady=(4, 2))
 
         self.content = tk.Frame(body, bg=BG, padx=18, pady=16)
         self.content.pack(side="left", fill="both", expand=True)
@@ -2023,17 +2238,22 @@ class ToolboxShell:
         self._build_keyboard_page()
         self._build_macro_page()
         self._build_mod_page()
+        from .feature_ui import FeaturePages
+        self.feature_pages = FeaturePages(self, {
+            "bg": BG, "surface": SURFACE, "border": BORDER, "text": TEXT,
+            "muted": MUTED, "accent": ACCENT, "green": GREEN, "red": RED, "selection": SELECTION,
+        }, RoundedPanel)
         self._build_settings_page()
 
-        footer = tk.Frame(self.root, bg="#FFFFFF", padx=18, pady=7)
+        footer = tk.Frame(self.root, bg=SURFACE, padx=18, pady=7)
         footer.pack(fill="x")
         self._main_roots.append(footer)
-        footer_meta = tk.Frame(footer, bg="#FFFFFF")
+        footer_meta = tk.Frame(footer, bg=SURFACE)
         footer_meta.pack(side="left")
         tk.Label(
             footer_meta,
             text=toolbox_author_label(),
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=MUTED,
             font=("Microsoft YaHei UI", 8),
         ).pack(side="left")
@@ -2041,9 +2261,9 @@ class ToolboxShell:
             footer_meta,
             text="GitHub 仓库",
             command=self._open_repository,
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=BLUE,
-            activebackground="#E5EDED",
+            activebackground=SIDEBAR,
             activeforeground=BLUE,
             relief="flat",
             bd=0,
@@ -2055,7 +2275,7 @@ class ToolboxShell:
             footer_meta,
             text="bilibili",
             command=self._open_bilibili,
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg="#E05A72",
             activebackground="#F4E4E7",
             activeforeground="#C8435B",
@@ -2069,9 +2289,9 @@ class ToolboxShell:
             footer_meta,
             text=SUPPORT_LABEL,
             command=self._open_support_directory,
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=GOLD,
-            activebackground="#F4E8CC",
+            activebackground=SELECTION,
             activeforeground=GOLD,
             relief="flat",
             bd=0,
@@ -2082,27 +2302,29 @@ class ToolboxShell:
         self._support_button.pack(side="left", padx=(4, 0))
         self._support_button.bind("<Enter>", self._show_support_popup)
         self._support_button.bind("<Leave>", self._schedule_support_popup_hide)
+        footer_exit = tk.Frame(footer, bg=SURFACE)
         tk.Button(
-            footer,
+            footer_exit,
             text="退出工具箱",
             command=self.close_command,
-            bg="#FFFFFF",
+            bg=SURFACE,
             fg=MUTED,
-            activebackground="#E5EDED",
+            activebackground=SIDEBAR,
             relief="flat",
             bd=0,
             cursor="hand2",
             font=("Microsoft YaHei UI", 8),
         ).pack(side="right")
+        responsive_pair(footer, footer_meta, footer_exit)
         body.pack_forget()
         footer.pack_forget()
         footer.pack(side="bottom", fill="x")
         body.pack(fill="both", expand=True)
 
     def _new_page(self, page_id: str) -> tk.Frame:
-        page = tk.Frame(self.content, bg=BG)
+        page = ScrollablePage(self.content)
         self.pages[page_id] = page
-        return page
+        return page.content
 
     def _page_heading(
         self,
@@ -2124,19 +2346,57 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 15, "bold"),
         ).pack(anchor="w")
         if subtitle:
-            tk.Label(
+            label = tk.Label(
                 copy,
                 text=subtitle,
                 bg=BG,
                 fg=MUTED,
+                anchor="w",
+                justify="left",
                 font=("Microsoft YaHei UI", 8),
-            ).pack(anchor="w", pady=(3, 0))
+            )
+            label.pack(fill="x", pady=(3, 0))
+            label.bind("<Configure>", self._wrap_mod_description)
         if action is not None:
             self._button(row, action[0], action[1], accent=True, width=12).pack(side="right")
 
     def _build_home_page(self) -> None:
         page = self._new_page("home")
         self._page_heading(page, "工具箱概览", "从这里打开和管理各个独立功能。")
+        primary = RoundedPanel(page, height=None, fill=SURFACE, content_padx=12, content_pady=9)
+        primary.pack(fill="x", pady=(0, 10))
+        tk.Label(primary.content, text="你的营地工具", bg=SURFACE, fg=TEXT, font=("Microsoft YaHei UI", 11, "bold")).pack(anchor="w", pady=(0, 7))
+        row = tk.Frame(primary.content, bg=SURFACE)
+        row.pack(fill="x")
+        primary_cells: list[tk.Frame] = []
+        for column, (page_id, title, hint) in enumerate((
+            ("team", "队伍状态", "队友状态与背包"),
+            ("enhancement", "LC 增强计划", "按需调节玩法"),
+            ("loadout", "配装助手", "装备、附魔与灵魂石"),
+        )):
+            row.columnconfigure(column, weight=1, uniform="primary")
+            cell = tk.Frame(row, bg=SURFACE)
+            primary_cells.append(cell)
+            cell.grid(row=0, column=column, sticky="nsew", padx=(0, 8) if column < 2 else 0)
+            self._button(cell, title, lambda target=page_id: self.show_page(target), width=11).pack(fill="x")
+            hint_label = tk.Label(cell, text=hint, bg=SURFACE, fg=MUTED, font=("Microsoft YaHei UI", 8), anchor="w", justify="left")
+            hint_label.pack(fill="x", pady=(5, 0))
+            hint_label.bind("<Configure>", self._wrap_mod_description)
+        primary_columns = [3]
+        def layout_primary(event: Any) -> None:
+            minimum = max(cell.winfo_children()[0].winfo_reqwidth() for cell in primary_cells)+12
+            columns = min(3, max(1, event.width//minimum))
+            if columns == primary_columns[0]:
+                return
+            primary_columns[0] = columns
+            for column in range(3):
+                row.columnconfigure(column, weight=1 if column<columns else 0, uniform="primary" if column<columns else "")
+            for index, cell in enumerate(primary_cells):
+                cell.grid_configure(row=index//columns, column=index%columns, padx=(0, 8) if index%columns<columns-1 else 0, pady=(0, 8) if index//columns<(len(primary_cells)-1)//columns else 0)
+        row.bind("<Configure>", layout_primary)
+        primary_note = tk.Label(primary.content, text="配装助手默认可查看；队伍状态与增强计划按需开启。", bg=SURFACE, fg=MUTED, font=("Microsoft YaHei UI", 8), anchor="w", justify="left")
+        primary_note.pack(fill="x", pady=(8, 0))
+        primary_note.bind("<Configure>", self._wrap_mod_description)
         self._module_card(
             page,
             "战",
@@ -2164,24 +2424,15 @@ class ToolboxShell:
             ("查看方案", lambda: self.show_page("macro")),
             ("编辑宏", self.macro_feature.open_window),
         )
-        notice = tk.Frame(page, bg=SIDEBAR, padx=12, pady=10)
+        notice = tk.Frame(page, bg=SIDEBAR, padx=10, pady=5)
         notice.pack(fill="x", pady=(3, 0))
         tk.Label(
             notice,
-            text="安全边界",
+            text="宏仅在游戏前台运行 · Ctrl + Shift + F12 紧急停止",
             bg=SIDEBAR,
             fg=TEXT,
             font=("Microsoft YaHei UI", 9, "bold"),
         ).pack(anchor="w")
-        tk.Label(
-            notice,
-            text="宏只在 LostCastle2.exe 为前台时执行；Ctrl + Shift + F12 可随时紧急停止。",
-            bg=SIDEBAR,
-            fg=MUTED,
-            justify="left",
-            wraplength=610,
-            font=("Microsoft YaHei UI", 8),
-        ).pack(anchor="w", pady=(4, 0))
 
         self._page_support_row(
             page,
@@ -2195,10 +2446,10 @@ class ToolboxShell:
         button = tk.Button(
             row,
             text=SUPPORT_LABEL,
-            command=lambda: self._show_support_popup(anchor=button),
+            command=self._open_support_directory,
             bg=BG,
             fg=GOLD,
-            activebackground="#F4E8CC",
+            activebackground=SELECTION,
             activeforeground=GOLD,
             relief="flat",
             bd=0,
@@ -2208,7 +2459,7 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 8, "bold"),
         )
         button.pack(side="right", padx=(8, 0))
-        button.bind("<Enter>", self._cancel_support_popup_hide)
+        button.bind("<Enter>", lambda event: self._show_support_popup(event, anchor=button))
         button.bind("<Leave>", self._schedule_support_popup_hide)
         self.support_entry_buttons[page_id] = button
         label = tk.Label(
@@ -2254,7 +2505,7 @@ class ToolboxShell:
             text=mark,
             width=3,
             height=2,
-            bg="#EEE2C7" if mark == "战" else "#DFE8EC" if mark == "键" else "#E8DFEF",
+            bg="#F3DFD4" if mark == "战" else "#E0ECE5" if mark == "键" else "#EEE5EC",
             fg=GOLD if mark == "战" else BLUE if mark == "键" else "#755895",
             font=("Microsoft YaHei UI", 10, "bold"),
         )
@@ -2277,16 +2528,6 @@ class ToolboxShell:
         primary_button.pack(side="left")
         self.module_action_buttons[f"{status_key}_secondary"] = secondary_button
         self.module_action_buttons[f"{status_key}_primary"] = primary_button
-        self.labels[summary_key] = tk.Label(
-            card,
-            text="—",
-            bg=SURFACE,
-            fg=TEXT,
-            anchor="e",
-            justify="right",
-            font=("Microsoft YaHei UI", 8),
-        )
-        self.labels[summary_key].pack(side="right", padx=12)
         copy = tk.Frame(card, bg=SURFACE)
         copy.pack(side="left", fill="x", expand=True)
         tk.Label(
@@ -2306,6 +2547,9 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 8),
         )
         self.labels[status_key].pack(fill="x", pady=(3, 0))
+        self.labels[summary_key] = tk.Label(copy, text="—", bg=SURFACE, fg=TEXT, anchor="w", justify="left", font=("Microsoft YaHei UI", 11))
+        self.labels[summary_key].pack(fill="x", pady=(3, 0))
+        self.labels[summary_key].bind("<Configure>", self._wrap_mod_description)
 
     def _build_combat_page(self) -> None:
         page = self._new_page("combat")
@@ -2318,7 +2562,7 @@ class ToolboxShell:
         self.labels["combat_connection"] = tk.Label(
             page,
             text="● 等待战斗桥接数据",
-            bg="#E5EDED",
+            bg=SIDEBAR,
             fg=MUTED,
             anchor="w",
             padx=11,
@@ -2758,6 +3002,19 @@ class ToolboxShell:
             "MOD收录与适配持续更新，欢迎自愿支持。",
         )
 
+        filters = tk.Frame(page, bg=BG)
+        filters.pack(fill="x", pady=(0, 10))
+        tk.Label(filters, text="功能分类", bg=BG, fg=MUTED, font=("Microsoft YaHei UI", 8)).pack(side="left", padx=(0, 7))
+        categories = ttk.Combobox(filters, textvariable=self.mod_category_var, values=tuple(MOD_CATEGORIES.values()), state="readonly", width=14)
+        categories.pack(side="left", padx=(0, 14))
+        categories.bind("<<ComboboxSelected>>", lambda _event: self._populate_mod_tree())
+        tk.Label(filters, text="状态", bg=BG, fg=MUTED, font=("Microsoft YaHei UI", 8)).pack(side="left", padx=(0, 7))
+        states = ttk.Combobox(filters, textvariable=self.mod_state_var, values=("全部状态", "已安装", "未安装"), state="readonly", width=10)
+        states.pack(side="left")
+        states.bind("<<ComboboxSelected>>", lambda _event: self._populate_mod_tree())
+        self.mod_count_label = tk.Label(filters, text="", bg=BG, fg=MUTED, font=("Microsoft YaHei UI", 8))
+        self.mod_count_label.pack(side="right")
+
         toolbar = tk.Frame(page, bg=BG)
         toolbar.pack(fill="x", pady=(0, 8))
         tk.Label(
@@ -2793,14 +3050,14 @@ class ToolboxShell:
         mod_content.columnconfigure(0, weight=1)
         mod_content.rowconfigure(0, weight=1)
         mod_content.rowconfigure(1, weight=0)
-        list_panel = RoundedPanel(mod_content, height=160, content_padx=8, content_pady=8)
+        list_panel = RoundedPanel(mod_content, height=None, content_padx=8, content_pady=8)
         list_panel.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
         list_frame = list_panel.content
         tree = ttk.Treeview(
             list_frame,
             columns=("name", "version", "author", "status"),
             show="headings",
-            height=5,
+            height=6,
             style="Toolbox.Treeview",
             selectmode="browse",
         )
@@ -2944,28 +3201,28 @@ class ToolboxShell:
         if label.winfo_pixels(label.cget("wraplength")) != width:
             label.configure(wraplength=width)
 
+    def _filtered_mod_descriptors(self) -> list[ModDescriptor]:
+        category = next((key for key, name in MOD_CATEGORIES.items() if name == self.mod_category_var.get()), "all")
+        entries = filter_mods((entry for entry in self.mod_manager.catalog.entries if entry.mod_id != "enhancement-plan"), self.mod_search_var.get(), category)
+        state = self.mod_state_var.get()
+        if state != "全部状态":
+            entries = [entry for entry in entries if (
+                bool(getattr(self._mod_status_cache.get(entry.mod_id), "installed", False))
+                == (state == "已安装")
+            )]
+        return entries
+
     def _populate_mod_tree(self) -> None:
         tree = self.mod_tree
         if tree is None:
             return
         selected = self.mod_selected_id
-        query = self.mod_search_var.get().strip().casefold()
         for item in tree.get_children(""):
             tree.delete(item)
         visible_ids: list[str] = []
-        for descriptor in self.mod_manager.catalog.entries:
-            haystack = "\n".join(
-                (
-                    descriptor.display.name,
-                    descriptor.display.author,
-                    descriptor.display.summary,
-                    descriptor.display.usage_hint,
-                )
-            ).casefold()
-            if query and query not in haystack:
-                continue
-            status = self.mod_manager.status(descriptor.mod_id)
-            label, _color = self._mod_status_text(descriptor, status.state)
+        for descriptor in self._filtered_mod_descriptors():
+            status = self._mod_status_cache.get(descriptor.mod_id)
+            label, _color = self._mod_status_text(descriptor, status.state) if status is not None else ("● 待查看", MUTED)
             tree.insert(
                 "",
                 "end",
@@ -2978,6 +3235,7 @@ class ToolboxShell:
                 ),
             )
             visible_ids.append(descriptor.mod_id)
+        self.mod_count_label.configure(text=f"{len(visible_ids)} / {len(self.mod_manager.catalog.entries)} 项")
         if selected not in visible_ids:
             selected = visible_ids[0] if visible_ids else None
         self.mod_selected_id = selected
@@ -3025,7 +3283,7 @@ class ToolboxShell:
         )
         self.mod_detail_labels["status"].configure(text=label, fg=color)
         self.mod_detail_labels["author"].configure(
-            text=f"作者：{descriptor.display.author}"
+            text=f"{MOD_CATEGORIES[mod_category(descriptor.mod_id)]}  ·  作者：{descriptor.display.author}"
         )
         self.mod_detail_labels["summary"].configure(text=descriptor.display.summary)
         self.mod_detail_labels["usage"].configure(
@@ -3429,7 +3687,7 @@ class ToolboxShell:
         ):
             return
         self._mod_busy = True
-        self._refresh_mod_page()
+        self._refresh_mod_page(force=True)
         self._record_support_event(
             "mod_install_begin", mod_id=mod_id, source=str(source),
             source_kind="directory" if source.is_dir() else source.suffix.lower(),
@@ -3646,7 +3904,7 @@ class ToolboxShell:
         except queue.Empty:
             return
         self._mod_busy = False
-        self._refresh_mod_page()
+        self._refresh_mod_page(force=True)
         if success:
             messagebox.showinfo("配置完成", "MOD 已配置。", parent=self.root)
         else:
@@ -3654,6 +3912,8 @@ class ToolboxShell:
 
     @staticmethod
     def _mod_error_text(error: Exception | None) -> str:
+        if isinstance(error, ModGameRunning):
+            return str(error)
         if isinstance(error, ModConflictError):
             names = "、".join(error.conflicts)
             return f"检测到提供同名插件的已安装 MOD：{names}。请先卸载冲突项。"
@@ -3716,7 +3976,10 @@ class ToolboxShell:
         except Exception as exception:
             messagebox.showerror("删除失败", self._mod_error_text(exception), parent=self.root)
             return
-        self._refresh_mod_page()
+        self._refresh_mod_page(force=True)
+        if is_plugin and self.mod_manager.status(mod_id).present:
+            messagebox.showinfo("已保留不同文件", "目录中不同或修改过的 DLL 已保留，请先备份并确认需要保留的版本。", parent=self.root)
+            return
         if removed:
             messagebox.showinfo(
                 "已卸载" if is_plugin else "已删除",
@@ -3724,37 +3987,86 @@ class ToolboxShell:
                 parent=self.root,
             )
 
-    def _refresh_mod_page(self) -> None:
+    def _refresh_mod_page(self, *, force: bool = False) -> None:
         tree = self.mod_tree
         if tree is None:
             return
+        if force:
+            self._mod_status_cache_time = 0.0
+            self._mod_scan_generation += 1
+            self._mod_scan_reader = None
+            self._mod_scan_error = False
+        game_identity = (
+            str(getattr(self.keyboard, "settings", {}).get("game_path", "")),
+            id(self.mod_manager.catalog),
+        )
+        changed = game_identity != self._mod_game_identity
+        if changed:
+            self._mod_game_identity = game_identity
+            self._mod_scan_generation += 1
+            self._mod_scan_reader = None
+            self._mod_status_cache = {}
+            self._mod_status_cache_time = 0.0
+            self._mod_scan_error = False
+        now = time.monotonic()
+        accepted = False
+        try:
+            token, reader, statuses, error = self._mod_scan_results.get_nowait()
+        except queue.Empty:
+            pass
+        else:
+            if token == self._mod_scan_job:
+                self._mod_scan_job = None
+            if token == (self._mod_scan_generation, game_identity) and not self._mod_busy:
+                self._mod_status_cache_time = now
+                self._mod_scan_error = error is not None
+                if error is None:
+                    self._mod_status_cache = statuses
+                    self._mod_scan_reader = reader
+                    accepted = True
+        if self.current_page != "mods":
+            return
+        if (
+            now - self._mod_status_cache_time >= 5.0
+            and self._mod_scan_job is None
+            and not self._mod_busy
+            and not self._closed
+        ):
+            provider = self.mod_manager.game_exe_provider
+            game_exe = provider() if provider is not None else None
+            reader = self._mod_scan_reader or self.mod_manager.status_reader(game_exe)
+            token = (self._mod_scan_generation, game_identity)
+            self._mod_scan_job = token
+            results = self._mod_scan_results
+
+            def scan() -> None:
+                try:
+                    statuses = {entry.mod_id: reader.status(entry.mod_id) for entry in reader.catalog.entries}
+                except Exception as error:
+                    results.put((token, reader, {}, error))
+                else:
+                    results.put((token, reader, statuses, None))
+
+            threading.Thread(target=scan, name="LC2ModStatus", daemon=True).start()
+        if not (accepted or changed):
+            self._update_mod_detail()
+            if self._mod_scan_error:
+                self.mod_count_label.configure(text=f"{len(tree.get_children(''))} / {len(self.mod_manager.catalog.entries)} 项 · 状态刷新失败")
+            return
         visible = set(tree.get_children(""))
-        query = self.mod_search_var.get().strip().casefold()
-        expected = {
-            descriptor.mod_id
-            for descriptor in self.mod_manager.catalog.entries
-            if not query
-            or query
-            in "\n".join(
-                (
-                    descriptor.display.name,
-                    descriptor.display.author,
-                    descriptor.display.summary,
-                    descriptor.display.usage_hint,
-                )
-            ).casefold()
-        }
+        expected = {descriptor.mod_id for descriptor in self._filtered_mod_descriptors()}
         if visible != expected:
             self._populate_mod_tree()
             return
         for mod_id in visible:
             descriptor = self.mod_manager.descriptor(mod_id)
-            status = self.mod_manager.status(mod_id)
-            label, _color = self._mod_status_text(descriptor, status.state)
+            status = self._mod_status_cache.get(mod_id)
+            label, _color = self._mod_status_text(descriptor, status.state) if status is not None else ("● 待查看", MUTED)
             values = list(tree.item(mod_id, "values"))
             if len(values) == 4 and values[3] != label.replace("● ", ""):
                 values[3] = label.replace("● ", "")
                 tree.item(mod_id, values=values)
+        self.mod_count_label.configure(text=f"{len(visible)} / {len(self.mod_manager.catalog.entries)} 项")
         self._update_mod_detail()
 
     def _build_settings_page(self) -> None:
@@ -3779,7 +4091,13 @@ class ToolboxShell:
                 ("宽敞", lambda: self._set_toolbox_window_preset("spacious")),
             ),
         )
-        tk.Frame(display, bg="#E2D9CC", height=1).pack(fill="x")
+        tk.Frame(display, bg=BORDER, height=1).pack(fill="x")
+        self._display_control_row(display, "字号与按钮", "toolbox_font_scale", (
+            ("缩小", lambda: self._set_main_ui_scale(-0.1)),
+            ("默认", lambda: self._set_main_ui_scale(0.0)),
+            ("放大", lambda: self._set_main_ui_scale(0.1)),
+        ))
+        tk.Frame(display, bg=BORDER, height=1).pack(fill="x")
         self._display_control_row(
             display,
             "按键显示设备",
@@ -3789,7 +4107,7 @@ class ToolboxShell:
                 ("手柄", lambda: self._set_input_display_mode("gamepad")),
             ),
         )
-        tk.Frame(display, bg="#E2D9CC", height=1).pack(fill="x")
+        tk.Frame(display, bg=BORDER, height=1).pack(fill="x")
         self._display_control_row(
             display,
             "按键显示缩放",
@@ -3801,7 +4119,7 @@ class ToolboxShell:
                 ("恢复拖动", self._restore_keyboard_interaction),
             ),
         )
-        tk.Frame(display, bg="#E2D9CC", height=1).pack(fill="x")
+        tk.Frame(display, bg=BORDER, height=1).pack(fill="x")
         self._display_control_row(
             display,
             "战斗 HUD 缩放",
@@ -3898,7 +4216,7 @@ class ToolboxShell:
             text=SUPPORT_TITLE,
             bg=SURFACE,
             fg=TEXT,
-            font=("Microsoft YaHei UI", 10, "bold"),
+            font=self._main_font("Microsoft YaHei UI", 10, "bold"),
         ).pack(anchor="w")
         tk.Label(
             panel,
@@ -3906,8 +4224,8 @@ class ToolboxShell:
             bg=SURFACE,
             fg=MUTED,
             justify="left",
-            wraplength=300,
-            font=("Microsoft YaHei UI", 8),
+            wraplength=round(300 * self._monitor_dpi / 96),
+            font=self._main_font("Microsoft YaHei UI", 8),
         ).pack(anchor="w", pady=(5, 8))
 
         qr_path = (
@@ -3933,11 +4251,11 @@ class ToolboxShell:
             tk.Label(
                 panel,
                 text="点击打开本地赞助说明与收款码",
-                bg="#F4E8CC",
+                bg=SELECTION,
                 fg=GOLD,
                 padx=12,
                 pady=10,
-                font=("Microsoft YaHei UI", 8, "bold"),
+                font=self._main_font("Microsoft YaHei UI", 8, "bold"),
                 cursor="hand2",
             ).pack(fill="x")
         tk.Label(
@@ -3945,7 +4263,7 @@ class ToolboxShell:
             text="点击查看微信 / 支付宝与完整说明",
             bg=SURFACE,
             fg=GOLD,
-            font=("Microsoft YaHei UI", 8),
+            font=self._main_font("Microsoft YaHei UI", 8),
             cursor="hand2",
         ).pack(pady=(8, 0))
 
@@ -3971,9 +4289,17 @@ class ToolboxShell:
             height = popup.winfo_reqheight()
             x = button.winfo_rootx()
             y = button.winfo_rooty() - height - 8
-            x = min(max(8, x), max(8, popup.winfo_screenwidth() - width - 8))
-            y = min(max(8, y), max(8, popup.winfo_screenheight() - height - 8))
-            popup.geometry(f"+{x}+{y}")
+            left, top, right, bottom = nearest_monitor_work_area(
+                button.winfo_rootx(), button.winfo_rooty(),
+                button.winfo_width(), button.winfo_height(),
+                fallback_width=popup.winfo_screenwidth(),
+                fallback_height=popup.winfo_screenheight(),
+            )
+            if y < top + 8:
+                y = button.winfo_rooty() + button.winfo_height() + 8
+            x = min(max(left + 8, x), max(left + 8, right - width - 8))
+            y = min(max(top + 8, y), max(top + 8, bottom - height - 8))
+            place_tk_window(popup, width, height, x, y)
         except tk.TclError:
             self._support_popup = None
 
@@ -4007,7 +4333,10 @@ class ToolboxShell:
         tree = self.mod_tree
         if tree is None or event.widget is not tree:
             return
-        widths = mod_tree_column_widths(event.width)
+        # The original fixed columns were sized for roughly 13-pixel text.
+        # Use the actual window font so status copy stays readable on HiDPI.
+        text_pixels = abs(self._main_font("Microsoft YaHei UI", 11)[1])
+        widths = mod_tree_column_widths(event.width - 4, text_scale=text_pixels / 13)
         for column, width in widths.items():
             tree.column(column, width=width)
         selected = self.mod_selected_id
@@ -4048,6 +4377,7 @@ class ToolboxShell:
             font=("Microsoft YaHei UI", 8),
         )
         self.labels[value_key].pack(side="left", padx=(10, 0))
+        responsive_pair(row, copy, controls, wrap_controls=True)
 
     def _settings_row(
         self,
@@ -4068,17 +4398,14 @@ class ToolboxShell:
             tk.Label(copy, text=detail, bg=SURFACE, fg=MUTED, anchor="w", font=("Microsoft YaHei UI", 8)).pack(fill="x", pady=(3, 0))
         self._button(row, action_text, command, width=11).pack(side="right")
         if not last:
-            tk.Frame(parent, bg="#E2D9CC", height=1).pack(fill="x")
+            tk.Frame(parent, bg=BORDER, height=1).pack(fill="x")
 
     def _set_toolbox_window_preset(self, preset: str) -> None:
         requested_width, requested_height = TOOLBOX_WINDOW_PRESETS[preset]
-        width, height = clamp_main_window_size(
-            requested_width,
-            requested_height,
-            screen_width=self.root.winfo_screenwidth(),
-            screen_height=self.root.winfo_screenheight(),
-            tk_scaling=float(self.root.tk.call("tk", "scaling")),
-        )
+        density = self._monitor_dpi / 96
+        work = self._main_work_area()
+        width = min(round(requested_width*density), work[2]-work[0]-24)
+        height = min(round(requested_height*density), work[3]-work[1]-64)
         self.root.state("normal")
         x, y = clamp_to_nearest_work_area(
             self.root.winfo_x(),
@@ -4089,12 +4416,30 @@ class ToolboxShell:
             fallback_height=self.root.winfo_screenheight(),
         )
         place_tk_window(self.root, width, height, x, y)
-        self.main_ui_scale = TOOLBOX_UI_SCALES[preset]
-        self._apply_main_ui_scale()
         self.root.update_idletasks()
-        self.keyboard.set_toolbox_window_size(width, height)
-        self.keyboard.set_toolbox_ui_scale(self.main_ui_scale)
+        density = self._monitor_dpi / 96
+        self.keyboard.set_toolbox_window_size(round(width/density), round(height/density))
         self._refresh_display_settings()
+        if hasattr(self, "navigation"):
+            self.navigation.reveal(self.nav_buttons[self.current_page])
+
+    def _set_main_ui_scale(self, change: float) -> None:
+        self.main_ui_scale = 1.15 if change == 0.0 else min(1.8, max(0.9, round(self.main_ui_scale+change, 2)))
+        self.keyboard.set_toolbox_ui_scale(self.main_ui_scale)
+        self._apply_main_ui_scale()
+        self._refresh_display_settings()
+
+    def _toggle_team_mini(self) -> None:
+        self.team_mini.toggle(self.hud.window)
+
+    def _show_toolbox(self) -> None:
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+
+    def _toggle_team_reading(self) -> None:
+        if self.game_features is not None:
+            self.game_features.set_enabled("team_enabled", not self.game_features.settings()["team_enabled"])
 
     def _set_keyboard_scale(self, change: float) -> None:
         # A scale command is also an explicit request to inspect the overlay.
@@ -4128,8 +4473,10 @@ class ToolboxShell:
         if width <= 1 or height <= 1:
             width, height = self.keyboard.toolbox_window_size
         self.labels["toolbox_window_size"].configure(
-            text=f"{width} × {height} · {round(self.main_ui_scale * 100)}%"
+            text=f"{width} × {height}"
         )
+        if "toolbox_font_scale" in self.labels:
+            self.labels["toolbox_font_scale"].configure(text=f"{round(self.main_ui_scale*100)}% · 显示器 {round(self._monitor_dpi/96*100)}%")
         modes = []
         if self.keyboard.key_only:
             modes.append("纯净")
@@ -4161,21 +4508,25 @@ class ToolboxShell:
             text=text,
             command=command,
             width=width,
-            bg=ACCENT if accent else "#E9F0F0",
-            fg="#FFFAF5" if accent else "#3E5D60",
-            activebackground=ACCENT_HOVER if accent else "#D6E5E4",
-            activeforeground="#FFFAF5" if accent else TEXT,
+            bg=ACCENT if accent else SIDEBAR,
+            fg=ACCENT_TEXT if accent else TEXT,
+            activebackground=ACCENT_HOVER if accent else SIDEBAR,
+            activeforeground=ACCENT_TEXT if accent else TEXT,
             relief="flat",
             bd=0,
+            highlightthickness=0,
+            takefocus=True,
+            disabledforeground="#E1CDC0" if accent else MUTED,
             padx=5 if compact else 8,
             pady=2 if compact else 7,
             cursor="hand2",
-            font=("Microsoft YaHei UI", 7 if compact else 8, "bold"),
+            font=("Microsoft YaHei UI", 11 if compact else 12, "bold"),
         )
 
     def show_page(self, page_id: str) -> None:
         if page_id not in self.pages:
             raise KeyError(page_id)
+        self.current_page = page_id
         for current_id, page in self.pages.items():
             if current_id == page_id:
                 page.pack(fill="both", expand=True)
@@ -4184,11 +4535,11 @@ class ToolboxShell:
         for current_id, button in self.nav_buttons.items():
             selected = current_id == page_id
             button.configure(
-                bg=ACCENT if selected else SIDEBAR,
-                fg="#FFFAF5" if selected else TEXT,
+                bg=SELECTION if selected else SIDEBAR,
+                fg=TEXT,
                 font=(
                     "Microsoft YaHei UI",
-                    max(7, round(9 * self.main_ui_scale)),
+                    main_pixel_font_size(12, self.main_ui_scale, self._monitor_dpi),
                     "bold" if selected else "normal",
                 ),
             )
@@ -4199,7 +4550,10 @@ class ToolboxShell:
         elif page_id == "combat":
             self._refresh_combat()
         elif page_id == "mods":
-            self._refresh_mod_page()
+            self._refresh_mod_page(force=True)
+        if self.feature_pages is not None:
+            self.feature_pages.refresh()
+        self.team_mini.refresh()
 
     def refresh(self) -> None:
         self._refresh_module_statuses()
@@ -4209,6 +4563,9 @@ class ToolboxShell:
         self._refresh_display_settings()
         self._draw_keyboard_preview()
         self.hud.refresh()
+        if self.feature_pages is not None:
+            self.feature_pages.refresh()
+        self.team_mini.refresh()
 
     def _refresh_module_statuses(self) -> None:
         game_running = bool(self.keyboard.game_process_id)
@@ -4309,8 +4666,9 @@ class ToolboxShell:
         _set_metric_label(
             self.labels["combat_damage"],
             format_metric(snapshot.personal_damage),
-            base_size=max(8, round(22 * self.main_ui_scale)),
+            base_size=round(22 * self.main_ui_scale * self._monitor_dpi/72),
             characters_at_base=10,
+            minimum_size=round(14*self._monitor_dpi/72), pixel_sizes=True,
         )
         self.labels["combat_boss"].configure(
             text=f"Boss {format_metric(snapshot.personal_boss_damage)}"
@@ -4318,8 +4676,9 @@ class ToolboxShell:
         _set_metric_label(
             self.labels["combat_hp"],
             format_whole_metric(snapshot.taken_settlement_damage),
-            base_size=max(8, round(22 * self.main_ui_scale)),
+            base_size=round(22 * self.main_ui_scale * self._monitor_dpi/72),
             characters_at_base=10,
+            minimum_size=round(14*self._monitor_dpi/72), pixel_sizes=True,
         )
         self.labels["combat_heal"].configure(
             text=f"回复 +{format_whole_metric(snapshot.effective_healing)}"
@@ -4327,8 +4686,9 @@ class ToolboxShell:
         _set_metric_label(
             self.labels["combat_mp"],
             format_whole_metric(snapshot.mp_spent),
-            base_size=max(8, round(22 * self.main_ui_scale)),
+            base_size=round(22 * self.main_ui_scale * self._monitor_dpi/72),
             characters_at_base=10,
+            minimum_size=round(14*self._monitor_dpi/72), pixel_sizes=True,
         )
         self.labels["combat_mp_gain"].configure(
             text=f"恢复 +{format_whole_metric(snapshot.mp_gained)}"
@@ -4533,7 +4893,7 @@ class ToolboxShell:
             y,
             right,
             y,
-            fill="#E4D8C7",
+            fill=BORDER,
             width=line_width,
             capstyle=tk.ROUND,
         )
@@ -4651,6 +5011,7 @@ class ToolboxShell:
     def _tick(self) -> None:
         if self._closed:
             return
+        self._refresh_monitor_dpi()
         if self.combat_event_pump is not None:
             self.combat_event_pump.note_ui_tick()
             if not self.combat_event_pump.running:
@@ -4684,22 +5045,19 @@ class ToolboxShell:
             try:
                 if self.root.state() == "normal":
                     self.keyboard.set_toolbox_window_size(
-                        self.root.winfo_width(),
-                        self.root.winfo_height(),
+                        round(self.root.winfo_width() / (self._monitor_dpi/96)),
+                        round(self.root.winfo_height() / (self._monitor_dpi/96)),
                     )
             except tk.TclError:
                 pass
+        self.team_mini.close()
         self.hud.close()
 
     @staticmethod
-    def _initial_geometry(root: tk.Tk, requested_width: int, requested_height: int) -> str:
-        width, height = clamp_main_window_size(
-            requested_width,
-            requested_height,
-            screen_width=root.winfo_screenwidth(),
-            screen_height=root.winfo_screenheight(),
-            tk_scaling=float(root.tk.call("tk", "scaling")),
-        )
+    def _initial_geometry(root: tk.Tk, requested_width: int, requested_height: int, *, dpi: int | None = None) -> str:
+        density = (dpi or window_dpi(root)) / 96
+        width = min(round(requested_width*density), root.winfo_screenwidth()-24)
+        height = min(round(requested_height*density), root.winfo_screenheight()-64)
         x = max(20, (root.winfo_screenwidth() - width) // 2)
         y = max(20, (root.winfo_screenheight() - height) // 2)
         return f"{width}x{height}+{x}+{y}"

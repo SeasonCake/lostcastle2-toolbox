@@ -84,6 +84,9 @@ def main() -> int:
             "LC2CombatBridge/LC2CombatBridge.dll",
             "unrelated/keep.dll",
         ]
+        if manifest_payload.get("features"):
+            expected_plugins.append("LC2ToolboxFeatures/LC2ToolboxFeatures.dll")
+            expected_plugins.sort()
         if plugin_files != expected_plugins:
             raise RuntimeError(f"Unexpected packaged setup plugins: {plugin_files}")
         if console_is_enabled(config.read_text(encoding="utf-8-sig")):
@@ -108,6 +111,9 @@ def main() -> int:
             conflict_blocked = True
         if not conflict_blocked or (conflict_game / "winhttp.dll").exists():
             raise RuntimeError("Conflicting runtime did not fail before writes.")
+        upgraded = conflict_manager.install(replace_existing=True)
+        if not upgraded.ready:
+            raise RuntimeError("Selected existing-runtime update did not become ready.")
 
         report = {
             "build_profile": profile_id,
@@ -122,6 +128,8 @@ def main() -> int:
             "plugins_after_setup": plugin_files,
             "community_mods_auto_enabled": False,
             "conflicting_core_blocked_before_write": conflict_blocked,
+            "selected_conflicting_core_update": upgraded.state,
+            "runtime_update_backup": str(conflict_manager.last_backup_path),
         }
         sys.stdout.buffer.write(
             (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8")

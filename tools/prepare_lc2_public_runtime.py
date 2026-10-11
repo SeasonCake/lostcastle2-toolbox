@@ -6,11 +6,14 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import sys
 import tempfile
 import zipfile
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 OUTPUT_ROOT = (PROJECT_ROOT / "third_party" / "lc2_public_runtime").resolve()
 MANIFEST_PATH = (PROJECT_ROOT / "assets" / "lc2_public_runtime_manifest.json").resolve()
 
@@ -54,6 +57,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--bridge", required=True, type=Path)
+    parser.add_argument("--features", type=Path, help="Include the project-owned optional feature component.")
     parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
     parser.add_argument("--manifest", type=Path, default=MANIFEST_PATH)
     return parser.parse_args()
@@ -126,6 +130,7 @@ def inspect_official_archive(source: Path) -> tuple[list[dict[str, object]], int
 def build_manifest(
     source: Path,
     bridge: Path,
+    features: Path | None = None,
 ) -> dict[str, object]:
     bridge = bridge.resolve()
     if (
@@ -135,7 +140,7 @@ def build_manifest(
     ):
         raise ValueError("LC2CombatBridge public candidate identity is unexpected.")
     specs, uncompressed_bytes = inspect_official_archive(source)
-    return {
+    manifest = {
         "schema_version": 1,
         "build_profile": "distribution",
         "runtime_version": (
@@ -174,6 +179,21 @@ def build_manifest(
         "runtime_file_count": len(specs),
         "runtime_uncompressed_bytes": uncompressed_bytes,
     }
+    if features is not None:
+        from toolbox.mod_inspector import _bepin_plugin_metadata
+        if not features.is_file() or features.name != "LC2ToolboxFeatures.dll":
+            raise ValueError("Project-owned feature component is missing.")
+        metadata = _bepin_plugin_metadata(features.read_bytes())
+        if metadata is None or metadata[0] != "cn.zidus.lc2.toolbox.features" or metadata[2] != "1.9.0":
+            raise ValueError("Project-owned feature component identity is unexpected.")
+        manifest["features"] = {
+            "filename": features.name, "target": "BepInEx/plugins/LC2ToolboxFeatures/LC2ToolboxFeatures.dll",
+            "size_bytes": features.stat().st_size, "sha256": sha256_file(features),
+            "team_enabled_default": False, "loadout_viewing_default": True,
+            "gameplay_changes": "manual_camp_requests_only",
+        }
+        manifest["runtime_version"] += " + LC2ToolboxFeatures 1.9.0"
+    return manifest
 
 
 def copy_atomic(source: Path, target: Path) -> None:
@@ -201,9 +221,12 @@ def prepare(args: argparse.Namespace) -> dict[str, object]:
     if manifest_path != MANIFEST_PATH:
         raise ValueError("Refusing to replace an unexpected public runtime manifest.")
 
-    manifest = build_manifest(source, bridge)
+    features = getattr(args, "features", None)
+    manifest = build_manifest(source, bridge, features)
     output_root.mkdir(parents=True, exist_ok=True)
     allowed_outputs = {RUNTIME_ARCHIVE_FILENAME, BRIDGE_FILENAME}
+    if features is not None:
+        allowed_outputs.add("LC2ToolboxFeatures.dll")
     unexpected = sorted(
         item.name for item in output_root.iterdir() if item.name not in allowed_outputs
     )
@@ -214,6 +237,11 @@ def prepare(args: argparse.Namespace) -> dict[str, object]:
     bridge_target = output_root / BRIDGE_FILENAME
     copy_atomic(source, runtime_target)
     copy_atomic(bridge, bridge_target)
+    if features is not None:
+        features_target = output_root / "LC2ToolboxFeatures.dll"
+        copy_atomic(features, features_target)
+        if sha256_file(features_target) != manifest["features"]["sha256"]:
+            raise ValueError("Copied project-owned feature component identity changed.")
     if (
         runtime_target.stat().st_size != OFFICIAL_SIZE
         or sha256_file(runtime_target) != OFFICIAL_SHA256

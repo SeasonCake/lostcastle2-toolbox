@@ -64,11 +64,11 @@ class AppShellModelTests(unittest.TestCase):
         source = inspect.getsource(ToolboxShell._module_card)
         self.assertLess(
             source.index('actions.pack(side="right")'),
-            source.index('self.labels[summary_key].pack(side="right"'),
+            source.index('copy.pack(side="left", fill="x", expand=True)'),
         )
         self.assertLess(
-            source.index('self.labels[summary_key].pack(side="right"'),
             source.index('copy.pack(side="left", fill="x", expand=True)'),
+            source.index('self.labels[summary_key].pack(fill="x"'),
         )
         refresh = inspect.getsource(ToolboxShell._refresh_module_statuses)
         self.assertIn("text=combat_status.label", refresh)

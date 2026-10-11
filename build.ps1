@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('Diagnostic', 'Distribution')]
     [string]$BuildProfile = 'Diagnostic',
     [string]$GameDir = '',
@@ -59,7 +59,7 @@ if ((Get-FileHash -Algorithm SHA256 -LiteralPath $goldEditorPath).Hash -ne $gold
 if (-not (Test-Path -LiteralPath $communityModsPath -PathType Container)) {
     throw 'Missing prepared community MOD payloads.'
 }
-if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 78) {
+if (@(Get-ChildItem -LiteralPath $communityModsPath -File -Recurse).Count -ne 90) {
     throw 'Prepared community MOD payload file count mismatch.'
 }
 $runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
@@ -244,10 +244,18 @@ if ($LASTEXITCODE -ne 0) {
 Copy-Item -LiteralPath $runtimeArchivePath -Destination $stagedRuntimeBundlePath
 $stagedBridgePath = Join-Path $stagedRuntimeBundlePath 'LC2CombatBridge.dll'
 Copy-Item -LiteralPath $stagedBridgeSource -Destination $stagedBridgePath
+$stagedFeaturesOutput = Join-Path $profileStageRoot 'features'
+& $resolvedDotNetPath build '.\game_plugins\LC2ToolboxFeatures\LC2ToolboxFeatures.csproj' `
+    -c Release "-p:GameDir=$resolvedGameDir" --output $stagedFeaturesOutput --nologo
+if ($LASTEXITCODE -ne 0) { throw "Toolbox feature component build failed with exit code $LASTEXITCODE." }
+$stagedFeaturesPath = Join-Path $stagedRuntimeBundlePath 'LC2ToolboxFeatures.dll'
+Copy-Item -LiteralPath (Join-Path $stagedFeaturesOutput 'LC2ToolboxFeatures.dll') -Destination $stagedFeaturesPath
 $stagedManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
-$stagedManifest.runtime_version = 'BepInEx 6.0.0-be.785 + LC2CombatBridge 1.7.4'
+$stagedManifest.runtime_version = 'BepInEx 6.0.0-be.785 + LC2CombatBridge 1.7.4 + LC2ToolboxFeatures 1.9.0'
 $stagedManifest.bridge.size_bytes = (Get-Item -LiteralPath $stagedBridgePath).Length
 $stagedManifest.bridge.sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $stagedBridgePath).Hash
+$stagedManifest.features.size_bytes = (Get-Item -LiteralPath $stagedFeaturesPath).Length
+$stagedManifest.features.sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $stagedFeaturesPath).Hash
 $stagedManifest | Add-Member -NotePropertyName build_profile -NotePropertyValue $profileId
 $stagedManifest.bridge | Add-Member `
     -NotePropertyName diagnostics_enabled `
@@ -292,9 +300,9 @@ if ($LASTEXITCODE -ne 0) {
 
 $packageParent = Join-Path $buildOutputRoot 'package'
 $packageName = if ($BuildProfile -eq 'Diagnostic') {
-    "失落城堡2工具箱1.8.0-诊断候选-r$CandidateRevision"
+    "失落城堡2工具箱1.9.0-诊断候选-r$CandidateRevision"
 } else {
-    '失落城堡2工具箱1.8.0-实时数值监测+一键MOD安装'
+    '失落城堡2工具箱1.9.0-实时数值监测+一键MOD安装'
 }
 $packageRoot = Join-Path $packageParent $packageName
 if (Test-Path -LiteralPath $packageRoot) {
@@ -319,9 +327,11 @@ foreach ($directory in @($packageRoot, $packageConfig, $packageModules, $package
 $runtimeRoot = Join-Path $buildOutputRoot 'dist\失落城堡2工具箱'
 Get-ChildItem -LiteralPath $runtimeRoot -Force | Copy-Item -Destination $packageRoot -Recurse -Force
 Copy-Item -LiteralPath '.\package_assets\使用说明.txt' -Destination $packageRoot -Force
+Copy-Item -LiteralPath '.\package_assets\1.9.0更新说明.txt' -Destination (Join-Path $packageRoot '更新说明.txt')
+Copy-Item -LiteralPath '.\package_assets\1.9.0群公告.txt' -Destination (Join-Path $packageRoot '群公告.txt')
 if ($diagnosticsExpected) {
     @"
-失落城堡2工具箱 1.8.0-r$CandidateRevision · 诊断内测版
+失落城堡2工具箱 1.9.0-r$CandidateRevision · 诊断内测版
 
 本包用于恢复验证，尚未作为正式分享版发布。
 对局事件记录默认开启，可在战斗统计页关闭；支持诊断另保留有界异常样本与消费状态。

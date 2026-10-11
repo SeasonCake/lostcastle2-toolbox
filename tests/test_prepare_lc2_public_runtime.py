@@ -23,11 +23,12 @@ BRIDGE_INPUT = (
     PROJECT_ROOT
     / "third_party/lc2_public_runtime/LC2CombatBridge.dll"
 )
+FEATURE_INPUT = PROJECT_ROOT / "third_party/lc2_public_runtime/LC2ToolboxFeatures.dll"
 
 
 class PublicRuntimePreparationTests(unittest.TestCase):
     def test_tracked_manifest_is_exact_deterministic_official_derivative(self) -> None:
-        if not OFFICIAL_INPUT.is_file() or not BRIDGE_INPUT.is_file():
+        if not OFFICIAL_INPUT.is_file() or not BRIDGE_INPUT.is_file() or not FEATURE_INPUT.is_file():
             self.skipTest("ignored official input or local Bridge build is unavailable")
         expected = json.loads(
             (PROJECT_ROOT / "assets/lc2_public_runtime_manifest.json").read_text(
@@ -35,12 +36,14 @@ class PublicRuntimePreparationTests(unittest.TestCase):
             )
         )
 
-        actual = build_manifest(OFFICIAL_INPUT, BRIDGE_INPUT)
+        actual = build_manifest(OFFICIAL_INPUT, BRIDGE_INPUT, FEATURE_INPUT)
 
         self.assertEqual(actual, expected)
         self.assertEqual(actual["source_identity"]["sha256"], OFFICIAL_SHA256)
         self.assertEqual(actual["runtime_archive"]["sha256"], OFFICIAL_SHA256)
         self.assertEqual(actual["bridge"]["sha256"], BRIDGE_SHA256)
+        self.assertFalse(actual["features"]["team_enabled_default"])
+        self.assertTrue(actual["features"]["loadout_viewing_default"])
 
     def test_wrong_bridge_and_unsafe_members_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

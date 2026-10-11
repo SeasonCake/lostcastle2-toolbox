@@ -1,0 +1,486 @@
+{
+  "release": "1.9.0",
+  "entries": 84,
+  "payload_files": 90,
+  "payload_bytes": 5162445,
+  "updated_ids": [
+    "demon-invasion",
+    "dual-blades-overhaul",
+    "dynamic-hp",
+    "fire-dragon-enhancement",
+    "golem-shield-boost",
+    "lightning-enhance-plate",
+    "room-prefix",
+    "unified-tools"
+  ],
+  "new_ids": [
+    "armor-enhancement",
+    "boss-cinematic-free",
+    "boss-hpbar-steady",
+    "chaos-charge-fix",
+    "curse-treasure-enhancement",
+    "desert-marauder-combo",
+    "evil-spirit-stack",
+    "golden-rescue",
+    "ice-system-enhancement",
+    "inspire-duration",
+    "stage-countdown",
+    "unique-weapon-perks"
+  ],
+  "historical_identities": {
+    "unified-tools": [
+      {
+        "path": "LostCastle2.UnifiedTools.dll",
+        "sha256": "9DB7675D86935E3033FBF014FC260D21DDC78D837C493F4F0DD256C9A869DA4C",
+        "size_bytes": 258048
+      }
+    ],
+    "lightning-enhance-plate": [
+      {
+        "path": "LC2LightlingSystemUpgradeV2.2.0.dll",
+        "size_bytes": 56320,
+        "sha256": "37769266F5F1D6BA1544EB41358B7583CF82537BA33DF0229C3E1383D232EFE0"
+      },
+      {
+        "path": "LC2LightlingSystemUpgradePanel.dll",
+        "size_bytes": 31744,
+        "sha256": "2239EE9F2BB17189BD47595F9EDB6C75D7214ED7283098F8347E3F19C732A58D"
+      },
+      {
+        "path": "LC2LightningEnhancePlatev1.0.1.dll",
+        "sha256": "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
+        "size_bytes": 35328
+      },
+      {
+        "path": "LC2LightningEnhancePlatev1.1.0.dll",
+        "size_bytes": 39936,
+        "sha256": "377660D5AA0B3A03152E44BFABCBBCF82B77790A953EEA7150F0AAB63C793BC0"
+      },
+      {
+        "path": "LC2LightningEnhancePlatePanel.dll",
+        "size_bytes": 23040,
+        "sha256": "CD23E449E51DDE6A4C0A94CCDE4502BE2892109776BA5C053A2DDAED8324A924"
+      },
+      {
+        "path": "LC2LightlingSystemUpgradePanel.dll",
+        "sha256": "E3C388D08004BB2B7A462C734A7CB9E955D52B83D40873BB0C52F3153D293572",
+        "size_bytes": 35840
+      },
+      {
+        "path": "LC2LightlingSystemUpgradeV2.5.2.dll",
+        "sha256": "5E5ABD33FDBB1822710A12F71A6A03954A8BF6151C67B476696884BF30B787F8",
+        "size_bytes": 64000
+      },
+      {
+        "path": "LC2LightlingSystemUpgradePanel.dll",
+        "sha256": "9E9F5B6F7029ABD665F00146D18A6725E41AABEFE2CCDE9498903012344EC4BC",
+        "size_bytes": 36864
+      },
+      {
+        "path": "LC2LightlingSystemUpgradeV2.6.1.dll",
+        "sha256": "FF490B52A6F8AF9118F40D79EE1171B1A4FFC99BB8FF2CB2A974B48F7E736ABF",
+        "size_bytes": 81920
+      },
+      {
+        "path": "LC2LightlingSystemUpgradePanel.dll",
+        "sha256": "1F705016F21B79BF577A47180A8C83F35C4411856071A0A4211C7E5AE15F1D41",
+        "size_bytes": 36864
+      },
+      {
+        "path": "LC2LightlingSystemUpgradeV2.6.1.dll",
+        "sha256": "4717EFC679E1DBFA71F24E906552BFB6AD3D9DA1FFBAB049519A5B6FDE651C5B",
+        "size_bytes": 79360
+      }
+    ],
+    "dynamic-hp": [
+      {
+        "path": "LC2DynamicHp.dll",
+        "sha256": "58868BAB99DA35E1DAB19AED62731589D65F6276A59CC89CECAA7A54D315885E",
+        "size_bytes": 44032
+      }
+    ],
+    "loot-combat-enhancement": [
+      {
+        "path": "LC2LootWeightPatch.dll",
+        "sha256": "524342AC2C0A49AAC13C582AC79DBC11B1BCAA293A25CB345C896EC88CCB563C",
+        "size_bytes": 95232
+      }
+    ],
+    "fire-dragon-enhancement": [
+      {
+        "path": "LC2FIreDragonSetEnhancementPanel.dll",
+        "sha256": "C429DBF7D04322B49C24292A92CDDFF5DCF043C54C1E1123AB026C4AAEDEC510",
+        "size_bytes": 27136
+      },
+      {
+        "path": "LC2FIreDragonSetEnhancementV1.0.0.dll",
+        "sha256": "2FFD4F9F11CEEA67F48427FA89968FCDADD7FC8F30DEC85C1DFA6D72A73E6ACA",
+        "size_bytes": 65536
+      }
+    ],
+    "dual-blades-overhaul": [
+      {
+        "path": "LC2DualBladesOverhaulPanle.dll",
+        "sha256": "D7C588D59DFDE210A24FEAABFA7713E543040596B5734C68CC5DD7E7B81FD80B",
+        "size_bytes": 19456
+      },
+      {
+        "path": "LC2DualBladesOverhaulV1.0.0.dll",
+        "sha256": "04E32BF33DFD632EFEF6F3C55804C6AFA52DBFDD07A23C415769AFB76E432D23",
+        "size_bytes": 28160
+      }
+    ],
+    "demon-invasion": [
+      {
+        "path": "LC2DemonInvasion.dll",
+        "sha256": "5ADDBAFD53EDF1C6F47B131C77FC5611C8E8AD6860724BEF57107827ED9C8AA1",
+        "size_bytes": 25600
+      }
+    ],
+    "golem-shield-boost": [
+      {
+        "path": "LC2GolemShieldBoost.dll",
+        "sha256": "D58F6FA58DB23F3DA9272E952F3350DAA183F832EFEE5F8E274DE337DDA46E56",
+        "size_bytes": 10752
+      }
+    ],
+    "hideyoshi-summon": [
+      {
+        "path": "LC2.HideyoshiSummon召唤狐狸剑姬.dll",
+        "sha256": "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C",
+        "size_bytes": 21504
+      }
+    ],
+    "room-prefix": [
+      {
+        "path": "LC2RoomPrefix.dll",
+        "sha256": "D78C7182039A181423958F4D2220249852EED90D34E2CE3508B3CABC7E573784",
+        "size_bytes": 32768
+      }
+    ],
+    "hand-color-white": [
+      {
+        "path": "LC2.HandColorWhite手掌变白.dll",
+        "sha256": "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623",
+        "size_bytes": 10752
+      }
+    ],
+    "player-live-stats": [
+      {
+        "path": "实时数据1.3.dll",
+        "sha256": "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
+        "size_bytes": 27136
+      }
+    ],
+    "enhancement-plan": [
+      {
+        "path": "LC2EnhancementPlan_v4.8.dll",
+        "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+        "size_bytes": 328192
+      }
+    ],
+    "monster-treasure": [
+      {
+        "path": "怪物宝藏v11.dll",
+        "sha256": "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+        "size_bytes": 86016
+      },
+      {
+        "path": "怪物宝藏v11.6.dll",
+        "sha256": "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
+        "size_bytes": 107008
+      }
+    ],
+    "thunder-hammer-summon": [
+      {
+        "path": "LC2.ThunderHammer真雷神之锤.dll",
+        "sha256": "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
+        "size_bytes": 31744
+      }
+    ],
+    "damage-meter": [
+      {
+        "path": "失落城堡2伤害统计v1.5.1.dll",
+        "sha256": "64677F4DBEA9316911862D68A09B67615C1CA1B8BC7742A0108D0CC7D579A8D6",
+        "size_bytes": 59392
+      }
+    ]
+  },
+  "selected_identities": {
+    "unified-tools": {
+      "version": "1.2（包版本）",
+      "primary": "LostCastle2.UnifiedTools.dll",
+      "sha256": "DB6192F7B82A19207C7F8091A1A617A462E9415D061D76576B990DBC6367D76C",
+      "size_bytes": 421888,
+      "files": [
+        {
+          "path": "LostCastle2.UnifiedTools.dll",
+          "sha256": "DB6192F7B82A19207C7F8091A1A617A462E9415D061D76576B990DBC6367D76C",
+          "size_bytes": 421888
+        }
+      ]
+    },
+    "evil-spirit-stack": {
+      "version": "1.1（说明版本）",
+      "primary": "LC2EvilSpiritStack.dll",
+      "sha256": "BEDC077FBFF2033DD35D1A81129735EDB25805AC5DB5D45441713FBDB0CB82DA",
+      "size_bytes": 12288,
+      "files": [
+        {
+          "path": "LC2EvilSpiritStack.dll",
+          "sha256": "BEDC077FBFF2033DD35D1A81129735EDB25805AC5DB5D45441713FBDB0CB82DA",
+          "size_bytes": 12288
+        }
+      ]
+    },
+    "lightning-enhance-plate": {
+      "version": "2.7.2",
+      "primary": "LC2电花流派增强方案V2.7.2.dll",
+      "sha256": "5EBBE8F407D5EF1C298F79F46B02FC7CE6C872B5F631535F97A826DA9A54C993",
+      "size_bytes": 44032,
+      "files": [
+        {
+          "path": "LC2电花流派增强方案V2.7.2.dll",
+          "sha256": "5EBBE8F407D5EF1C298F79F46B02FC7CE6C872B5F631535F97A826DA9A54C993",
+          "size_bytes": 44032
+        },
+        {
+          "path": "LC2雷击流派增强方案V2.7.2.dll",
+          "sha256": "7238FDC3DAEFB27EA3EF5F75EB3822F0F3083943447CA8D5DED02613FF778E61",
+          "size_bytes": 73216
+        }
+      ]
+    },
+    "dynamic-hp": {
+      "version": "4.4.0",
+      "primary": "LC2DynamicHp.dll",
+      "sha256": "0D17913FEE64A758531C90849AC008292E36C2863E055275D19573F6DEF08435",
+      "size_bytes": 46592,
+      "files": [
+        {
+          "path": "LC2DynamicHp.dll",
+          "sha256": "0D17913FEE64A758531C90849AC008292E36C2863E055275D19573F6DEF08435",
+          "size_bytes": 46592
+        }
+      ]
+    },
+    "fire-dragon-enhancement": {
+      "version": "2.1.0",
+      "primary": "LC2FIreDragonSetEnhancement.dll",
+      "sha256": "FB8B5A6EEB6BE9723679467A7ACBACC785083AF0912B58FBDFDFAA2D6692C141",
+      "size_bytes": 62464,
+      "files": [
+        {
+          "path": "LC2FIreDragonSetEnhancement.dll",
+          "sha256": "FB8B5A6EEB6BE9723679467A7ACBACC785083AF0912B58FBDFDFAA2D6692C141",
+          "size_bytes": 62464
+        },
+        {
+          "path": "LC2FIreDragonSetEnhancementPanel.dll",
+          "sha256": "53F6CD1B1BB6ED29C77DEF684AADB1872B9A8791720E98831B2AB868A58D0803",
+          "size_bytes": 27136
+        }
+      ]
+    },
+    "unique-weapon-perks": {
+      "version": "0.6.0",
+      "primary": "独有词条开源.dll",
+      "sha256": "0BAF9834A3A5349AD3EF0B199AA5F699DB071FAA3AFF7B22507C4065898443D1",
+      "size_bytes": 29696,
+      "files": [
+        {
+          "path": "独有词条开源.dll",
+          "sha256": "0BAF9834A3A5349AD3EF0B199AA5F699DB071FAA3AFF7B22507C4065898443D1",
+          "size_bytes": 29696
+        }
+      ]
+    },
+    "dual-blades-overhaul": {
+      "version": "1.1.0",
+      "primary": "LC2DualBladesOverhaulV1.1.0.dll",
+      "sha256": "4831575C70017601231CEAF53FF68957FDD30D4DEB596978DE2CF48279B7E520",
+      "size_bytes": 23040,
+      "files": [
+        {
+          "path": "LC2DualBladesOverhaulPanle.dll",
+          "sha256": "E602CD855017D803389B94BEFA857E73C84E585636A4978069DC17EB40B4E03F",
+          "size_bytes": 19456
+        },
+        {
+          "path": "LC2DualBladesOverhaulV1.1.0.dll",
+          "sha256": "4831575C70017601231CEAF53FF68957FDD30D4DEB596978DE2CF48279B7E520",
+          "size_bytes": 23040
+        }
+      ]
+    },
+    "stage-countdown": {
+      "version": "1.0.0",
+      "primary": "LC2OnePlayerCountdown.dll",
+      "sha256": "D1252BA5C3CECBEE0128D907C90AF01D2F751FCF019F2BE70CB2C5A27139A203",
+      "size_bytes": 7168,
+      "files": [
+        {
+          "path": "LC2OnePlayerCountdown.dll",
+          "sha256": "D1252BA5C3CECBEE0128D907C90AF01D2F751FCF019F2BE70CB2C5A27139A203",
+          "size_bytes": 7168
+        }
+      ]
+    },
+    "boss-cinematic-free": {
+      "version": "1.4.1",
+      "primary": "LC2BossCinematicFree.dll",
+      "sha256": "51E404FA31A3719527F75AC7D98D8640B760A6FAEC65AD9174C11E5481CFFFC6",
+      "size_bytes": 27136,
+      "files": [
+        {
+          "path": "LC2BossCinematicFree.dll",
+          "sha256": "51E404FA31A3719527F75AC7D98D8640B760A6FAEC65AD9174C11E5481CFFFC6",
+          "size_bytes": 27136
+        }
+      ]
+    },
+    "ice-system-enhancement": {
+      "version": "1.0.4",
+      "primary": "LC2冰系流派增强方案V1.0.4.dll",
+      "sha256": "EA35F9181F81D0CE55B11F3A7054CB00FFE673A42E6C205F7357622EB177356C",
+      "size_bytes": 59392,
+      "files": [
+        {
+          "path": "LC2冰系流派增强方案V1.0.4.dll",
+          "sha256": "EA35F9181F81D0CE55B11F3A7054CB00FFE673A42E6C205F7357622EB177356C",
+          "size_bytes": 59392
+        }
+      ]
+    },
+    "armor-enhancement": {
+      "version": "1.1.0",
+      "primary": "LC2护甲增强方案V1.1.0.dll",
+      "sha256": "2F0318A10C4A51C8AB6696FA477BB051C59A9042035093572E9D80619713A208",
+      "size_bytes": 45056,
+      "files": [
+        {
+          "path": "LC2护甲增强方案V1.1.0.dll",
+          "sha256": "2F0318A10C4A51C8AB6696FA477BB051C59A9042035093572E9D80619713A208",
+          "size_bytes": 45056
+        }
+      ]
+    },
+    "curse-treasure-enhancement": {
+      "version": "2.0.0",
+      "primary": "LC2诅咒宝藏增强方案V2.0.0.dll",
+      "sha256": "78ED79F7D273CACCA9A8B5DAEB9B85F7D5E3A7463641F9C65EABEFD854C920B8",
+      "size_bytes": 86528,
+      "files": [
+        {
+          "path": "LC2诅咒宝藏增强方案V2.0.0.dll",
+          "sha256": "78ED79F7D273CACCA9A8B5DAEB9B85F7D5E3A7463641F9C65EABEFD854C920B8",
+          "size_bytes": 86528
+        }
+      ]
+    },
+    "desert-marauder-combo": {
+      "version": "1.0.0",
+      "primary": "LC2DesertMarauderComboWindow.dll",
+      "sha256": "40BDDB7E106866637521BD79D06C10BE136AB2646ABB78E11EF065A5B4DC9C2D",
+      "size_bytes": 19456,
+      "files": [
+        {
+          "path": "LC2DesertMarauderComboWindow.dll",
+          "sha256": "40BDDB7E106866637521BD79D06C10BE136AB2646ABB78E11EF065A5B4DC9C2D",
+          "size_bytes": 19456
+        }
+      ]
+    },
+    "inspire-duration": {
+      "version": "1.1.0",
+      "primary": "LC2InspireDuration.dll",
+      "sha256": "F6EBD9F770C6DC8F01A132F6C2256A9FB6769CFBF7DA962FCFADA86A72E90A4A",
+      "size_bytes": 17408,
+      "files": [
+        {
+          "path": "LC2InspireDuration.dll",
+          "sha256": "F6EBD9F770C6DC8F01A132F6C2256A9FB6769CFBF7DA962FCFADA86A72E90A4A",
+          "size_bytes": 17408
+        }
+      ]
+    },
+    "boss-hpbar-steady": {
+      "version": "2.1.1",
+      "primary": "LC2血量钳制与延迟撤销V2.1.1.dll",
+      "sha256": "620EBC76B319CD8842D086BEBD33290551783DAD87005B0E2B952DA1B9CD01BF",
+      "size_bytes": 11776,
+      "files": [
+        {
+          "path": "LC2血量钳制与延迟撤销V2.1.1.dll",
+          "sha256": "620EBC76B319CD8842D086BEBD33290551783DAD87005B0E2B952DA1B9CD01BF",
+          "size_bytes": 11776
+        }
+      ]
+    },
+    "chaos-charge-fix": {
+      "version": "1.0.2",
+      "primary": "修复诡谲大剑技能不触发领主甲蓄能1.02.dll",
+      "sha256": "F2F3A1A180CE31E285BCE7DEB512E367178C6E7F63B0B0EE1907CAA1C48E9D6F",
+      "size_bytes": 24064,
+      "files": [
+        {
+          "path": "修复诡谲大剑技能不触发领主甲蓄能1.02.dll",
+          "sha256": "F2F3A1A180CE31E285BCE7DEB512E367178C6E7F63B0B0EE1907CAA1C48E9D6F",
+          "size_bytes": 24064
+        }
+      ]
+    },
+    "golden-rescue": {
+      "version": "1.0.16",
+      "primary": "【医龙养猪流】救人地面掉落10魂晶，被救-5魂晶1.16.dll",
+      "sha256": "E93BE7DAB0DAFC5724A1DE869877E9785B9183D9647B63E1F886CADE6CE2BFEA",
+      "size_bytes": 53248,
+      "files": [
+        {
+          "path": "【医龙养猪流】救人地面掉落10魂晶，被救-5魂晶1.16.dll",
+          "sha256": "E93BE7DAB0DAFC5724A1DE869877E9785B9183D9647B63E1F886CADE6CE2BFEA",
+          "size_bytes": 53248
+        }
+      ]
+    },
+    "demon-invasion": {
+      "version": "1.5.4",
+      "primary": "LC2DemonInvasion.dll",
+      "sha256": "159802EA8B7DEB2983CD91465DA6C9BD9382E93FF1795675F288F7C15951257F",
+      "size_bytes": 27136,
+      "files": [
+        {
+          "path": "LC2DemonInvasion.dll",
+          "sha256": "159802EA8B7DEB2983CD91465DA6C9BD9382E93FF1795675F288F7C15951257F",
+          "size_bytes": 27136
+        }
+      ]
+    },
+    "golem-shield-boost": {
+      "version": "1.0.3",
+      "primary": "LC2GolemShieldBoost.dll",
+      "sha256": "85D02682A33698DD73686BFCF4E4CA06229E7E74C079C600D5461DB5B2EAEA2A",
+      "size_bytes": 11776,
+      "files": [
+        {
+          "path": "LC2GolemShieldBoost.dll",
+          "sha256": "85D02682A33698DD73686BFCF4E4CA06229E7E74C079C600D5461DB5B2EAEA2A",
+          "size_bytes": 11776
+        }
+      ]
+    },
+    "room-prefix": {
+      "version": "1.3.0",
+      "primary": "LC2RoomPrefix.dll",
+      "sha256": "77E2FE026F381E0C5E99D065F9BDA80E566CE58E40EE3B34ECD883D9FB2FCF39",
+      "size_bytes": 26112,
+      "files": [
+        {
+          "path": "LC2RoomPrefix.dll",
+          "sha256": "77E2FE026F381E0C5E99D065F9BDA80E566CE58E40EE3B34ECD883D9FB2FCF39",
+          "size_bytes": 26112
+        }
+      ]
+    }
+  }
+}

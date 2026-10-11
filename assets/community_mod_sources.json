@@ -11,7 +11,9 @@
       "author": "墨河以轩",
       "summary": "向队友快速转移金币并修复客机金币消失问题",
       "usage_hint": "安装后启动游戏，按 F1 使用。",
-      "hotkeys": ["F1"],
+      "hotkeys": [
+        "F1"
+      ],
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
@@ -45,7 +47,9 @@
       "id": "monster-treasure",
       "sort_priority": 165,
       "source": "怪物宝藏v11.7（更新详情且看压缩包内txt文件，怪物会获得宝藏哦）.rar",
-      "include": ["怪物v11.7.dll"],
+      "include": [
+        "怪物v11.7.dll"
+      ],
       "primary": "怪物v11.7.dll",
       "provides": [
         "怪物v11.7.dll",
@@ -60,9 +64,23 @@
       "author": "懒虫桑",
       "summary": "按区域为敌对生物添加宝藏、冰属性与光环效果，并提供 Boss 范围和保存设置",
       "usage_hint": "安装后重启游戏，按 Alt+F 或在工具箱点击“打开 MOD 面板”；玩法逻辑仅由房主/单机启用，客机只查看面板。11.7 限制伤害类宝藏最多把玩家打到1血，并再次修复反复倒地问题；本工具箱尚未实战验证，与动态血量、增强计划等建议分开使用。",
-      "hotkeys": ["Alt+F"],
+      "hotkeys": [
+        "Alt+F"
+      ],
       "panel_hotkey": "Alt+F",
-      "author_source": "11.7 DLL 内嵌“作者 懒虫桑”；随包 v11.7/9.2 更新说明与用户提供来源记录"
+      "author_source": "11.7 DLL 内嵌“作者 懒虫桑”；随包 v11.7/9.2 更新说明与用户提供来源记录",
+      "superseded_files": [
+        {
+          "path": "怪物宝藏v11.dll",
+          "sha256": "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
+          "size_bytes": 86016
+        },
+        {
+          "path": "怪物宝藏v11.6.dll",
+          "sha256": "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
+          "size_bytes": 107008
+        }
+      ]
     },
     {
       "id": "armor-transmog",
@@ -74,7 +92,9 @@
       "author": "兔子王お",
       "summary": "在游戏内更换角色服装外观",
       "usage_hint": "安装后启动游戏，按 F9 打开服装幻化界面。",
-      "hotkeys": ["F9"],
+      "hotkeys": [
+        "F9"
+      ],
       "panel_hotkey": "F9",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
@@ -88,7 +108,9 @@
       "author": "空容",
       "summary": "为武器选择并激活额外刻印与共鸣",
       "usage_hint": "进入营地读取数据；面板会自动出现，也可按 F5 打开或关闭，按原说明完成主刻印刷新。",
-      "hotkeys": ["F5"],
+      "hotkeys": [
+        "F5"
+      ],
       "panel_hotkey": "F5",
       "author_source": "含源码版本 README 署名"
     },
@@ -102,7 +124,9 @@
       "author": "Amagi",
       "summary": "在游戏内管理刻印相关灵魂石",
       "usage_hint": "安装后启动游戏，按 F6 打开管理界面。",
-      "hotkeys": ["F6"],
+      "hotkeys": [
+        "F6"
+      ],
       "panel_hotkey": "F6",
       "author_source": "随包说明署名"
     },
@@ -116,7 +140,9 @@
       "author": "空容、昕（修改）",
       "summary": "按关卡序列自定义可替换房间类型",
       "usage_hint": "安装后启动游戏，按 F1 打开面板；输入房间类型编号序列并保存。",
-      "hotkeys": ["F1"],
+      "hotkeys": [
+        "F1"
+      ],
       "panel_hotkey": "F1",
       "author_source": "v2.0 操作说明署名"
     },
@@ -125,7 +151,10 @@
       "sort_priority": 110,
       "source": "LC2增强计划v5.0.0.zip",
       "include": [
-        {"sha256": "0B4CEC387EA2634AA8F96E78CDD5E214B5A00629F81CB4181F5B2C67AEEA5899", "target": "LC2EnhancementPlan_v5.0.0.dll"}
+        {
+          "sha256": "0B4CEC387EA2634AA8F96E78CDD5E214B5A00629F81CB4181F5B2C67AEEA5899",
+          "target": "LC2EnhancementPlan_v5.0.0.dll"
+        }
       ],
       "primary": "LC2EnhancementPlan_v5.0.0.dll",
       "name": "LC2 增强计划",
@@ -133,30 +162,50 @@
       "author": "茶橘柚、空容、刺心、木亦",
       "summary": "提供多项战斗、掉落与便利功能调节",
       "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 F3 或 Shift+Q，首次启动会生成默认配置。F3 与动态血量等 MOD 冲突时可改用 Shift+Q。",
-      "hotkeys": ["F3", "Shift+Q"],
+      "hotkeys": [
+        "F3",
+        "Shift+Q"
+      ],
       "panel_hotkey": "F3",
-      "author_source": "5.0.0 DLL 内嵌作者团队署名“茶橘柚、空容、刺心、木亦”与 F3/Shift+Q 面板提示"
+      "author_source": "5.0.0 DLL 内嵌作者团队署名“茶橘柚、空容、刺心、木亦”与 F3/Shift+Q 面板提示",
+      "superseded_files": [
+        {
+          "path": "LC2EnhancementPlan_v4.8.dll",
+          "sha256": "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
+          "size_bytes": 328192
+        }
+      ],
+      "provides": [
+        "lc2enhancementplan_v5.0.0.dll"
+      ]
     },
     {
       "id": "lightning-enhance-plate",
       "sort_priority": 160,
-      "source": "LC2雷系流派增强方案V2.2.0[已整合雷击与电花增强，原雷击强化版].zip",
-      "primary": "LC2LightlingSystemUpgradeV2.2.0.dll",
-      "name": "雷系流派增强方案",
-      "version": "2.2.0",
+      "source": "LC2雷系流派增强方案V2.7.2[修BUG].zip",
+      "primary": "LC2电花流派增强方案V2.7.2.dll",
+      "name": "雷击与电花流派增强",
+      "version": "2.7.2",
       "author": "脆毛肚",
-      "summary": "整合雷击、轰雷与电花强化，支持宝藏、职业限制和伤害参数调节",
-      "usage_hint": "安装后重启游戏，按 F9 打开面板；需同时安装主程序与面板。F9 与服装幻化及按键窗鼠标穿透重叠。新版说明仅确认单人/房主完整生效，客机效果未验证；请勿与旧雷击强化版同时使用。",
-      "hotkeys": [
-        "F9"
-      ],
-      "author_source": "9月8日群文件上传截图与2.2.0面板内署名脆毛肚；主程序及面板BepInPlugin 2.2.0、随包2.2.0更新说明",
+      "summary": "包含雷击、电花两个分支；雷击默认按直接攻击计算，电花默认限法师/法杖",
+      "usage_hint": "安装后重启游戏，分别在 config 中调节雷击与电花参数；2.7.2已取消旧版面板。客机伤害补报来自原作者说明，实际联机组合尚未逐项核验。",
+      "hotkeys": [],
+      "author_source": "9月8日群文件上传截图与2.2.0面板内署名脆毛肚；主程序及面板BepInPlugin 2.2.0、随包2.2.0更新说明；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
       "include": [
-        "LC2LightlingSystemUpgradeV2.2.0.dll",
-        "LC2LightlingSystemUpgradePanel.dll"
+        "LC2电花流派增强方案V2.7.2.dll",
+        "LC2雷击流派增强方案V2.7.2.dll"
       ],
-      "panel_hotkey": "F9",
       "superseded_files": [
+        {
+          "path": "LC2LightlingSystemUpgradeV2.2.0.dll",
+          "size_bytes": 56320,
+          "sha256": "37769266F5F1D6BA1544EB41358B7583CF82537BA33DF0229C3E1383D232EFE0"
+        },
+        {
+          "path": "LC2LightlingSystemUpgradePanel.dll",
+          "size_bytes": 31744,
+          "sha256": "2239EE9F2BB17189BD47595F9EDB6C75D7214ED7283098F8347E3F19C732A58D"
+        },
         {
           "path": "LC2LightningEnhancePlatev1.0.1.dll",
           "sha256": "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3",
@@ -171,29 +220,72 @@
           "path": "LC2LightningEnhancePlatePanel.dll",
           "size_bytes": 23040,
           "sha256": "CD23E449E51DDE6A4C0A94CCDE4502BE2892109776BA5C053A2DDAED8324A924"
+        },
+        {
+          "path": "LC2LightlingSystemUpgradePanel.dll",
+          "sha256": "E3C388D08004BB2B7A462C734A7CB9E955D52B83D40873BB0C52F3153D293572",
+          "size_bytes": 35840
+        },
+        {
+          "path": "LC2LightlingSystemUpgradeV2.5.2.dll",
+          "sha256": "5E5ABD33FDBB1822710A12F71A6A03954A8BF6151C67B476696884BF30B787F8",
+          "size_bytes": 64000
+        },
+        {
+          "path": "LC2LightlingSystemUpgradePanel.dll",
+          "sha256": "9E9F5B6F7029ABD665F00146D18A6725E41AABEFE2CCDE9498903012344EC4BC",
+          "size_bytes": 36864
+        },
+        {
+          "path": "LC2LightlingSystemUpgradeV2.6.1.dll",
+          "sha256": "FF490B52A6F8AF9118F40D79EE1171B1A4FFC99BB8FF2CB2A974B48F7E736ABF",
+          "size_bytes": 81920
+        },
+        {
+          "path": "LC2LightlingSystemUpgradePanel.dll",
+          "sha256": "1F705016F21B79BF577A47180A8C83F35C4411856071A0A4211C7E5AE15F1D41",
+          "size_bytes": 36864
+        },
+        {
+          "path": "LC2LightlingSystemUpgradeV2.6.1.dll",
+          "sha256": "4717EFC679E1DBFA71F24E906552BFB6AD3D9DA1FFBAB049519A5B6FDE651C5B",
+          "size_bytes": 79360
         }
       ],
-      "redistribution_status": "maintainer_authorized_public_bundle_2026-09-02",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
       "provides": [
         "lc2lightningenhanceplatev1.0.1.dll",
         "lc2lightningenhanceplatev1.1.0.dll",
         "lc2lightningenhanceplatepanel.dll",
         "lc2lightlingsystemupgradev2.2.0.dll",
-        "lc2lightlingsystemupgradepanel.dll"
+        "lc2lightlingsystemupgradepanel.dll",
+        "LC2电花流派增强方案V2.7.2.dll",
+        "LC2雷击流派增强方案V2.7.2.dll",
+        "LC2LightlingSystemUpgradeV2.2.0.dll",
+        "LC2LightlingSystemUpgradePanel.dll",
+        "LC2LightningEnhancePlatev1.0.1.dll",
+        "LC2LightningEnhancePlatev1.1.0.dll",
+        "LC2LightningEnhancePlatePanel.dll",
+        "LC2LightlingSystemUpgradeV2.5.2.dll",
+        "LC2LightlingSystemUpgradeV2.6.1.dll"
       ]
     },
     {
       "id": "not-drug-god",
       "sort_priority": 175,
       "source": "药神测试版.zip",
-      "include": ["LC2NotDrugGod.dll"],
+      "include": [
+        "LC2NotDrugGod.dll"
+      ],
       "primary": "LC2NotDrugGod.dll",
       "name": "我不是药神（测试版）",
       "version": "1.0.0",
       "author": "木亦",
       "summary": "让宝箱按配置额外掉落原生或 DIY 药水，并提供多种可叠加药水效果",
       "usage_hint": "安装后重启游戏，按 F1 或在工具箱点击“打开 MOD 面板”；配置掉落概率、原生/DIY 药水池并保存。F1 与一键丢钱、区域类型重铸、海克斯强化药水冲突，建议不要同时启用。",
-      "hotkeys": ["F1"],
+      "hotkeys": [
+        "F1"
+      ],
       "panel_hotkey": "F1",
       "author_source": "DLL 未见作者署名；作者提供的 QQ 上传截图显示上传者木亦（2026-08-30）"
     },
@@ -257,7 +349,9 @@
       "author": "空容",
       "summary": "允许塑能法弹、法力护盾与以太飘浮同时激活",
       "usage_hint": "安装后启动游戏，按 F8 打开相关设置。",
-      "hotkeys": ["F8"],
+      "hotkeys": [
+        "F8"
+      ],
       "panel_hotkey": "F8",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
@@ -289,35 +383,65 @@
     {
       "id": "dynamic-hp",
       "sort_priority": 160,
-      "source": "倍血4.3.0正式版.7z",
-      "include": ["LC2DynamicHp.dll"],
+      "source": "倍血主体修复噩梦之源于进游戏自动弹出.7z",
+      "include": [
+        "LC2DynamicHp.dll"
+      ],
       "primary": "LC2DynamicHp.dll",
       "name": "关卡动态血量",
-      "version": "4.3.0",
+      "version": "4.4.0",
       "author": "刺心",
-      "summary": "按配置动态调整怪物与首领血量",
-      "usage_hint": "安装后重启游戏生效；按 F3 打开配置界面。",
-      "hotkeys": ["F3"],
+      "summary": "调整关卡血量倍率，并修正进入游戏自动弹出面板问题",
+      "usage_hint": "安装后重启游戏，按 F3 打开面板。房主规则与客机同步效果需同房成员确认，勿同时叠加多个血量插件。",
+      "hotkeys": [
+        "F3"
+      ],
       "panel_hotkey": "F3",
-      "author_source": "LC2DynamicHp.dll 内嵌 GUI 与版本日志署名；QQ 上传者墨河以轩"
+      "author_source": "LC2DynamicHp.dll 内嵌 GUI 与版本日志署名；QQ 上传者墨河以轩；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "superseded_files": [
+        {
+          "path": "LC2DynamicHp.dll",
+          "sha256": "58868BAB99DA35E1DAB19AED62731589D65F6276A59CC89CECAA7A54D315885E",
+          "size_bytes": 44032
+        }
+      ],
+      "provides": [
+        "LC2DynamicHp.dll"
+      ]
     },
     {
       "id": "demon-invasion",
-      "source": "倍血4.3.0正式版.7z",
-      "include": ["LC2DemonInvasion.dll"],
+      "source": "boss入侵修复boss刷新逻辑.7z",
+      "include": [
+        "LC2DemonInvasion.dll"
+      ],
       "primary": "LC2DemonInvasion.dll",
       "name": "魔神侵袭拓展",
-      "version": "4.3.0",
+      "version": "1.5.4",
       "author": "墨河以轩",
-      "summary": "扩展魔神侵袭刷怪与关卡处理逻辑",
-      "usage_hint": "安装后重启游戏自动生效。",
+      "summary": "更新入侵 Boss 的刷新逻辑",
+      "usage_hint": "安装后重启游戏；建议与其他改变 Boss 生成或血量的 MOD 分开试用。",
       "hotkeys": [],
-      "author_source": "QQ 上传者；同包组件未发现独立作者署名"
+      "author_source": "QQ 上传者；同包组件未发现独立作者署名；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "superseded_files": [
+        {
+          "path": "LC2DemonInvasion.dll",
+          "sha256": "5ADDBAFD53EDF1C6F47B131C77FC5611C8E8AD6860724BEF57107827ED9C8AA1",
+          "size_bytes": 25600
+        }
+      ],
+      "provides": [
+        "LC2DemonInvasion.dll"
+      ]
     },
     {
       "id": "brain-core-boost",
       "source": "倍血4.3.0正式版.7z",
-      "include": ["LC2BrainCoreMod.dll"],
+      "include": [
+        "LC2BrainCoreMod.dll"
+      ],
       "primary": "LC2BrainCoreMod.dll",
       "name": "噩梦之源法球强化",
       "version": "4.3.0",
@@ -329,16 +453,29 @@
     },
     {
       "id": "golem-shield-boost",
-      "source": "倍血4.3.0正式版.7z",
-      "include": ["LC2GolemShieldBoost.dll"],
+      "source": "尝试修复石头人无法破盾.7z",
+      "include": [
+        "LC2GolemShieldBoost.dll"
+      ],
       "primary": "LC2GolemShieldBoost.dll",
-      "name": "岩石巨兽护盾强化",
-      "version": "4.3.0",
+      "name": "岩石巨兽护盾修正",
+      "version": "1.0.3",
       "author": "墨河以轩",
-      "summary": "强化岩石巨兽的护盾数值",
-      "usage_hint": "安装后重启游戏自动生效。",
+      "summary": "更新岩石巨兽护盾拓展，尝试修复无法破盾的问题",
+      "usage_hint": "安装后重启游戏。需要配套动态血量时按来源说明使用；修复效果尚未在本工具箱实战核验。",
       "hotkeys": [],
-      "author_source": "QQ 上传者；同包组件未发现独立作者署名"
+      "author_source": "QQ 上传者；同包组件未发现独立作者署名；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "superseded_files": [
+        {
+          "path": "LC2GolemShieldBoost.dll",
+          "sha256": "D58F6FA58DB23F3DA9272E952F3350DAA183F832EFEE5F8E274DE337DDA46E56",
+          "size_bytes": 10752
+        }
+      ],
+      "provides": [
+        "LC2GolemShieldBoost.dll"
+      ]
     },
     {
       "id": "sword-break-block-buff",
@@ -355,7 +492,9 @@
     {
       "id": "ice-pillar-enhancement",
       "source": "纵冰之杖加强，大幅增加冰锥数量.zip",
-      "include": ["IcePillarCrash.dll"],
+      "include": [
+        "IcePillarCrash.dll"
+      ],
       "primary": "IcePillarCrash.dll",
       "name": "纵冰之杖加强",
       "version": "1.16.0",
@@ -401,7 +540,10 @@
       "sort_priority": 250,
       "source": "新增武器法杖“啵啵法杖”完整版.zip",
       "include": [
-        {"sha256": "ACC96A4EF24C6B8E4FB56F51163CC07FD8DB736C957EF2DE6ED3502C6DDE9C85", "target": "ComboContract.dll"}
+        {
+          "sha256": "ACC96A4EF24C6B8E4FB56F51163CC07FD8DB736C957EF2DE6ED3502C6DDE9C85",
+          "target": "ComboContract.dll"
+        }
       ],
       "primary": "ComboContract.dll",
       "name": "啵啵法杖",
@@ -427,7 +569,9 @@
     {
       "id": "evil-fire-crusher-summon",
       "source": "召唤大师珀亚V2.6 非整合包.rar",
-      "include": ["LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll"],
+      "include": [
+        "LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll"
+      ],
       "primary": "LC2.EvilFireCrusherSummon召唤邪火粉碎者.dll",
       "name": "召唤邪火粉碎者",
       "version": "2.0",
@@ -441,7 +585,9 @@
       "id": "nightmare-doll-skin",
       "sort_priority": 920,
       "source": "召唤大师珀亚V2.6 非整合包.rar",
-      "include": ["LC2.NightmareDollNeedle噩梦娃娃皮肤.dll"],
+      "include": [
+        "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll"
+      ],
       "primary": "LC2.NightmareDollNeedle噩梦娃娃皮肤.dll",
       "name": "噩梦娃娃皮肤",
       "version": "2.0",
@@ -508,7 +654,9 @@
     {
       "id": "reaper-summon",
       "source": "召唤大师珀亚V2.6 非整合包.rar",
-      "include": ["LC2.ReaperSummon召唤行刑者.dll"],
+      "include": [
+        "LC2.ReaperSummon召唤行刑者.dll"
+      ],
       "primary": "LC2.ReaperSummon召唤行刑者.dll",
       "name": "召唤行刑者",
       "version": "2.6",
@@ -521,7 +669,9 @@
     {
       "id": "reinforce-hideyoshi",
       "source": "召唤大师珀亚2.1 非整合包.rar",
-      "include": ["LC2.ReinforceHideyoshi真·雷神之锤.dll"],
+      "include": [
+        "LC2.ReinforceHideyoshi真·雷神之锤.dll"
+      ],
       "primary": "LC2.ReinforceHideyoshi真·雷神之锤.dll",
       "name": "增援发信仪召唤失落剑客幽影",
       "version": "1.0.0",
@@ -535,7 +685,9 @@
       "id": "coil-summon-bobo",
       "sort_priority": 245,
       "source": "召唤大师珀亚V2.6 非整合包.rar",
-      "include": ["LC2.CoilSummonBoBo磁暴线圈召唤啵啵.dll"],
+      "include": [
+        "LC2.CoilSummonBoBo磁暴线圈召唤啵啵.dll"
+      ],
       "primary": "LC2.CoilSummonBoBo磁暴线圈召唤啵啵.dll",
       "name": "磁暴线圈召唤啵啵",
       "version": "1.0.0",
@@ -549,7 +701,9 @@
       "id": "thunder-hammer-summon",
       "sort_priority": 240,
       "source": "召唤大师珀亚V2.6 非整合包.rar",
-      "include": ["LC2.ThunderHammer真·雷神之锤.dll"],
+      "include": [
+        "LC2.ThunderHammer真·雷神之锤.dll"
+      ],
       "primary": "LC2.ThunderHammer真·雷神之锤.dll",
       "provides": [
         "LC2.ThunderHammer真雷神之锤.dll",
@@ -561,13 +715,22 @@
       "summary": "雷神之锤技能召唤愤怒雷精灵，并提供伤害、行动与水晶清理设置",
       "usage_hint": "安装后重启游戏自动生效；2.6来源更新为1.5.1，继续维护雷精灵入场阶段的玩家输入与友方行动。仅主机/单机执行召唤，联机建议使用一致版本。",
       "hotkeys": [],
-      "author_source": "BepInPlugin 1.5.1 元数据；召唤大师珀亚 2.6 来源包与说明"
+      "author_source": "BepInPlugin 1.5.1 元数据；召唤大师珀亚 2.6 来源包与说明",
+      "superseded_files": [
+        {
+          "path": "LC2.ThunderHammer真雷神之锤.dll",
+          "sha256": "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
+          "size_bytes": 31744
+        }
+      ]
     },
     {
       "id": "summon-model-swap",
       "sort_priority": 940,
       "source": "召唤大师珀亚V2.6 非整合包.rar",
-      "include": ["LC2.SummonModelSwap召唤物模型替换.dll"],
+      "include": [
+        "LC2.SummonModelSwap召唤物模型替换.dll"
+      ],
       "primary": "LC2.SummonModelSwap召唤物模型替换.dll",
       "name": "召唤物模型替换",
       "version": "2.0",
@@ -588,7 +751,17 @@
       "summary": "在游戏内按玩家显示独立伤害统计，并逐房使用官方数据校准",
       "usage_hint": "安装后重启游戏生效；支持联机玩家分列，该 MOD 的游戏内界面与盒子战斗统计相互独立。",
       "hotkeys": [],
-      "author_source": "DLL 内嵌界面署名；QQ 上传者听（2026-08-29）"
+      "author_source": "DLL 内嵌界面署名；QQ 上传者听（2026-08-29）",
+      "superseded_files": [
+        {
+          "path": "失落城堡2伤害统计v1.5.1.dll",
+          "sha256": "64677F4DBEA9316911862D68A09B67615C1CA1B8BC7742A0108D0CC7D579A8D6",
+          "size_bytes": 59392
+        }
+      ],
+      "provides": [
+        "失落城堡2伤害统计v1.6.4-逐房强制官方校准修正版.dll"
+      ]
     },
     {
       "id": "chest-drop-enhancement",
@@ -600,7 +773,9 @@
       "author": "茶橘柚",
       "summary": "调整宝箱宝藏数量与相关掉落效果",
       "usage_hint": "安装后启动游戏，按 F10 打开设置面板。",
-      "hotkeys": ["F10"],
+      "hotkeys": [
+        "F10"
+      ],
       "panel_hotkey": "F10",
       "author_source": "程序内署名"
     },
@@ -652,7 +827,9 @@
       "author": "茶橘柚",
       "summary": "为联机房间提供可配置的欢迎语",
       "usage_hint": "安装后启动游戏，按 F11 打开相关设置。",
-      "hotkeys": ["F11"],
+      "hotkeys": [
+        "F11"
+      ],
       "panel_hotkey": "F11",
       "author_source": "DLL 内嵌作者字符串；QQ 上传者茶橘柚"
     },
@@ -717,7 +894,9 @@
       "author": "時間與你",
       "summary": "在战斗房胜利后提供随机海克斯药水强化",
       "usage_hint": "安装后启动游戏，按 F1 打开面板；联机时各玩家均需安装才能本地生效。F1 与一键丢钱、区域类型重铸、我不是药神（测试版）冲突，建议不要同时启用。",
-      "hotkeys": ["F1"],
+      "hotkeys": [
+        "F1"
+      ],
       "panel_hotkey": "F1",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
@@ -767,7 +946,9 @@
       "author": "Freenix",
       "summary": "禁用指定物品并为装备或藏品设置掉落概率",
       "usage_hint": "安装后启动游戏，可在工具箱点击“打开 MOD 面板”；键盘操作为 Insert（Ins）键，填写物品名称与概率并保存。",
-      "hotkeys": ["INS"],
+      "hotkeys": [
+        "INS"
+      ],
       "panel_hotkey": "INS",
       "author_source": "随包说明署名"
     },
@@ -780,28 +961,48 @@
       "author": "啊这",
       "summary": "调整爆裂弓效果与触发概率",
       "usage_hint": "安装后启动游戏，按 F11 打开控制面板。",
-      "hotkeys": ["F11"],
+      "hotkeys": [
+        "F11"
+      ],
       "panel_hotkey": "F11",
       "author_source": "作者提供的 QQ 上传列表截图（2026-08-28）"
     },
     {
       "id": "room-prefix",
       "sort_priority": 810,
-      "source": "自定义房间前缀（基于刺心 修改 保留违禁词系统）.zip",
+      "source": "自定义房间前缀mod.7z",
       "primary": "LC2RoomPrefix.dll",
       "name": "自定义房间前缀",
-      "version": "1.0",
+      "version": "1.3.0",
       "author": "社区修改（基于刺心版本）",
-      "summary": "自定义联机房间标题前缀并保留违禁词系统",
-      "usage_hint": "安装后启动游戏，按 Alt+1 打开面板；面板标题下方可控制开关。",
-      "hotkeys": ["Alt+1"],
+      "summary": "调整联机房间的名称前缀",
+      "usage_hint": "安装后重启游戏，按 Alt+1 打开房间前缀设置。",
+      "hotkeys": [
+        "Alt+1"
+      ],
       "panel_hotkey": "Alt+1",
-      "author_source": "来源文件名与随包说明"
+      "author_source": "来源文件名与随包说明；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
+      "include": [
+        "LC2RoomPrefix.dll"
+      ],
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "superseded_files": [
+        {
+          "path": "LC2RoomPrefix.dll",
+          "sha256": "D78C7182039A181423958F4D2220249852EED90D34E2CE3508B3CABC7E573784",
+          "size_bytes": 32768
+        }
+      ],
+      "provides": [
+        "LC2RoomPrefix.dll"
+      ]
     },
     {
       "id": "curse-coin",
       "source": "最后的光辉 (2).zip",
-      "include": ["LC2CurseCoin.dll"],
+      "include": [
+        "LC2CurseCoin.dll"
+      ],
       "primary": "LC2CurseCoin.dll",
       "name": "诅咒硬币保底",
       "version": "1.5.0",
@@ -814,7 +1015,9 @@
     {
       "id": "build-master",
       "source": "最后的光辉 (2).zip",
-      "include": ["LC2构筑大师.dll"],
+      "include": [
+        "LC2构筑大师.dll"
+      ],
       "primary": "LC2构筑大师.dll",
       "name": "LC2 构筑大师",
       "version": "1.0.0",
@@ -827,7 +1030,9 @@
     {
       "id": "redstone-carver",
       "source": "最后的光辉 (2).zip",
-      "include": ["LC2RedstoneCarver.dll"],
+      "include": [
+        "LC2RedstoneCarver.dll"
+      ],
       "primary": "LC2RedstoneCarver.dll",
       "name": "增强斩击",
       "version": "4.0.0",
@@ -858,7 +1063,9 @@
       "author": "不易",
       "summary": "强化毒雾相关效果与上限",
       "usage_hint": "安装后启动游戏，按 F12 打开相关设置。",
-      "hotkeys": ["F12"],
+      "hotkeys": [
+        "F12"
+      ],
       "panel_hotkey": "F12",
       "author_source": "随包说明署名"
     },
@@ -878,16 +1085,30 @@
       "id": "player-live-stats",
       "sort_priority": 100,
       "source": "显示实时数值及查看其他玩家数值2.0.rar",
-      "include": ["实时数值v2.0.dll"],
+      "include": [
+        "实时数值v2.0.dll"
+      ],
       "primary": "实时数值v2.0.dll",
       "name": "玩家实时属性与队友面板",
       "version": "2.0",
       "author": "懒虫桑",
       "summary": "实时显示本地与其他玩家属性、效果，修复房主数据偶尔缺失",
       "usage_hint": "安装后启动游戏，按 F6 或在工具箱点击“打开 MOD 面板”；勾选要显示的数值，直接点击玩家名字查看对应数据。",
-      "hotkeys": ["F6"],
+      "hotkeys": [
+        "F6"
+      ],
       "panel_hotkey": "F6",
-      "author_source": "2.0 DLL 内嵌界面署名“作者：懒虫桑”；随包更新说明"
+      "author_source": "2.0 DLL 内嵌界面署名“作者：懒虫桑”；随包更新说明",
+      "superseded_files": [
+        {
+          "path": "实时数据1.3.dll",
+          "sha256": "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
+          "size_bytes": 27136
+        }
+      ],
+      "provides": [
+        "实时数值v2.0.dll"
+      ]
     },
     {
       "id": "inventory-source-panel",
@@ -938,23 +1159,40 @@
     {
       "id": "fire-dragon-enhancement",
       "sort_priority": 180,
-      "source": "LC2火龙流派增强方案V1.0.0.zip",
-      "primary": "LC2FIreDragonSetEnhancementV1.0.0.dll",
+      "source": "LC2火龙流派增强方案V2.1.0[兼容新版本].zip",
+      "primary": "LC2FIreDragonSetEnhancement.dll",
       "include": [
-        "LC2FIreDragonSetEnhancementV1.0.0.dll",
+        "LC2FIreDragonSetEnhancement.dll",
         "LC2FIreDragonSetEnhancementPanel.dll"
       ],
-      "name": "火龙流派增强方案",
-      "version": "1.0.0",
-      "author": "脆毛肚（上传）",
-      "summary": "调整火龙系列宝藏与技能效果，并提供配置面板",
-      "usage_hint": "安装后重启游戏，按 F10 打开面板；主程序和面板一起安装。与合成火龙测试版分别使用；联机组合尚未实战验证。",
+      "name": "火龙流派增强",
+      "version": "2.1.0",
+      "author": "脆毛肚",
+      "summary": "更新火龙之心与焰首效果，适配新游戏版本并精简旧套装合成逻辑",
+      "usage_hint": "安装后重启游戏，按 F10 打开面板。主插件与面板成对安装；2.1.0移除了问题较多的七合一合成效果。",
       "hotkeys": [
         "F10"
       ],
-      "author_source": "2026-09-10截图上传者脆毛肚；原包更新日志、双插件1.0.0元数据及面板F10字符串。上传者不独立证明原作者。",
-      "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13",
-      "panel_hotkey": "F10"
+      "author_source": "2026-09-10截图上传者脆毛肚；原包更新日志、双插件1.0.0元数据及面板F10字符串。上传者不独立证明原作者。；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "panel_hotkey": "F10",
+      "superseded_files": [
+        {
+          "path": "LC2FIreDragonSetEnhancementPanel.dll",
+          "sha256": "C429DBF7D04322B49C24292A92CDDFF5DCF043C54C1E1123AB026C4AAEDEC510",
+          "size_bytes": 27136
+        },
+        {
+          "path": "LC2FIreDragonSetEnhancementV1.0.0.dll",
+          "sha256": "2FFD4F9F11CEEA67F48427FA89968FCDADD7FC8F30DEC85C1DFA6D72A73E6ACA",
+          "size_bytes": 65536
+        }
+      ],
+      "provides": [
+        "LC2FIreDragonSetEnhancement.dll",
+        "LC2FIreDragonSetEnhancementPanel.dll",
+        "LC2FIreDragonSetEnhancementV1.0.0.dll"
+      ]
     },
     {
       "id": "tornado-greatsword",
@@ -995,23 +1233,40 @@
     {
       "id": "dual-blades-overhaul",
       "sort_priority": 182,
-      "source": "LC2双刀职业增强方案V1.0.0.zip",
-      "primary": "LC2DualBladesOverhaulV1.0.0.dll",
+      "source": "LC2双刀职业增强方案V1.1.0[客机正常生效].zip",
+      "primary": "LC2DualBladesOverhaulV1.1.0.dll",
       "include": [
-        "LC2DualBladesOverhaulV1.0.0.dll",
-        "LC2DualBladesOverhaulPanle.dll"
+        "LC2DualBladesOverhaulPanle.dll",
+        "LC2DualBladesOverhaulV1.1.0.dll"
       ],
-      "name": "双刀职业增强方案",
-      "version": "1.0.0",
-      "author": "脆毛肚（上传）",
-      "summary": "调整双刀刻印连击上限、终结攻击与终始双刃技能",
-      "usage_hint": "安装后重启游戏，按 F8 打开面板；主程序和面板一起安装。F8与多共鸣面板重叠，建议分别使用；联机效果尚未实战验证。",
+      "name": "双刀流派增强",
+      "version": "1.1.0",
+      "author": "脆毛肚",
+      "summary": "调整双刀连击与刻印效果，更新客机生效方案",
+      "usage_hint": "安装后重启游戏，按 F8 打开配置面板。主插件与面板成对安装；客机效果按原说明，工具箱未逐项实战验证。",
       "hotkeys": [
         "F8"
       ],
-      "author_source": "2026-09-12截图上传者脆毛肚；两个BepInPlugin均1.0.0，面板程序集引用主插件，内嵌F8与功能配置说明。",
-      "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13",
-      "panel_hotkey": "F8"
+      "author_source": "2026-09-12截图上传者脆毛肚；两个BepInPlugin均1.0.0，面板程序集引用主插件，内嵌F8与功能配置说明。；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "panel_hotkey": "F8",
+      "superseded_files": [
+        {
+          "path": "LC2DualBladesOverhaulPanle.dll",
+          "sha256": "D7C588D59DFDE210A24FEAABFA7713E543040596B5734C68CC5DD7E7B81FD80B",
+          "size_bytes": 19456
+        },
+        {
+          "path": "LC2DualBladesOverhaulV1.0.0.dll",
+          "sha256": "04E32BF33DFD632EFEF6F3C55804C6AFA52DBFDD07A23C415769AFB76E432D23",
+          "size_bytes": 28160
+        }
+      ],
+      "provides": [
+        "LC2DualBladesOverhaulPanle.dll",
+        "LC2DualBladesOverhaulV1.1.0.dll",
+        "LC2DualBladesOverhaulV1.0.0.dll"
+      ]
     },
     {
       "id": "icebound-wand-tuner",
@@ -1028,26 +1283,30 @@
       "usage_hint": "安装后重启游戏，持有冰封魔杖时生效；原配置默认冰附魔3点，可在生成的cfg中调整。与纵冰之杖加强是不同条目；实际效果尚未实战验证。",
       "hotkeys": [],
       "author_source": "2026-09-12截图上传者兔子王お；BepInPlugin 0.4.3，内嵌N5-009/IntervalSeconds/IceEnchantValue及默认3点说明。",
-      "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13"
+      "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13",
+      "provides": [
+        "LC2.IceboundWandTuner冰杖获得3点冰附魔.dll",
+        "effect:icebound-wand-enchantment"
+      ]
     },
     {
       "id": "unified-tools",
       "sort_priority": 145,
-      "source": "懒虫整合包（包含背包检测 宝藏播报 怪物宝藏 数值查看四合一）.rar",
+      "source": "v1.2懒虫整合包有bug找作者反馈（包含背包检测 宝藏播报 怪物宝藏 数值查看四合一）.rar",
       "primary": "LostCastle2.UnifiedTools.dll",
       "include": [
         "LostCastle2.UnifiedTools.dll"
       ],
       "name": "懒虫整合工具",
-      "version": "1.0.0",
+      "version": "1.2（包版本）",
       "author": "懒虫桑",
-      "summary": "整合背包检测、宝藏播报、怪物宝藏和数值查看",
-      "usage_hint": "安装后重启游戏，按 F6 打开统一面板；先卸载独立版怪物宝藏、多人背包与装备、玩家实时属性模块。F6也与刻印灵魂石管理器重叠；联机效果尚未实战验证。",
+      "summary": "整合背包检测、宝藏播报、怪物宝藏与实时数值四类功能",
+      "usage_hint": "安装后重启游戏，按 F6 打开面板。与独立怪物宝藏、背包、数值插件互斥；该包未逐项实战验证，玩法逻辑按原说明由房主启用。",
       "hotkeys": [
         "F6"
       ],
-      "author_source": "2026-09-13原包功能介绍及DLL内嵌“作者：懒虫桑”；BepInPlugin local.lc2.unified-tools 1.0.0。",
-      "redistribution_status": "maintainer_selected_for_1.7.9_group_2026-09-13",
+      "author_source": "2026-09-13原包功能介绍及DLL内嵌“作者：懒虫桑”；BepInPlugin local.lc2.unified-tools 1.0.0。；2026-10-11原包说明、DLL元数据和作者提供截图核对。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
       "panel_hotkey": "F6",
       "provides": [
         "lostcastle2.unifiedtools.dll",
@@ -1058,7 +1317,15 @@
         "怪物宝藏v10.5.dll",
         "LostCastle2.MonsterPlusMod.dll",
         "lostcastle2.inventorysourcepanel.dll",
-        "实时数值v2.0.dll"
+        "实时数值v2.0.dll",
+        "LostCastle2.UnifiedTools.dll"
+      ],
+      "superseded_files": [
+        {
+          "path": "LostCastle2.UnifiedTools.dll",
+          "sha256": "9DB7675D86935E3033FBF014FC260D21DDC78D837C493F4F0DD256C9A869DA4C",
+          "size_bytes": 258048
+        }
       ]
     },
     {
@@ -1135,6 +1402,219 @@
       "hotkeys": [],
       "author_source": "2026-09-13 205844截图发送者兔子王お；BepInPlugin local.lc2.gun2darkmatter 1.0.0，元数据注明Gun_023到Gun_034技能替换。",
       "redistribution_status": "maintainer_selected_for_1.8.0_group_2026-09-15"
+    },
+    {
+      "id": "ice-system-enhancement",
+      "source": "LC2冰系流派增强方案V1.0.4[修BUG].zip",
+      "include": [
+        "LC2冰系流派增强方案V1.0.4.dll"
+      ],
+      "primary": "LC2冰系流派增强方案V1.0.4.dll",
+      "sort_priority": 310,
+      "version": "1.0.4",
+      "name": "冰系流派增强",
+      "author": "脆毛肚",
+      "summary": "调整冰系宝藏、冰附魔与护盾联动，包含叠层和木桩异常修复",
+      "usage_hint": "安装后重启游戏，在 config 中调整参数；与旧冰封魔杖附魔插件二选一。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "provides": [
+        "LC2冰系流派增强方案V1.0.4.dll",
+        "effect:icebound-wand-enchantment"
+      ]
+    },
+    {
+      "id": "armor-enhancement",
+      "source": "LC2护甲增强方案V1.1.0[兼容新版本].zip",
+      "include": [
+        "LC2护甲增强方案V1.1.0.dll"
+      ],
+      "primary": "LC2护甲增强方案V1.1.0.dll",
+      "sort_priority": 320,
+      "version": "1.1.0",
+      "name": "护甲流派增强",
+      "author": "脆毛肚、兔子王お",
+      "summary": "调整恶魔君王甲壳、兽面吞头连环铠与不祥女仆装效果",
+      "usage_hint": "安装后重启游戏。可能与其他护甲/符文叠层修改重叠，建议按需选择。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "curse-treasure-enhancement",
+      "source": "LC2诅咒宝藏增强方案V2.0.0.zip",
+      "include": [
+        "LC2诅咒宝藏增强方案V2.0.0.dll"
+      ],
+      "primary": "LC2诅咒宝藏增强方案V2.0.0.dll",
+      "sort_priority": 330,
+      "version": "2.0.0",
+      "name": "诅咒宝藏增强",
+      "author": "脆毛肚",
+      "summary": "调整贪欲之壶、寒冰邪刃、符文盾等诅咒宝藏效果",
+      "usage_hint": "安装后重启游戏。与其他调整同类宝藏的插件组合效果尚未实战核验。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "desert-marauder-combo",
+      "source": "LC2荒漠暴徒手炮宏枪.zip",
+      "include": [
+        "LC2DesertMarauderComboWindow.dll"
+      ],
+      "primary": "LC2DesertMarauderComboWindow.dll",
+      "sort_priority": 340,
+      "version": "1.0.0",
+      "name": "荒漠暴徒手炮连招",
+      "author": "脆毛肚",
+      "summary": "调整荒漠暴徒手炮的连招窗口",
+      "usage_hint": "安装后重启游戏，长按普攻并点按武器技能；只影响装载插件的本机玩家。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "evil-spirit-stack",
+      "source": "显示孽者之石叠层v1.1.zip",
+      "include": [
+        "LC2EvilSpiritStack.dll"
+      ],
+      "primary": "LC2EvilSpiritStack.dll",
+      "sort_priority": 155,
+      "version": "1.1（说明版本）",
+      "name": "孽者之石叠层显示",
+      "author": "茶橘柚",
+      "summary": "显示本地孽者之石层数和剩余时间，可拖动位置",
+      "usage_hint": "安装后重启游戏，携带孽者之石并触发效果；界面显示叠层/倒计时，无层数时为0。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "inspire-duration",
+      "source": "LC2激励时长v1.1.zip",
+      "include": [
+        "LC2InspireDuration.dll"
+      ],
+      "primary": "LC2InspireDuration.dll",
+      "sort_priority": 350,
+      "version": "1.1.0",
+      "name": "激励时长设置",
+      "author": "茶橘柚",
+      "summary": "自定义激励效果的持续时间",
+      "usage_hint": "安装后重启游戏，按 ~ 打开设置；范围1–600秒，联机需要成员自行安装并确认相同设置。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "boss-hpbar-steady",
+      "source": "修复BOSS血条蹦迪V2.1.1[修BUG].zip",
+      "include": [
+        "LC2血量钳制与延迟撤销V2.1.1.dll"
+      ],
+      "primary": "LC2血量钳制与延迟撤销V2.1.1.dll",
+      "sort_priority": 360,
+      "version": "2.1.1",
+      "name": "Boss 血条回弹修正",
+      "author": "脆毛肚",
+      "summary": "调整怪物血量快照与护盾显示，减少旧同步导致的血条回弹",
+      "usage_hint": "安装后重启游戏。这会改变伤害与血量同步处理；先单独试用，与其他网络伤害/血量修改的组合未实战核验。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "chaos-charge-fix",
+      "source": "修复诡谲大剑技能不触发领主甲蓄能1.02.dll",
+      "include": [
+        "修复诡谲大剑技能不触发领主甲蓄能1.02.dll"
+      ],
+      "primary": "修复诡谲大剑技能不触发领主甲蓄能1.02.dll",
+      "sort_priority": 370,
+      "version": "1.0.2",
+      "name": "诡谲大剑领主甲蓄能修正",
+      "author": "第一剑修",
+      "summary": "修正诡谲大剑技能未触发领主甲蓄能的情况",
+      "usage_hint": "安装后重启游戏，配合对应武器与护甲使用。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "golden-rescue",
+      "source": "【医龙养猪流】救人地面掉落10魂晶，被救-5魂晶1.16.dll",
+      "include": [
+        "【医龙养猪流】救人地面掉落10魂晶，被救-5魂晶1.16.dll"
+      ],
+      "primary": "【医龙养猪流】救人地面掉落10魂晶，被救-5魂晶1.16.dll",
+      "sort_priority": 380,
+      "version": "1.0.16",
+      "name": "绿光医龙救援增益",
+      "author": "第一剑修",
+      "summary": "调整救援绿光效果；救援成功额外掉落10魂晶，被救者扣5魂晶",
+      "usage_hint": "安装后重启游戏，按角色救援流程触发。会改变魂晶获取，请先与队伍约定；1.14及同名1.16副本不混装。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11",
+      "provides": [
+        "【医龙养猪流】救人地面掉落10魂晶，被救-5魂晶1.16.dll",
+        "绿光医龙养猪流1.16.dll",
+        "LC2_绿光医龙_1.14.dll"
+      ]
+    },
+    {
+      "id": "stage-countdown",
+      "source": "新关卡倒计时修正为30S[房主权威].zip",
+      "include": [
+        "LC2OnePlayerCountdown.dll"
+      ],
+      "primary": "LC2OnePlayerCountdown.dll",
+      "sort_priority": 220,
+      "version": "1.0.0",
+      "name": "关卡准备倒计时 30 秒",
+      "author": "脆毛肚",
+      "summary": "将新关卡准备倒计时修正为30秒",
+      "usage_hint": "由房主安装后重启游戏，按房主规则执行。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "unique-weapon-perks",
+      "source": "武器独有词条开源（有文本介绍）.rar",
+      "include": [
+        "独有词条开源.dll"
+      ],
+      "primary": "独有词条开源.dll",
+      "sort_priority": 180,
+      "version": "0.6.0",
+      "name": "武器独有词条扩展",
+      "author": "白夜（上传）",
+      "summary": "让部分武器独占词条进入同类或全武器词条池",
+      "usage_hint": "安装后重启游戏，通过正常获取或刷新武器触发；会调整词条池，与其他同类修改按需取舍。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
+    },
+    {
+      "id": "boss-cinematic-free",
+      "source": "LC2BossCinematicFree_v1.4.1源码.zip",
+      "include": [
+        "LC2BossCinematicFree.dll"
+      ],
+      "primary": "LC2BossCinematicFree.dll",
+      "sort_priority": 230,
+      "version": "1.4.1",
+      "name": "Boss 演出自由",
+      "author": "社区未署名",
+      "summary": "保留 Boss 演出，尝试解除演出期间的强制镜头与输入限制",
+      "usage_hint": "安装后重启游戏。与跳过演出类功能二选一；本版未在全部Boss转阶段场景实战核验。",
+      "hotkeys": [],
+      "author_source": "作者提供2026-10-11截图与原包说明；上传者只作为来源线索，明确未知作者不补造署名。",
+      "redistribution_status": "maintainer_selected_for_1.9.0_group_2026-10-11"
     }
   ]
 }

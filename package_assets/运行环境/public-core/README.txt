@@ -1,6 +1,6 @@
 失落城堡2工具箱 public-core · 官方运行环境来源与许可
 
-public-core 不携带旧版从真实游戏目录准备的 307 文件 runtime 快照，也不携带其中的 Unity base libraries。它只携带 BepInEx 官方 build #785 的原始 Windows x64 IL2CPP ZIP（字节不重打包）以及本项目 MIT 许可的 LC2 Combat Bridge。
+public-core 不携带旧版从真实游戏目录准备的307文件runtime快照，也不携带其中的Unity base libraries。它只携带BepInEx官方build #785原始Windows x64 IL2CPP ZIP（字节不重打包），以及本项目MIT许可的LC2 Combat Bridge和LC2ToolboxFeatures。
 
 固定官方输入：
 
@@ -23,4 +23,4 @@ public-core 不携带旧版从真实游戏目录准备的 307 文件 runtime 快
 
 首次运行游戏时，官方 BepInEx 会在用户自己的游戏目录中下载/生成与当前 Unity 版本对应的 base libraries 和 interop。public-core 不把这些本机生成文件打进发行包，也不会上传它们。
 
-工具箱只在用户明确确认、游戏完全关闭时初始化运行环境；不同身份的现有 BepInEx 核心会写前阻断。LC2 Combat Bridge 单独按版本和 SHA-256 安装到其独占插件目录。
+工具箱只在用户明确确认、游戏完全关闭时初始化或更新运行环境；不同身份的现有核心先保存可恢复副本，保留插件与配置，写入失败则恢复。Bridge与自有功能组件分别按版本和SHA-256安装到独占目录；配装查看默认开启，实际修改由用户在营地手动确认。

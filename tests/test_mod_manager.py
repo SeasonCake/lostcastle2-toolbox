@@ -21,6 +21,7 @@ from toolbox.mod_inspector import _bepin_plugin_metadata
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOCAL_COMMUNITY_PAYLOAD_ROOT = PROJECT_ROOT / "third_party" / "community_mods"
+V190_FROZEN = json.loads((PROJECT_ROOT / "tests/fixtures/community_mod_1.9.0.json").read_text(encoding="utf-8"))
 
 
 def catalog_payload(content: bytes) -> dict[str, object]:
@@ -500,10 +501,10 @@ class ModManagerTests(unittest.TestCase):
         catalog = ModCatalog.from_file(
             PROJECT_ROOT / "assets" / "community_mod_catalog.json"
         )
-        self.assertEqual(len(catalog.entries), 72)
+        self.assertEqual(len(catalog.entries), 84)
         self.assertEqual(
             sum(len(descriptor.operation.files) for descriptor in catalog.entries),
-            78,
+            90,
         )
         self.assertEqual(
             sum(
@@ -511,13 +512,15 @@ class ModManagerTests(unittest.TestCase):
                 for descriptor in catalog.entries
                 for spec in descriptor.operation.files
             ),
-            4_585_933,
+            5_162_445,
         )
         self.assertTrue(
             all(
                 descriptor.integrity_policy.redistribution_status
                 == (
-                    "maintainer_selected_for_1.8.0_group_2026-09-15"
+                    "maintainer_selected_for_1.9.0_group_2026-10-11"
+                    if descriptor.mod_id in set(V190_FROZEN["updated_ids"] + V190_FROZEN["new_ids"])
+                    else "maintainer_selected_for_1.8.0_group_2026-09-15"
                     if descriptor.mod_id in {"dark-matter-black-hole", "goblin-cannon-dark-matter", "loot-combat-enhancement"}
                     else "maintainer_selected_for_1.7.9_group_2026-09-13"
                     if descriptor.mod_id in {
@@ -533,7 +536,7 @@ class ModManagerTests(unittest.TestCase):
             )
         )
         self.assertIn(
-            "Count -ne 78",
+            "Count -ne 90",
             (PROJECT_ROOT / "build.ps1").read_text(encoding="utf-8"),
         )
         superseded = {
@@ -544,61 +547,11 @@ class ModManagerTests(unittest.TestCase):
             for descriptor in catalog.entries
             if descriptor.operation.superseded_files
         }
-        self.assertEqual(
-            superseded,
-            {
-                "loot-combat-enhancement": (
-                    ("LC2LootWeightPatch.dll", 95_232, "524342AC2C0A49AAC13C582AC79DBC11B1BCAA293A25CB345C896EC88CCB563C"),
-                ),
-                "lightning-enhance-plate": (
-                    ("LC2LightningEnhancePlatev1.0.1.dll", 35_328, "79E6DD31DE864036893A36E3AA13D7AD606DED6683A4E7A81470D8D048DA35D3"),
-                    ("LC2LightningEnhancePlatev1.1.0.dll", 39_936, "377660D5AA0B3A03152E44BFABCBBCF82B77790A953EEA7150F0AAB63C793BC0"),
-                    ("LC2LightningEnhancePlatePanel.dll", 23_040, "CD23E449E51DDE6A4C0A94CCDE4502BE2892109776BA5C053A2DDAED8324A924"),
-                ),
-                "hideyoshi-summon": (("LC2.HideyoshiSummon召唤狐狸剑姬.dll", 21_504, "2280AB8A4B2032F9255FE354D060488C620483287FCD6A6C3425BA87B2E41F3C"),),
-                "hand-color-white": (("LC2.HandColorWhite手掌变白.dll", 10_752, "5E106C35664073893B84941C1561E24B3A9B0AF04572C65854A71AC83356A623"),),
-                "damage-meter": (
-                    (
-                        "失落城堡2伤害统计v1.5.1.dll",
-                        59_392,
-                        "64677F4DBEA9316911862D68A09B67615C1CA1B8BC7742A0108D0CC7D579A8D6",
-                    ),
-                ),
-                "enhancement-plan": (
-                    (
-                        "LC2EnhancementPlan_v4.8.dll",
-                        328_192,
-                        "C066736FEC2074527925F8A4B587B82621F7C0179B5735D032CBC69B3A7760E7",
-                    ),
-                ),
-                "monster-treasure": (
-                    (
-                        "怪物宝藏v11.dll",
-                        86_016,
-                        "084D7F96F433C22667836793FDE780913B579C5739608E341CB726C8C25116E6",
-                    ),
-                    (
-                        "怪物宝藏v11.6.dll",
-                        107_008,
-                        "038A921150C190EB1F5682C9386147CF110D65FD735E790FDD2ED2EC59EC549A",
-                    ),
-                ),
-                "player-live-stats": (
-                    (
-                        "实时数据1.3.dll",
-                        27_136,
-                        "ADF5C15460741FABA356B9B7ADFEF3FC2762A5B236949F302EBD5E84E3553B17",
-                    ),
-                ),
-                "thunder-hammer-summon": (
-                    (
-                        "LC2.ThunderHammer真雷神之锤.dll",
-                        31_744,
-                        "AD2EE74103BCD857E2B0A67E5BB50FF95D99BB95309B28A16F620C89118B405F",
-                    ),
-                ),
-            },
-        )
+        expected_history = {
+            mod_id: tuple((spec["path"], spec["size_bytes"], spec["sha256"]) for spec in specs)
+            for mod_id, specs in V190_FROZEN["historical_identities"].items()
+        }
+        self.assertEqual(superseded, expected_history)
         self.require_local_community_payloads()
         bundled_root = PROJECT_ROOT / "third_party"
         for descriptor in catalog.entries:
@@ -652,6 +605,7 @@ class ModManagerTests(unittest.TestCase):
             "dark-matter-black-hole",
             "goblin-cannon-dark-matter",
             "loot-combat-enhancement",
+            *V190_FROZEN["new_ids"],
         ):
             with self.subTest(mod_id=mod_id), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
@@ -707,7 +661,7 @@ class ModManagerTests(unittest.TestCase):
             metadata_by_id[descriptor.mod_id] = metadata
             ids_by_guid.setdefault(metadata[0].casefold(), []).append(descriptor.mod_id)
 
-        self.assertEqual(len(metadata_by_id), 72)
+        self.assertEqual(len(metadata_by_id), 84)
         self.assertEqual(
             {guid: ids for guid, ids in ids_by_guid.items() if len(ids) > 1},
             {},
@@ -719,9 +673,9 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(
             metadata_by_id["lightning-enhance-plate"],
             (
-                "local.lc2.lightlingsystemupgradev2.2.0",
-                "LC2LightlingSystemUpgradeV2.2.0",
-                "2.2.0",
+                "local.lc2.flowersystemupgradev2.7.2",
+                "LC2FlowerSystemUpgradeV2.7.2",
+                "2.7.2",
             ),
         )
         self.assertEqual(
@@ -992,22 +946,22 @@ class ModManagerTests(unittest.TestCase):
         self.assertEqual(bobo_staff.integrity_policy.size_bytes, 31_744)
 
         lightning = catalog.get("lightning-enhance-plate")
-        self.assertEqual(lightning.display.name, "雷系流派增强方案")
-        self.assertEqual(lightning.display.version, "2.2.0")
+        self.assertEqual(lightning.display.name, "雷击与电花流派增强")
+        self.assertEqual(lightning.display.version, "2.7.2")
         self.assertEqual(lightning.display.author, "脆毛肚")
         self.assertEqual(
             lightning.operation.expected_filename,
-            "LC2LightlingSystemUpgradeV2.2.0.dll",
+            "LC2电花流派增强方案V2.7.2.dll",
         )
-        self.assertEqual(lightning.operation.hotkeys, ("F9",))
-        self.assertEqual(lightning.operation.panel_hotkey, "F9")
-        self.assertIn("客机效果未验证", lightning.display.usage_hint)
+        self.assertEqual(lightning.operation.hotkeys, ())
+        self.assertIsNone(lightning.operation.panel_hotkey)
+        self.assertIn("实际联机组合尚未逐项核验", lightning.display.usage_hint)
         self.assertEqual(len(lightning.operation.files), 2)
         self.assertEqual(
             lightning.integrity_policy.sha256,
-            "37769266F5F1D6BA1544EB41358B7583CF82537BA33DF0229C3E1383D232EFE0",
+            "5EBBE8F407D5EF1C298F79F46B02FC7CE6C872B5F631535F97A826DA9A54C993",
         )
-        self.assertEqual(lightning.integrity_policy.size_bytes, 56_320)
+        self.assertEqual(lightning.integrity_policy.size_bytes, 44_032)
 
         unchanged_summon_payloads = {
             "evil-fire-crusher-summon": (

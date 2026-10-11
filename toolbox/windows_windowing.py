@@ -43,6 +43,52 @@ _user32.SetTimer.argtypes = (wintypes.HWND, ctypes.c_size_t, wintypes.UINT, ctyp
 _user32.SetTimer.restype = ctypes.c_size_t
 _user32.KillTimer.argtypes = (wintypes.HWND, ctypes.c_size_t)
 _user32.KillTimer.restype = wintypes.BOOL
+_user32.GetWindowLongW.argtypes = (wintypes.HWND, ctypes.c_int)
+_user32.GetWindowLongW.restype = wintypes.LONG
+_user32.SetWindowLongW.argtypes = (wintypes.HWND, ctypes.c_int, wintypes.LONG)
+_user32.SetWindowLongW.restype = wintypes.LONG
+_user32.ShowWindow.argtypes = (wintypes.HWND, ctypes.c_int)
+_user32.ShowWindow.restype = wintypes.BOOL
+_user32.IsWindowVisible.argtypes = (wintypes.HWND,)
+_user32.IsWindowVisible.restype = wintypes.BOOL
+_user32.IsIconic.argtypes = (wintypes.HWND,)
+_user32.IsIconic.restype = wintypes.BOOL
+
+
+def _tk_shell(window: Any, *, flush: bool = True) -> int:
+    if flush:
+        window.update_idletasks()
+    client = int(window.winfo_toplevel().winfo_id())
+    return int(_user32.GetAncestor(client, 2) or client)
+
+
+def prepare_tk_overlay(window: Any, *, click_through: bool = False) -> None:
+    """Keep this app's floating view from activating or raising its main owner."""
+    hwnd = _tk_shell(window)
+    style = int(_user32.GetWindowLongW(hwnd, -20)) | 0x08000080
+    style &= ~0x00040000
+    style = style | 0x20 if click_through else style & ~0x20
+    _user32.SetWindowLongW(hwnd, -20, style)
+    owner_setter = _user32.SetWindowLongPtrW
+    owner_setter.argtypes = (wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t)
+    owner_setter.restype = ctypes.c_ssize_t
+    owner_setter(hwnd, -8, 0)
+    _user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | 0x20)
+
+
+def tk_window_is_visible(window: Any) -> bool:
+    try:
+        hwnd = _tk_shell(window)
+        return bool(_user32.IsWindowVisible(hwnd) and not _user32.IsIconic(hwnd))
+    except (AttributeError, OSError, ValueError):
+        return False
+
+
+def show_tk_window_no_activate(window: Any) -> bool:
+    hwnd = _tk_shell(window)
+    _user32.ShowWindow(hwnd, 4)
+    _user32.SetWindowPos(hwnd, wintypes.HWND(-1), 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | 0x40)
+    return tk_window_is_visible(window)
 
 
 def start_ui_message_timer() -> int:
@@ -57,6 +103,25 @@ def start_ui_message_timer() -> int:
 def stop_ui_message_timer(timer_id: int) -> bool:
     """Release a timer on the same UI thread that created it."""
     return bool(_user32.KillTimer(None, timer_id)) if timer_id else True
+
+
+def window_dpi(window: Any) -> int:
+    """Read the effective DPI of this application's own top-level window."""
+    try:
+        client = int(window.winfo_toplevel().winfo_id())
+        hwnd = int(_user32.GetAncestor(client, 2) or client)
+        query = _user32.GetDpiForWindow
+        query.argtypes = (wintypes.HWND,)
+        query.restype = wintypes.UINT
+        dpi = int(query(hwnd))
+        if 72 <= dpi <= 384:
+            return dpi
+    except (AttributeError, OSError, ValueError):
+        pass
+    try:
+        return max(72, min(384, round(float(window.tk.call("tk", "scaling")) * 72)))
+    except (AttributeError, ValueError):
+        return 96
 
 
 def clamp_window_position(

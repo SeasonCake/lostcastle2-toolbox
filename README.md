@@ -12,6 +12,7 @@ The repository currently contains:
 - versioned contracts and a replayable aggregator for damage, healing, mana, effects, and shields;
 - separate maintenance and distribution profiles: the diagnostic candidate can pause/export anonymous per-event evidence, while the distribution build keeps only in-memory current-match state and resets it at explicit session boundaries;
 - a managed entry point for attributed third-party tools.
+- dedicated team status, loadout, and LC Enhancement Plan pages; loadout changes require manual confirmation in camp.
 
 The application now starts in a calculator-style main toolbox window. It manages the keyboard overlay, macros, and a compact combat HUD; full combat details live in the main window. The v2 event contract keeps game observation, aggregation, and presentation separate so new items normally require a source-registry entry instead of new UI logic.
 
@@ -20,6 +21,8 @@ On a clean game installation, the first toolbox game launch offers an explicit o
 ## Download
 
 Current stable release: [v1.8.0](https://github.com/SeasonCake/lostcastle2-toolbox/releases/tag/v1.8.0). See the [v1.8.0 release notes](docs/LC2_1.8.0_RELEASE_NOTES.zh-CN.md) for changes, verification, and known limits.
+
+Source preparation for 1.9.0 adds an 84-entry community catalog, three primary pages, larger typography and a warm light theme, plus backed-up updates for an existing BepInEx installation. The [1.9.0 notes](docs/LC2_1.9.0_RELEASE_NOTES.zh-CN.md) distinguish verification from release status.
 
 Version 1.8.0 recognizes 72 community MODs, including two new black-hole weapon entries and Loot Weight Patch 2.8.0. It adds a lighter teal interface, refined card spacing, and clearer support links, while retaining the recovery and diagnostic-export improvements from 1.7.8. Damage taken, healing, and mana counter changes remain deferred. New MOD gameplay and all multiplayer combinations have not been fully tested.
 
@@ -87,7 +90,7 @@ The pinned 7-Zip runtime and its license are included so source-mode archive ins
 
 The temporary BepInEx probe has separate instructions in [`game_plugins/LC2DamageProbe/README.zh-CN.md`](game_plugins/LC2DamageProbe/README.zh-CN.md). It is research instrumentation, not the final HUD bridge.
 
-The current v1.7.6 catalog contains Soul Stone Trainer 1.2 by community author **恨你不见**, Gold Editor 1.0 by **刺心**, and 60 curated community MOD entries. It adds Lightning and Thunder Enhancement 1.0.1 by **脆毛肚**, and updates LC2 Enhancement Plan to 5.0.0 by **茶橘柚、空容、刺心、木亦**, Monster Treasure to 11.7 by **懒虫桑**, Reaper Summon to 2.6 and Thunder Hammer: Angry Thunder Spirit to 1.5.1 by **兔子王お**, and Bobo Staff to 1.9.6 by **啊 这**. The other six DLLs in the Summon Master 2.6 source are byte-identical to 2.5 and only migrate provenance. The older Reinforcement Transmitter: Lost Swordsman Shadow remains because it has a distinct plugin GUID. Superseded MonsterPlus and Summon Master 2.4/2.5 inputs are not duplicated. Max Players 1.3.0 still ships only its 15,872-byte plugin. All entries share the pinned runtime and total 61 hash-bound functional files (3,665,869 bytes); generated config, cache, interop, Doorstop, source-package contact details, and duplicate core files are excluded. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The current 1.9.0 source catalog contains the two original tools and 84 curated community MOD entries: 12 additions and 8 upgrades, with 90 functional payload files totaling 5,162,445 bytes. Functional categories, search and installation filters share a background status scan. Generated config, cache, interop, Doorstop, source-package contact details and duplicate core files are excluded. Original authors and exact identities remain in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and the catalogs.
 
 The bottom-left footer links to GitHub and the maintainer's [Bilibili space](https://space.bilibili.com/88048665?), followed by a `投喂` entry that shows the WeChat code by default and opens the local WeChat, Alipay, and explanation folder for friends who enjoy *Lost Castle 2* and want to support the maintainer or nudge an update.
 
@@ -97,6 +100,7 @@ The bottom-left footer links to GitHub and the maintainer's [Bilibili space](htt
 - Macros send only user-configured input while `LostCastle2.exe` is foreground, and stop on focus loss or `Ctrl + Shift + F12`.
 - The research probe observes resolved combat state. It does not modify damage, drops, saves, or network state.
 - Third-party tools do not inherit that read-only guarantee; the toolbox verifies pinned files and performs only the registered managed copy, install, uninstall, or explicit launch action.
+- Team and loadout snapshots stay local. Confirmed loadout actions alter the current local character in camp; gems use the game's own save path. These actions are separate from the read-only combat bridge.
 - Game binaries, generated interop assemblies, logs, screenshots, local configuration, and packaged builds are intentionally excluded from Git.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`CONTRIBUTING.md`](CONTRIBUTING.md), and [`SECURITY.md`](SECURITY.md).

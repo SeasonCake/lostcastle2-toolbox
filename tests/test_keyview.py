@@ -304,9 +304,9 @@ class KeyViewTests(unittest.TestCase):
             "verify_packaged_runtime.py --package $packageRoot",
             build_source,
         )
-        self.assertIn('"失落城堡2工具箱1.8.0-诊断候选-r$CandidateRevision"', build_source)
+        self.assertIn('"失落城堡2工具箱1.9.0-诊断候选-r$CandidateRevision"', build_source)
         self.assertIn("[int]$CandidateRevision = 1", build_source)
-        self.assertIn("失落城堡2工具箱1.8.0-实时数值监测+一键MOD安装", build_source)
+        self.assertIn("失落城堡2工具箱1.9.0-实时数值监测+一键MOD安装", build_source)
 
     def test_app_window_uses_the_packaged_toolbox_icon(self) -> None:
         root = mock.Mock()
@@ -880,7 +880,7 @@ class KeyViewTests(unittest.TestCase):
             self.assertEqual(loaded["color_preset"], keyview.DEFAULT_COLOR_PRESET)
             self.assertEqual(loaded["ui_scale"], 1.8)
             self.assertEqual(loaded["input_display_mode"], "keyboard")
-            self.assertEqual(loaded["toolbox_ui_scale"], 1.15)
+            self.assertEqual(loaded["toolbox_ui_scale"], 1.8)
             self.assertEqual(loaded["hud_ui_scale"], 0.85)
 
     def test_toolbox_window_size_is_bounded(self) -> None:

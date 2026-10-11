@@ -6,6 +6,8 @@ from ctypes import wintypes
 from dataclasses import dataclass
 import hashlib
 import json
+import queue
+import threading
 import os
 from pathlib import Path
 import random
@@ -44,6 +46,7 @@ from toolbox.runtime_setup import (
     RuntimeSetupGameRunning,
     RuntimeSetupManager,
 )
+from toolbox.game_features import GameFeatureService, DemoGameFeatureService
 from toolbox.user_mod_registry import UserModRegistry
 from toolbox.support_diagnostics import SupportDiagnostics
 from toolbox.windows_input import WindowsInputError, WindowsSendInputBackend, send_hotkey
@@ -56,11 +59,13 @@ from toolbox.windows_windowing import (
     start_ui_message_timer,
     stop_ui_message_timer,
     tk_geometry,
+    window_dpi,
+    tk_window_is_visible,
 )
 
 
 APP_NAME = "失落城堡2工具箱"
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 APP_USER_MODEL_ID = "SeasonCake.LostCastle2Toolbox"
 STEAM_APP_ID = "2445690"
 DEFAULT_GAME_EXE = Path(
@@ -800,6 +805,12 @@ def enable_dpi_awareness() -> None:
             ctypes.windll.shcore.SetProcessDpiAwareness(2)
         except Exception:
             user32.SetProcessDPIAware()
+    try:
+        user32.SetThreadDpiAwarenessContext.argtypes = (ctypes.c_void_p,)
+        user32.SetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+        user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))
+    except (AttributeError, OSError):
+        pass
 
 
 def hwnd_is_above(
@@ -931,7 +942,7 @@ def load_settings(path: Path = CONFIG_FILE) -> dict[str, Any]:
     defaults["toolbox_width"] = min(1400, max(780, toolbox_width))
     defaults["toolbox_height"] = min(1000, max(560, toolbox_height))
     defaults["toolbox_ui_scale"] = bounded_float(
-        "toolbox_ui_scale", DEFAULT_TOOLBOX_UI_SCALE, 0.9, 1.15
+        "toolbox_ui_scale", DEFAULT_TOOLBOX_UI_SCALE, 0.9, 1.8
     )
     defaults["hud_ui_scale"] = bounded_float("hud_ui_scale", 1.0, 0.85, 1.25)
     defaults["show_background"] = bool(defaults.get("show_background", True))
@@ -999,6 +1010,35 @@ def _png_dimensions(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", header[16:24])
 
 
+def _image_dimensions(path: Path) -> tuple[int, int]:
+    data = path.read_bytes()
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return _png_dimensions(path)
+    if not data.startswith(b"\xff\xd8") or len(data) > 32 * 1024 * 1024:
+        raise ValueError("QA screenshot must contain PNG or JPEG image data.")
+    position = 2
+    while position + 4 <= len(data):
+        if data[position] != 0xff:
+            break
+        while position < len(data) and data[position] == 0xff:
+            position += 1
+        if position >= len(data):
+            break
+        marker = data[position]
+        position += 1
+        if marker in (0xd8, 0xd9) or 0xd0 <= marker <= 0xd7:
+            continue
+        length = int.from_bytes(data[position:position+2], "big")
+        if length < 2 or position + length > len(data):
+            break
+        if marker in (0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf) and length >= 7:
+            height, width = struct.unpack(">HH", data[position+3:position+7])
+            if width and height:
+                return width, height
+        position += length
+    raise ValueError("QA JPEG screenshot has no valid size record.")
+
+
 def _top_level_window_rect(window: tk.Misc) -> tuple[int, int, int, int, int]:
     client_hwnd = int(window.winfo_id())
     hwnd = int(user32.GetAncestor(client_hwnd, 2) or client_hwnd)
@@ -1062,7 +1102,18 @@ def _widget_receipt(
     window_left: int,
     window_top: int,
 ) -> dict[str, object]:
-    font = tkfont.Font(root=widget, font=widget.cget("font"))
+    try:
+        font_value = widget.cget("font")
+    except tk.TclError:
+        font_value = ""
+    if not font_value:
+        from tkinter import ttk
+        font_value = ttk.Style(widget).lookup(widget.cget("style") or widget.winfo_class(), "font") or "TkDefaultFont"
+    font = tkfont.Font(root=widget, font=font_value)
+    try:
+        text = str(widget.cget("text"))
+    except tk.TclError:
+        text = "\n".join(map(str, widget.get(0, "end"))) if isinstance(widget, tk.Listbox) else ""
     x = widget.winfo_rootx() - window_left
     y = widget.winfo_rooty() - window_top
     width = widget.winfo_width()
@@ -1071,7 +1122,7 @@ def _widget_receipt(
     requested_height = widget.winfo_reqheight()
     measured_text_width = _measure_multiline_text_width(
         font,
-        widget.cget("text"),
+        text,
     )
     unwrapped_text_width = measured_text_width
     try:
@@ -1108,7 +1159,7 @@ def _widget_receipt(
         "requested_height": requested_height,
         "measured_text_width": measured_text_width,
         "font_linespace": font_linespace,
-        "text": str(widget.cget("text")),
+        "text": text,
     }
 
 
@@ -1126,11 +1177,28 @@ def write_qa_ui_receipt(
     )
     write_qa_progress_marker(receipt_path, "window_measured")
     screenshot = screenshot_path.resolve()
-    width, height = _png_dimensions(screenshot)
+    width, height = _image_dimensions(screenshot)
+    visible_frame = None
+    try:
+        rect = wintypes.RECT()
+        query_frame = ctypes.windll.dwmapi.DwmGetWindowAttribute
+        query_frame.argtypes = (wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD)
+        query_frame.restype = ctypes.c_long
+        if query_frame(hwnd, 9, ctypes.byref(rect), ctypes.sizeof(rect)) == 0:
+            visible_frame = {
+                "x": rect.left, "y": rect.top,
+                "width": rect.right - rect.left, "height": rect.bottom - rect.top,
+            }
+    except (AttributeError, OSError):
+        pass
     candidate_files = (
         Path(sys.executable).resolve(),
         Path(__file__).resolve(),
         (RESOURCE_DIR / "toolbox" / "app_shell.py").resolve(),
+        (RESOURCE_DIR / "toolbox" / "feature_ui.py").resolve(),
+        (RESOURCE_DIR / "toolbox" / "windows_windowing.py").resolve(),
+        (RESOURCE_DIR / "toolbox" / "team_mini_ui.py").resolve(),
+        (RESOURCE_DIR / "toolbox" / "ui_theme.py").resolve(),
         (RESOURCE_DIR / "assets" / "keyview.ico").resolve(),
         (RESOURCE_DIR / "assets" / "community_mod_catalog.json").resolve(),
         (RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json").resolve(),
@@ -1182,8 +1250,15 @@ def write_qa_ui_receipt(
         },
         "window": {
             "title": str(window.wm_title()),
+            "x": window_left,
+            "y": window_top,
             "width": window_width,
             "height": window_height,
+            "client_width": window.winfo_width(),
+            "client_height": window.winfo_height(),
+            "dpi": window_dpi(window),
+            "tk_scaling": float(window.tk.call("tk", "scaling")),
+            "visible_frame_physical": visible_frame,
             "icon_handles": icon_handles,
         },
         "screenshot": {
@@ -1192,6 +1267,11 @@ def write_qa_ui_receipt(
             "sha256": _file_sha256(screenshot),
             "width": width,
             "height": height,
+            "format": "PNG" if screenshot.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n" else "JPEG",
+            "physical_pixels_per_image_pixel": (
+                {"x": visible_frame["width"] / width, "y": visible_frame["height"] / height}
+                if visible_frame is not None else None
+            ),
         },
         "labels": label_receipts,
     }
@@ -1718,7 +1798,7 @@ class KeyViewApp:
         self._save_current_settings()
 
     def set_toolbox_ui_scale(self, value: float) -> None:
-        self.toolbox_ui_scale = min(1.15, max(0.9, float(value)))
+        self.toolbox_ui_scale = min(1.8, max(0.9, float(value)))
         self.settings["toolbox_ui_scale"] = self.toolbox_ui_scale
         self._save_current_settings()
 
@@ -3100,12 +3180,13 @@ def parse_window_size(value: str) -> tuple[int, int]:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=APP_NAME)
     parser.add_argument("--demo", action="store_true", help="循环演示按键高亮")
+    parser.add_argument("--demo-features", action="store_true", help="演示队伍与配装样例，不连接或修改游戏")
     parser.add_argument("--show-settings", action="store_true", help="启动后打开设置")
     parser.add_argument("--show-macros", action="store_true", help="启动后打开宏设置")
     parser.add_argument("--show-keyboard", action="store_true", help="启动后同时显示按键悬浮窗")
     parser.add_argument(
         "--show-page",
-        choices=("home", "combat", "keyboard", "macro", "mods", "settings"),
+        choices=("home", "team", "enhancement", "loadout", "combat", "keyboard", "macro", "mods", "settings"),
         default="home",
         help="开发验证：主窗口直接打开指定页面",
     )
@@ -3179,7 +3260,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--qa-ui-screenshot", type=Path, help=argparse.SUPPRESS)
     parser.add_argument(
         "--qa-ui-window",
-        choices=("main", "hud", "keyboard"),
+        choices=("main", "hud", "keyboard", "team-mini"),
         default="main",
         help=argparse.SUPPRESS,
     )
@@ -3336,6 +3417,7 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
             keyboard_app.settings.get("game_path")
         ),
         source_overrides=user_mod_sources,
+        game_running_provider=is_exact_game_process_running,
     )
     runtime_setup = RuntimeSetupManager(
         RESOURCE_DIR / "assets" / "lc2_runtime_manifest.json",
@@ -3348,7 +3430,11 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
     )
 
     def ensure_game_runtime() -> bool:
-        status = runtime_setup.status()
+        try:
+            status = runtime_setup.status()
+        except (RuntimeSetupError, OSError) as error:
+            messagebox.showerror(APP_NAME, f"暂时无法核对运行环境。\n\n{error}", parent=root)
+            return False
         support_exporter.record_event("runtime_status", state=status.state, detail=status.detail)
         if status.ready:
             return True
@@ -3359,28 +3445,66 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
                 parent=root,
             )
             return False
-        if status.state == "conflict":
-            messagebox.showerror(
-                APP_NAME,
-                f"检测到不同的现有 BepInEx 运行环境，盒子没有覆盖。\n\n{status.detail}\n\n可点击右上角“导出诊断”，将诊断包私发维护者。",
-                parent=root,
-            )
-            return False
+        game_exe = runtime_setup._game_exe()
+        replace_existing = runtime_setup.needs_framework_update()
+        component_update = status.state in {"bridge_update", "features_update", "needs_configuration"}
+        setup_title = "更新运行环境" if replace_existing else "更新工具箱组件" if component_update else "首次初始化"
+        setup_message = (
+            "将已有 BepInEx 更新为工具箱配套版本。\n\n"
+            "会备份原运行库，保留你安装的 MOD、补丁和配置；"
+            "旧兼容缓存会在下次启动时重新生成。更新失败会恢复原文件。\n\n"
+            "请先完全关闭游戏。是否现在更新？"
+        ) if replace_existing else (
+            "将更新工具箱的战斗与配装组件，保留现有 MOD 和配置。\n\n"
+            "配装助手默认可查看，更换装备仍需手动确认；队伍状态默认关闭。\n\n"
+            "请先完全关闭游戏。是否现在更新？"
+        ) if component_update else (
+            "战斗 HUD 和 DLL MOD 需要先初始化游戏运行环境。\n\n"
+            "盒子会安装配套 BepInEx、战斗 HUD Bridge 和工具箱功能组件。"
+            "配装助手默认可查看，更换装备仍需手动确认；"
+            "不会自动安装或启用任何社区 MOD，也会默认关闭调试控制台。\n\n"
+            "是否现在一键初始化？"
+        )
         if not messagebox.askyesno(
-            "首次初始化",
-            (
-                "战斗 HUD 和 DLL MOD 需要先初始化游戏运行环境。\n\n"
-                "盒子只会安装已验证的 BepInEx 与只读战斗 HUD Bridge，"
-                "不会自动安装或启用任何社区 MOD，也会默认关闭调试控制台。\n\n"
-                "是否现在一键初始化？"
-            ),
+            setup_title,
+            setup_message,
             parent=root,
         ):
             support_exporter.record_event("runtime_initialization_cancelled")
             return False
         try:
             support_exporter.record_event("runtime_initialization_begin")
-            runtime_setup.install()
+            setup_results: queue.Queue[Exception | None] = queue.Queue()
+            progress = tk.Toplevel(root)
+            progress.title(setup_title)
+            progress.transient(root)
+            progress.resizable(False, False)
+            progress.protocol("WM_DELETE_WINDOW", lambda: None)
+            tk.Label(progress, text="正在更新，请稍候…", font=("Microsoft YaHei UI", 12, "bold"), padx=24, pady=14).pack()
+            tk.Label(progress, text="正在备份与核对文件，请保持游戏关闭。", font=("Microsoft YaHei UI", 9), padx=24, pady=8).pack()
+            ttk.Progressbar(progress, mode="indeterminate", length=300).pack(padx=24, pady=(4, 18))
+            progress.winfo_children()[-1].start(12)
+            progress.grab_set()
+            finished = tk.BooleanVar(root, value=False)
+            def install_runtime_worker() -> None:
+                try:
+                    runtime_setup.install(replace_existing=replace_existing)
+                except Exception as error:
+                    setup_results.put(error)
+                else:
+                    setup_results.put(None)
+            def poll_runtime_result() -> None:
+                if not setup_results.empty():
+                    finished.set(True)
+                else:
+                    root.after(100, poll_runtime_result)
+            threading.Thread(target=install_runtime_worker, name="LC2RuntimeUpdate", daemon=True).start()
+            root.after(100, poll_runtime_result)
+            root.wait_variable(finished)
+            progress.destroy()
+            setup_error = setup_results.get_nowait()
+            if setup_error is not None:
+                raise setup_error
         except RuntimeSetupGameRunning as error:
             support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
             messagebox.showerror(APP_NAME, str(error), parent=root)
@@ -3389,7 +3513,7 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
             support_exporter.record_event("runtime_initialization_failed", error_type=type(error).__name__, message=str(error))
             messagebox.showerror(
                 APP_NAME,
-                f"检测到不同的现有运行环境，盒子没有覆盖。\n\n{error}",
+                f"运行环境暂时无法更新。\n\n{error}",
                 parent=root,
             )
             return False
@@ -3533,6 +3657,8 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
         app_version=(f"{APP_VERSION}-r{build_profile.candidate_revision} 内测"
                      if build_profile.candidate_revision is not None else APP_VERSION),
         persist_window_geometry=args.window_size is None,
+        game_features=DemoGameFeatureService() if args.demo and args.demo_features else GameFeatureService(lambda: resolve_game_exe(keyboard_app.settings.get("game_path"))),
+        display_dpi_override=round(args.tk_scaling*72) if args.tk_scaling is not None else None,
     )
     if combat_pump is not None:
         combat_pump.start()
@@ -3573,6 +3699,8 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
         qa_state = {"attempts": 0}
 
         def selected_qa_window() -> tk.Misc | None:
+            if args.qa_ui_window == "team-mini":
+                return shell.team_mini.window
             if args.qa_ui_window == "hud":
                 return shell.hud.window
             if args.qa_ui_window == "keyboard":
@@ -3584,7 +3712,7 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
                 return False
             if args.qa_ui_window == "keyboard":
                 return keyboard_app.is_visible_on_desktop()
-            return bool(window.winfo_viewable())
+            return tk_window_is_visible(window)
 
         def emit_qa_ui_receipt_when_captured() -> None:
             if qa_started_ns is None:
@@ -3592,7 +3720,10 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
             qa_state["attempts"] = int(qa_state["attempts"] or 0) + 1
             window = selected_qa_window()
             labels: dict[str, tk.Misc]
-            if args.qa_ui_window == "hud":
+            if args.qa_ui_window == "team-mini":
+                mini = shell.team_mini
+                labels = {key: getattr(mini, key) for key in ("status", "members", "vitals", "resources", "inventory", "item_detail", "enable_button", "lock_button")}
+            elif args.qa_ui_window == "hud":
                 labels = dict(shell.hud.labels)
                 for index, row in enumerate(shell.hud.teammate_labels, start=1):
                     name, damage, share, boss = row
@@ -3608,6 +3739,8 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
                 labels = {}
             else:
                 labels = dict(shell.labels)
+                if shell.feature_pages is not None:
+                    labels.update(shell.feature_pages.qa_widgets())
                 labels.update(
                     {
                         f"mod_{name}": widget
@@ -3673,7 +3806,7 @@ def main(argv: list[str] | None = None, *, support_exporter: SupportDiagnostics 
                     except OSError:
                         pass
                     return
-            if qa_state["attempts"] < 80:
+            if qa_state["attempts"] < 480:
                 root.after(250, emit_qa_ui_receipt_when_captured)
 
         def begin_qa_capture() -> None:

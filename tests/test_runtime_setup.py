@@ -4,8 +4,11 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+import os
+import subprocess
 import unittest
 import zipfile
+from unittest.mock import patch
 
 from toolbox.runtime_setup import (
     RuntimeSetupConflict,
@@ -37,6 +40,7 @@ def runtime_fixture(root: Path, *, include_config: bool = True) -> tuple[Path, P
         "BepInEx/core/BepInEx.Core.dll": b"core",
         "BepInEx/core/BepInEx.Unity.IL2CPP.dll": b"il2cpp",
         "BepInEx/unity-libs/6000.3.16.zip": b"unity libs",
+        "BepInEx/unity-libs/UnityEngine.CoreModule.dll": b"unity library seed",
         "dotnet/coreclr.dll": b"core clr",
         "winhttp.dll": b"doorstop",
     }
@@ -79,6 +83,156 @@ def runtime_fixture(root: Path, *, include_config: bool = True) -> tuple[Path, P
 
 
 class RuntimeSetupTests(unittest.TestCase):
+    def test_startup_unstripped_unity_dlls_are_preserved_without_framework_update_loop(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game)
+            self.assertTrue(manager.install().ready)
+            generated = game.parent / "BepInEx/unity-libs/UnityEngine.CoreModule.dll"
+            generated.write_bytes(b"BepInEx startup unstripped library")
+            self.assertTrue(manager.status().ready)
+            self.assertFalse(manager.needs_framework_update())
+            self.assertTrue(manager.install().ready)
+            self.assertEqual(generated.read_bytes(), b"BepInEx startup unstripped library")
+            core = game.parent / "BepInEx/core/BepInEx.Core.dll"
+            core.write_bytes(b"different framework core")
+            self.assertTrue(manager.needs_framework_update())
+            with self.assertRaises(RuntimeSetupConflict):
+                manager.install()
+            self.assertEqual(generated.read_bytes(), b"BepInEx startup unstripped library")
+    def test_feature_component_is_prevalidated_and_installed_independently(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root)
+            data = b"project-owned feature fixture"
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload["features"] = {"filename": "LC2ToolboxFeatures.dll", "target": "BepInEx/plugins/LC2ToolboxFeatures/LC2ToolboxFeatures.dll", "size_bytes": len(data), "sha256": sha256(data)}
+            manifest.write_text(json.dumps(payload), encoding="utf-8")
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game)
+            for source in (None, b"wrong feature bytes"):
+                if source is not None:
+                    (bundle / "LC2ToolboxFeatures.dll").write_bytes(source)
+                with self.assertRaises(RuntimeSetupError):
+                    manager.install()
+                self.assertEqual(list(game.parent.iterdir()), [game])
+            (bundle / "LC2ToolboxFeatures.dll").write_bytes(data)
+            self.assertTrue(manager.install().ready)
+            target = game.parent / payload["features"]["target"]
+            self.assertEqual(target.read_bytes(), data)
+            target.write_bytes(b"old component")
+            self.assertEqual(manager.status().state, "features_update")
+            self.assertFalse(manager.needs_framework_update())
+            self.assertTrue(manager.install().ready)
+            self.assertEqual(target.read_bytes(), data)
+
+    def test_selected_runtime_update_preserves_plugins_and_custom_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, files = runtime_fixture(root)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            originals = {
+                "BepInEx/core/BepInEx.Core.dll": b"other core",
+                "BepInEx/core/old-loader.dll": b"obsolete loader",
+                "BepInEx/interop/old-game.dll": b"generated old interop",
+                "BepInEx/cache/old.cache": b"generated old cache",
+                "dotnet/old-runtime.dll": b"old clr",
+                "BepInEx/config/BepInEx.cfg": b"[Logging.Console]\nEnabled = true\n\n[IL2CPP]\nCustom = keep\n",
+                "BepInEx/plugins/own/keep.dll": b"user plugin",
+                "BepInEx/config/own.cfg": b"user configuration",
+                "BepInEx/patchers/custom.dll": b"user patcher",
+            }
+            for relative, content in originals.items():
+                target = game.parent / relative
+                target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(content)
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game, backup_root=root / "backups")
+            self.assertTrue(manager.install(replace_existing=True).ready)
+            for relative, content in files.items():
+                if relative != "BepInEx/config/BepInEx.cfg":
+                    self.assertEqual((game.parent / relative).read_bytes(), content)
+            for relative in ("BepInEx/core/old-loader.dll", "BepInEx/interop/old-game.dll", "BepInEx/cache/old.cache", "dotnet/old-runtime.dll"):
+                self.assertFalse((game.parent / relative).exists())
+                self.assertEqual((manager.last_backup_path / "original" / relative).read_bytes(), originals[relative])
+            for relative in ("BepInEx/plugins/own/keep.dll", "BepInEx/config/own.cfg", "BepInEx/patchers/custom.dll"):
+                self.assertEqual((game.parent / relative).read_bytes(), originals[relative])
+            config = (game.parent / "BepInEx/config/BepInEx.cfg").read_text(encoding="utf-8")
+            self.assertIn("Custom = keep", config)
+            self.assertFalse(console_is_enabled(config))
+            receipt = json.loads((manager.last_backup_path / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(receipt["state"], "complete")
+
+    def test_runtime_update_write_failure_restores_exact_originals(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            old = game.parent / "BepInEx/core/BepInEx.Core.dll"
+            old.parent.mkdir(parents=True); old.write_bytes(b"other core")
+            stale = old.parent / "obsolete.dll"; stale.write_bytes(b"old loader")
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game, backup_root=root / "backups")
+            writer = manager._write_atomic
+            failed = False
+            def fail_once(target: Path, content: bytes) -> None:
+                nonlocal failed
+                if target.name == "winhttp.dll" and not failed:
+                    failed = True
+                    raise OSError("simulated permission failure")
+                writer(target, content)
+            with patch.object(manager, "_write_atomic", side_effect=fail_once):
+                with self.assertRaisesRegex(RuntimeSetupError, "已恢复原文件"):
+                    manager.install(replace_existing=True)
+            self.assertEqual(old.read_bytes(), b"other core")
+            self.assertEqual(stale.read_bytes(), b"old loader")
+            self.assertFalse((game.parent / "winhttp.dll").exists())
+            self.assertFalse((game.parent / ".doorstop_version").exists())
+            receipt = json.loads((manager.last_backup_path / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(receipt["state"], "rolled_back")
+
+    def test_runtime_update_requires_two_stopped_observations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            observations = iter((False, True))
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game, game_running_provider=lambda _path: next(observations))
+            with self.assertRaises(RuntimeSetupGameRunning):
+                manager.install(replace_existing=True)
+            self.assertEqual(list(game.parent.iterdir()), [game])
+
+    def test_runtime_update_rejects_linked_core_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest, bundle, _ = runtime_fixture(root)
+            game = root / "game/LostCastle2.exe"
+            game.parent.mkdir(); game.write_bytes(b"game")
+            outside = root / "outside"; outside.mkdir()
+            untouched = outside / "keep.dll"; untouched.write_bytes(b"keep")
+            bepinex = game.parent / "BepInEx"; bepinex.mkdir()
+            try:
+                (bepinex / "core").symlink_to(outside, target_is_directory=True)
+            except OSError:
+                if os.name != "nt":
+                    self.skipTest("Directory links unavailable in this host")
+                link_path = str(bepinex / "core").replace("'", "''")
+                target_path = str(outside).replace("'", "''")
+                result = subprocess.run([
+                    "C:/Program Files/PowerShell/7/pwsh.exe", "-NoProfile", "-NonInteractive", "-Command",
+                    f"New-Item -ItemType Junction -Path '{link_path}' -Target '{target_path}' | Out-Null",
+                ], capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
+            manager = RuntimeSetupManager(manifest, bundle, lambda: game)
+            with self.assertRaises(RuntimeSetupConflict):
+                manager.install(replace_existing=True)
+            self.assertEqual(untouched.read_bytes(), b"keep")
+            self.assertFalse((game.parent / "winhttp.dll").exists())
+
     def test_invalid_generated_configuration_is_rejected_without_writes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

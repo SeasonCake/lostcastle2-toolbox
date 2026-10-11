@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "runtime_version": "BepInEx 6.0.0-be.785 + LC2CombatBridge 1.7.4",
+  "runtime_version": "BepInEx 6.0.0-be.785 + LC2CombatBridge 1.7.4 + LC2ToolboxFeatures 1.9.0",
   "source_identity": {
     "kind": "validated_game_runtime",
     "file_count": 307,
@@ -1571,5 +1571,14 @@
     "BepInEx/interop/"
   ],
   "runtime_file_count": 307,
-  "runtime_uncompressed_bytes": 87570584
+  "runtime_uncompressed_bytes": 87570584,
+  "features": {
+    "filename": "LC2ToolboxFeatures.dll",
+    "target": "BepInEx/plugins/LC2ToolboxFeatures/LC2ToolboxFeatures.dll",
+    "size_bytes": 44032,
+    "sha256": "201F270836632D3AD0481CFCF62B5D2FF471BBA70C3D7736AAAFE786BE909473",
+    "team_enabled_default": false,
+    "loadout_viewing_default": true,
+    "gameplay_changes": "manual_camp_requests_only"
+  }
 }

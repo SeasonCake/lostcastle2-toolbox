@@ -6,7 +6,7 @@ This notice applies to the publicly distributable `public-core` asset. Third-par
 
 The public-core asset does **not** contain the Soul Stone Trainer, Gold Editor, or any of the curated community MOD DLL/resource payloads. Their catalog metadata remains available so a user who obtained an original package independently can select an exact matching file or extracted directory; size and SHA-256 validation still fail closed. Catalog presence, author attribution, a community upload, or local testing does not assert redistribution permission.
 
-The local maintainer test package is a separate non-public artifact and must not be uploaded to GitHub or sent to a QQ group.
+The diagnostic maintainer test package is a separate private verification artifact. An author-selected community distribution package is also separate from public-core and must not be uploaded as the GitHub public-core asset.
 
 ## 7-Zip command-line components
 
@@ -34,3 +34,7 @@ The public-core bundle uses the official BepInEx ZIP bytes, not the older 307-fi
 ## LC2 Combat Bridge
 
 LC2 Combat Bridge is part of this repository and is distributed under the repository MIT License. It is packaged separately from BepInEx and installed only into its dedicated plugin directory.
+
+## LC2 Toolbox Features
+
+LC2ToolboxFeatures 1.9.0 is independently implemented in this repository under its MIT License. It supplies local team/backpack views and manually requested camp loadout changes. Community test modules informed the product direction; their implementations are not bundled as this component. LC2 Enhancement Plan remains a distinct third-party catalog entry with its original attribution and is not bundled in public-core.

@@ -38,6 +38,10 @@ class ModSourceRequired(ModManagerError):
     """Raised when a catalog entry has no redistributable bundled source."""
 
 
+class ModGameRunning(ModManagerError):
+    """Raised when the selected game is running or its stopped state is unknown."""
+
+
 class ModIntegrityError(ModManagerError):
     """Raised when a selected or installed file differs from the catalog."""
 
@@ -219,6 +223,7 @@ class ModCatalog:
         superseded_files = ModCatalog._parse_file_specs(
             operation_raw.get("superseded_files"),
             "operation.superseded_files",
+            allow_path_versions=True,
         )
         provides = ModCatalog._parse_string_list(
             operation_raw.get("provides", []), "operation.provides"
@@ -350,13 +355,15 @@ class ModCatalog:
         )
 
     @staticmethod
-    def _parse_file_specs(raw: Any, section: str) -> tuple[ModFileSpec, ...]:
+    def _parse_file_specs(
+        raw: Any, section: str, *, allow_path_versions: bool = False
+    ) -> tuple[ModFileSpec, ...]:
         if raw is None:
             return ()
         if not isinstance(raw, list) or not raw:
             raise ModManagerError(f"MOD {section} must be a non-empty array.")
         specs: list[ModFileSpec] = []
-        paths: set[str] = set()
+        identities: set[tuple[str, str]] = set()
         for item in raw:
             if not isinstance(item, dict):
                 raise ModManagerError(f"MOD {section} entries must be objects.")
@@ -370,9 +377,10 @@ class ModCatalog:
                 raise ModManagerError("Invalid MOD payload SHA-256.")
             if type(size_bytes) is not int or size_bytes <= 0:
                 raise ModManagerError("Invalid MOD payload size.")
-            if path.casefold() in paths:
-                raise ModManagerError(f"Duplicate MOD payload path in {section}.")
-            paths.add(path.casefold())
+            identity = (path.casefold(), sha256 if allow_path_versions else "")
+            if identity in identities:
+                raise ModManagerError(f"Duplicate MOD payload identity in {section}.")
+            identities.add(identity)
             specs.append(ModFileSpec(path, sha256, size_bytes))
         return tuple(specs)
 
@@ -476,11 +484,13 @@ class ModManager:
         bundled_root: Path,
         game_exe_provider: Callable[[], Path | None] | None = None,
         source_overrides: dict[str, Path] | None = None,
+        game_running_provider: Callable[[Path], bool] | None = None,
     ) -> None:
         self.catalog = catalog
         self.managed_root = managed_root.resolve()
         self.bundled_root = bundled_root.resolve()
         self.game_exe_provider = game_exe_provider
+        self.game_running_provider = game_running_provider
         self._source_overrides = {
             mod_id: path.resolve()
             for mod_id, path in (source_overrides or {}).items()
@@ -489,6 +499,17 @@ class ModManager:
 
     def descriptor(self, mod_id: str) -> ModDescriptor:
         return self.catalog.get(mod_id)
+
+    def status_reader(self, game_exe: Path | None) -> ModManager:
+        """Freeze catalog, sources and game path for a background status scan."""
+        reader = ModManager(
+            self.catalog, self.managed_root, self.bundled_root,
+            game_exe_provider=lambda: game_exe,
+            source_overrides=self._source_overrides.copy(),
+            game_running_provider=self.game_running_provider,
+        )
+        reader._hash_cache = self._hash_cache.copy()
+        return reader
 
     def add_descriptor(self, descriptor: ModDescriptor, source: Path) -> None:
         if any(entry.mod_id == descriptor.mod_id for entry in self.catalog.entries):
@@ -587,6 +608,7 @@ class ModManager:
 
     def install(self, mod_id: str, source_path: Path | None = None) -> Path:
         descriptor = self.descriptor(mod_id)
+        self._ensure_game_stopped(descriptor)
         conflicts = self.installed_conflicts(mod_id)
         if conflicts:
             raise ModConflictError(conflicts)
@@ -601,6 +623,7 @@ class ModManager:
             self._remove_exact_superseded_files(descriptor)
             return target
         self._validate_write_targets(descriptor)
+        self._ensure_game_stopped(descriptor)
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + ".installing")
         try:
@@ -643,14 +666,23 @@ class ModManager:
     def uninstall(self, mod_id: str) -> bool:
         descriptor = self.descriptor(mod_id)
         directory = self._installed_directory(descriptor)
+        self._ensure_game_stopped(descriptor)
         specs = self._file_specs(descriptor)
         targets = [self._join_relative(directory, spec.path) for spec in specs]
         removed = False
-        for target in targets:
+        for target, spec in zip(targets, specs, strict=True):
             if not target.exists():
                 continue
             if not target.is_file():
                 raise ModManagerError("Managed MOD target is not a removable file.")
+            if descriptor.operation.kind == "bepinex_plugin":
+                if target.is_symlink() or getattr(target, "is_junction", lambda: False)():
+                    continue
+                identities = tuple(s for s in specs + descriptor.operation.superseded_files if s.path.casefold() == spec.path.casefold())
+                size = target.stat().st_size
+                digest = self._sha256(target, use_cache=False)
+                if not any(s.size_bytes == size and s.sha256 == digest for s in identities):
+                    continue
             target.unlink()
             removed = True
             self._hash_cache.pop(target, None)
@@ -688,6 +720,7 @@ class ModManager:
         directory = self._installed_directory(descriptor)
         specs = self._file_specs(descriptor)
         self._validate_write_targets(descriptor)
+        self._ensure_game_stopped(descriptor)
         for spec in specs:
             target = self._join_relative(directory, spec.path).resolve()
             self._ensure_contained(target, directory)
@@ -705,6 +738,20 @@ class ModManager:
                     temporary.unlink()
         self._remove_exact_superseded_files(descriptor, directory=directory)
         return self.installed_path(descriptor.mod_id)
+
+    def _ensure_game_stopped(self, descriptor: ModDescriptor) -> None:
+        if descriptor.operation.kind != "bepinex_plugin" or self.game_running_provider is None:
+            return
+        game = self.game_exe_provider() if self.game_exe_provider is not None else None
+        if game is None:
+            raise ModGamePathRequired("请先定位 LostCastle2.exe。")
+        for _ in range(2):
+            try:
+                stopped = self.game_running_provider(game) is False
+            except Exception as error:
+                raise ModGameRunning("暂时无法确认游戏已退出，请退出游戏后重试。") from error
+            if not stopped:
+                raise ModGameRunning("请先退出失落城堡 2，再安装、更新或卸载 MOD。")
 
     def _validate_write_targets(self, descriptor: ModDescriptor) -> None:
         directory = self._installed_directory(descriptor)

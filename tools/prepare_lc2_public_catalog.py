@@ -99,21 +99,22 @@ def _validate_file_specs(operation: dict[str, Any], section: str) -> None:
     label = f"operation.{section}"
     if not isinstance(specs, list) or not specs:
         raise PublicCatalogError(f"{label} must be a non-empty array.")
-    paths: set[str] = set()
+    identities: set[tuple[str, str]] = set()
     for spec in specs:
         file_spec = _required_mapping(spec, f"{label} entry")
         path = file_spec.get("path")
         _validate_relative_identity(path, f"{label}.path")
         folded = str(path).replace("\\", "/").casefold()
-        if folded in paths:
-            raise PublicCatalogError(f"{label} paths must be unique.")
-        paths.add(folded)
         size_bytes = file_spec.get("size_bytes")
         if type(size_bytes) is not int or size_bytes <= 0:
             raise PublicCatalogError(f"{label} size_bytes must be a positive integer.")
         sha256 = file_spec.get("sha256")
         if not isinstance(sha256, str) or not SHA256_PATTERN.fullmatch(sha256):
             raise PublicCatalogError(f"{label} sha256 must contain 64 hexadecimal characters.")
+        identity = (folded, sha256.upper() if section == "superseded_files" else "")
+        if identity in identities:
+            raise PublicCatalogError(f"{label} file identities must be unique.")
+        identities.add(identity)
 
 
 def _reject_local_path_fields(value: Any, label: str = "catalog") -> None:

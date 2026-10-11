@@ -34,7 +34,7 @@ class SupportUiTests(unittest.TestCase):
                 root=None, _mod_busy=False, mod_manager=manager,
                 _choose_mod_source=lambda _descriptor: selected,
                 _record_support_event=lambda event, **details: journal.append((event, details)),
-                ensure_game_runtime=lambda: True, _refresh_mod_page=lambda: None,
+                ensure_game_runtime=lambda: True, _refresh_mod_page=lambda **_kwargs: None,
                 _finish_mod_action=lambda success, error: results.append((success, error)),
             )
             with patch("toolbox.app_shell.messagebox.askyesno", return_value=True), patch("toolbox.app_shell.threading.Thread", ImmediateThread):
@@ -57,7 +57,7 @@ class SupportUiTests(unittest.TestCase):
                 root=None, _mod_busy=False, mod_manager=manager,
                 _choose_mod_source=lambda _descriptor: selected,
                 _record_support_event=lambda event, **details: journal.append((event, details)),
-                ensure_game_runtime=lambda: True, _refresh_mod_page=lambda: None,
+                ensure_game_runtime=lambda: True, _refresh_mod_page=lambda **_kwargs: None,
                 _finish_mod_action=lambda success, error: results.append((success, error)),
             )
             with patch("toolbox.app_shell.messagebox.askyesno", return_value=True), patch("toolbox.app_shell.threading.Thread", ImmediateThread):

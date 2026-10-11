@@ -13,12 +13,12 @@ from toolbox.mod_manager import ModCatalog, ModConflictError, ModIntegrityError,
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = PROJECT_ROOT / 'assets/community_mod_catalog.json'
 SELECTED = {
-    'fire-dragon-enhancement': ('1.0.0', 2, '2FFD4F9F11CEEA67F48427FA89968FCDADD7FC8F30DEC85C1DFA6D72A73E6ACA'),
+    'fire-dragon-enhancement': ('2.1.0', 2, 'FB8B5A6EEB6BE9723679467A7ACBACC785083AF0912B58FBDFDFAA2D6692C141'),
     'tornado-greatsword': ('1.0.0', 1, '0322D96260F54203848B9C5E47631D9C2FB23BB760A257A98B79A1B0D1658296'),
     'fire-dragon-synthesis': ('1.1', 3, 'BB284B81B39B9AAC441B738189C1C9C80BEEEF263820A088A798857DD88DE318'),
-    'dual-blades-overhaul': ('1.0.0', 2, '04E32BF33DFD632EFEF6F3C55804C6AFA52DBFDD07A23C415769AFB76E432D23'),
+    'dual-blades-overhaul': ('1.1.0', 2, '4831575C70017601231CEAF53FF68957FDD30D4DEB596978DE2CF48279B7E520'),
     'icebound-wand-tuner': ('0.4.3', 1, '0BE8C4FF2595A1785CEE82825BC17AE0485BD07ECC09A0F479486D4F35A002F3'),
-    'unified-tools': ('1.0.0', 1, '9DB7675D86935E3033FBF014FC260D21DDC78D837C493F4F0DD256C9A869DA4C'),
+    'unified-tools': ('1.2（包版本）', 1, 'DB6192F7B82A19207C7F8091A1A617A462E9415D061D76576B990DBC6367D76C'),
     'master-craftsman-cannon': ('0.1.0', 1, '06213B8FEE7681380CF6D174B84BC67038424541D80A4F984B4E74E0AC6FD8C3'),
     'weapon-picker': ('1.2.6', 1, '0384C2B7725E82F1B18350FFAC808A7D56F2910696EFF9483F6A2BC66ACF4F1F'),
     'loot-combat-enhancement': ('2.8.0', 1, '4D6CA50762804119595B396C1C2017498501CCC22A4CBC44E7E7AB21BB09DB69'),
@@ -129,7 +129,7 @@ class CommunityModUpdateTests(unittest.TestCase):
                 guid = metadata[0].casefold()
                 self.assertNotIn(guid, by_guid, f'{entry.mod_id}/{spec.path} duplicates {by_guid.get(guid)}')
                 by_guid[guid] = f'{entry.mod_id}/{spec.path}'
-        self.assertEqual(len(by_guid), 77)
+        self.assertEqual(len(by_guid), 89)
 
 
 if __name__ == '__main__':
